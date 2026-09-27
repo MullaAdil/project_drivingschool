@@ -1,0 +1,246 @@
+/* ==========================================================================
+   TRAINEE DASHBOARD — PROGRESS-ORIENTED, BRIGHT & INTERACTIVE
+   Visual 20-day timeline (In-Street vs Highway), QR payment, Day 20 feedback
+   ========================================================================== */
+
+.trainee-hero-card {
+  background: #ffffff;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-xl);
+  padding: 1.75rem 2rem;
+  box-shadow: var(--shadow-tile);
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.trainee-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.trainee-badge-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-lg);
+  background: var(--primary-light);
+  color: var(--primary);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+.progress-track-wrapper {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 260px;
+}
+
+.progress-track-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-canvas-accent);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary-gradient);
+  border-radius: var(--radius-pill);
+  transition: width 0.4s ease;
+}
+
+/* Day simulation tester bar (allows switching between day 7, 14, and 20) */
+.day-tester-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-canvas);
+  border: 1px dashed var(--border-card);
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* 20-Day Visual Timeline */
+.timeline-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.category-filter-tags {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.timeline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.timeline-day-card {
+  background: #ffffff;
+  border: 1.5px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: 1.15rem;
+  box-shadow: var(--shadow-tile);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 160px;
+  position: relative;
+  transition: transform var(--transition-lift), box-shadow var(--transition-normal);
+}
+
+.timeline-day-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-tile-hover);
+}
+
+.timeline-day-card.completed {
+  border-color: #a7f3d0;
+  background: #fafdfc;
+}
+
+.timeline-day-card.today {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-glow), var(--shadow-tile);
+}
+
+.timeline-day-card.locked {
+  opacity: 0.7;
+  background: var(--bg-canvas);
+}
+
+.day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.day-number {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.day-topic {
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.day-category-tag {
+  margin-top: 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-pill);
+  display: inline-block;
+  width: fit-content;
+}
+
+.cat-street {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.cat-highway {
+  background: var(--purple-light);
+  color: var(--purple);
+}
+
+.cat-test {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+/* Day 20 Feedback Form Styles */
+.feedback-card {
+  background: #ffffff;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  box-shadow: var(--shadow-tile);
+  margin-top: 2rem;
+}
+
+.feedback-locked-box {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.lock-icon-circle {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--bg-canvas-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: var(--text-muted);
+}
+
+/* Rating Stars */
+.star-rating-row {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.star-rating-row span {
+  color: #cbd5e1;
+  transition: color 0.15s;
+}
+
+.star-rating-row span.filled {
+  color: #f59e0b;
+}
+
+/* QR Code Display in Modal */
+.qr-modal-body {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.5rem;
+}
+
+.qr-code-box {
+  width: 200px;
+  height: 200px;
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+}

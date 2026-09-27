@@ -1,0 +1,279 @@
+/* ==========================================================================
+   ADMIN DASHBOARD — DATA-DENSE, BRIGHT & HIGHLY STRUCTURED
+   Zero dark colors. Crisp tables, dynamic assignment dropdowns, payment ledger
+   ========================================================================== */
+
+/* Main Sub-nav Navigation Tabs */
+.admin-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--border-light);
+  margin-bottom: 1.75rem;
+  padding-bottom: 0;
+  overflow-x: auto;
+}
+
+.admin-tab-btn {
+  background: transparent;
+  border: none;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.admin-tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.admin-tab-btn.active {
+  color: var(--primary);
+}
+
+.admin-tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  background: var(--primary);
+  border-radius: var(--radius-pill);
+}
+
+.admin-tab-count {
+  background: var(--bg-canvas-accent);
+  color: var(--text-secondary);
+  font-size: 0.725rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+}
+
+.admin-tab-btn.active .admin-tab-count {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+/* User Management Table Styles */
+.trainee-stage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-pill);
+}
+
+.trainee-stage-badge.in-street {
+  background: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid var(--primary-border);
+}
+
+.trainee-stage-badge.highway {
+  background: var(--purple-light);
+  color: var(--purple);
+  border: 1px solid var(--purple-border);
+}
+
+.trainee-stage-badge.assessment {
+  background: var(--success-light);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+}
+
+/* Highlighted Interactive Trainer Assignment Select */
+.assignment-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.assignment-select-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.assignment-select {
+  appearance: none;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 12px;
+  border: 1.5px solid var(--primary-border);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 2rem 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.08);
+  transition: all var(--transition-fast);
+}
+
+.assignment-select:hover {
+  border-color: var(--primary);
+  background-color: var(--primary-light);
+}
+
+.assignment-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+/* Payment Ledger Summary Row */
+.ledger-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.ledger-mini-tile {
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+}
+
+.ledger-mini-info span {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.ledger-mini-info strong {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.ledger-pill-status {
+  font-size: 0.725rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.status-paid {
+  background: var(--success-light);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+}
+
+.status-partial {
+  background: var(--warning-light);
+  color: var(--warning);
+  border: 1px solid var(--warning-border);
+}
+
+.status-pending {
+  background: var(--bg-canvas-accent);
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
+}
+
+.status-overdue {
+  background: var(--danger-light);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+}
+
+/* Fleet & Instructor Grid */
+.instructor-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.instructor-tile {
+  background: #ffffff;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-tile);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: transform var(--transition-lift), box-shadow var(--transition-normal);
+}
+
+.instructor-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-tile-hover);
+}
+
+.instructor-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.instructor-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.instructor-meta h4 {
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.instructor-meta p {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.instructor-stats {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: var(--bg-canvas);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+}
+
+.instructor-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.instructor-stat-item span {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.instructor-stat-item strong {
+  font-weight: 700;
+  color: var(--text-primary);
+}

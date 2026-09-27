@@ -1,0 +1,1381 @@
+/* ==========================================================================
+   GAFOOR DRIVING SCHOOL — LANDING PAGE & SHOWCASE (PULIVENDULA)
+   "Walk in & Drive out"
+   Govt. Accredited Indian Driving Academy:
+   - Emerald Green (#0c5836) and Metallic Gold (#c6923b) Brand Identity
+   - AP RTO Govt. Accreditation (#AP-04-DS-2024 / AP-39)
+   - Pulivendula Automated 8-Track & H-Track Training Circuit
+   - 3-Column Course Architecture in ₹ INR (₹5,500 – ₹8,500)
+   - Certified Driving Faculty & Localized Pulivendula Testimonials
+   - Indian UPI QR Modal (PhonePe / Google Pay / Paytm)
+   - Live Dashboard Suite Previews (Admin / Trainer / Trainee)
+   ========================================================================== */
+
+import { store } from '../store.js';
+import { showToast } from '../main.js';
+import { renderBrandLogo } from '../components/brandLogo.js';
+
+export function renderHomeWebsiteView(container, onNavigate) {
+  let activeTab = 'admin'; // 'admin' | 'trainer' | 'trainee'
+  let activeTrackGuide = 'track8'; // 'track8' | 'trackH' | 'flyover' | 'traffic'
+
+  function render() {
+    const trainees = store.trainees;
+    const trainers = store.trainers;
+    const payments = store.payments;
+    const schedule = store.schedule;
+
+    const totalInvoiced = payments.reduce((acc, p) => acc + p.amount, 0);
+    const totalCollected = payments.reduce((acc, p) => acc + p.paid, 0);
+    const collectionRate = Math.round((totalCollected / totalInvoiced) * 100);
+
+    const template = `
+      <div class="natu-page-wrapper">
+        <!-- TOP NOTIFICATION STRIP -->
+        <div style="background: var(--charcoal); color: #f7f3eb; padding: 0.5rem 1.5rem; font-size: 0.775rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+          <div style="display: flex; align-items: center; gap: 0.65rem;">
+            <span style="background: var(--turmeric); color: #1c1917; font-weight: 800; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem;">AP RTO</span>
+            <span>Govt. Accredited Motor Driving School · Reg #AP-04-DS-2024 · Pulivendula, YSR Kadapa Dist.</span>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <span style="color: #cbd5e1;">📍 Kadapa Road, Pulivendula · 📞 +91 98480 22334 / +91 94401 55678</span>
+          </div>
+        </div>
+
+        <!-- HERO SECTION -->
+        <section class="mnc-hero" style="text-align: center;">
+          <!-- CIRCULAR BLACK & WHITE ROAD ARENA (TEXT & LOGO STRICTLY INSIDE CIRCLE) -->
+          <div class="hero-circle-road-arena" id="hero-road-interactive-circle" title="Click to toggle Turbo Training Flow!">
+            
+            <!-- BLACK & WHITE CIRCULAR ROAD SVG (NO CAR) -->
+            <svg class="hero-circle-road-svg" viewBox="0 0 600 600" width="100%" height="100%" aria-label="Circular Black and White Driver Training Road Circuit">
+              <defs>
+                <!-- Depth shadow for realistic road elevation -->
+                <filter id="bwRoadDepth" x="-15%" y="-15%" width="130%" height="130%">
+                  <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.12" />
+                  <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000000" flood-opacity="0.08" />
+                </filter>
+                <radialGradient id="innerCircleShine" cx="50%" cy="38%" r="62%">
+                  <stop offset="0%" stop-color="#ffffff" />
+                  <stop offset="80%" stop-color="#faf8f5" />
+                  <stop offset="100%" stop-color="#f4ede2" />
+                </radialGradient>
+              </defs>
+
+              <!-- Outer Black & White Rumble Kerb (Classic Motorsport & RTO Track Style) -->
+              <circle cx="300" cy="300" r="293" fill="none" stroke="#18181b" stroke-width="6" />
+              <circle cx="300" cy="300" r="293" fill="none" stroke="#ffffff" stroke-width="6" stroke-dasharray="15 15" />
+              <circle cx="300" cy="300" r="296" fill="none" stroke="rgba(0,0,0,0.15)" stroke-width="1" />
+
+              <!-- Main Solid Black Asphalt Road Ring -->
+              <circle cx="300" cy="300" r="267" fill="none" stroke="#18181b" stroke-width="44" filter="url(#bwRoadDepth)" />
+
+              <!-- Outer Solid White Road Boundary Line -->
+              <circle cx="300" cy="300" r="289" fill="none" stroke="#ffffff" stroke-width="2.5" />
+
+              <!-- Inner Solid White Road Boundary Line -->
+              <circle cx="300" cy="300" r="245" fill="none" stroke="#ffffff" stroke-width="2.5" />
+
+              <!-- Inner Black & White Island Kerb -->
+              <circle cx="300" cy="300" r="242" fill="none" stroke="#18181b" stroke-width="3.5" />
+              <circle cx="300" cy="300" r="242" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-dasharray="10 10" />
+
+              <!-- Crisp White Zebra Crossing at 12 O'Clock (Top) -->
+              <g class="bw-zebra-crossing" opacity="0.95">
+                <rect x="272" y="24" width="4.5" height="42" rx="1.5" fill="#ffffff" />
+                <rect x="280" y="23.5" width="4.5" height="43" rx="1.5" fill="#ffffff" />
+                <rect x="288" y="23" width="4.5" height="44" rx="1.5" fill="#ffffff" />
+                <rect x="296" y="23" width="4.5" height="44" rx="1.5" fill="#ffffff" />
+                <rect x="304" y="23" width="4.5" height="44" rx="1.5" fill="#ffffff" />
+                <rect x="312" y="23.5" width="4.5" height="43" rx="1.5" fill="#ffffff" />
+                <rect x="320" y="24" width="4.5" height="42" rx="1.5" fill="#ffffff" />
+              </g>
+
+              <!-- Stenciled Road Direction Arrows (Clockwise Flow) -->
+              <g transform="translate(300, 300) rotate(90) translate(-300, -300)" opacity="0.85">
+                <path d="M 288,45 A 267 267 0 0 1 312,45" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" />
+                <polygon points="314,45 306,40 307,49" fill="#ffffff" />
+              </g>
+              <g transform="translate(300, 300) rotate(180) translate(-300, -300)" opacity="0.85">
+                <path d="M 288,45 A 267 267 0 0 1 312,45" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" />
+                <polygon points="314,45 306,40 307,49" fill="#ffffff" />
+              </g>
+              <g transform="translate(300, 300) rotate(270) translate(-300, -300)" opacity="0.85">
+                <path d="M 288,45 A 267 267 0 0 1 312,45" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" />
+                <polygon points="314,45 306,40 307,49" fill="#ffffff" />
+              </g>
+
+              <!-- White Stenciled Text On Road Ring -->
+              <text x="300" y="16" font-size="6.5" font-weight="900" fill="#18181b" text-anchor="middle" letter-spacing="1.5">▲ AP RTO TEST CIRCUIT · START / FINISH ▲</text>
+              <text x="300" y="588" font-size="6.5" font-weight="900" fill="#18181b" text-anchor="middle" letter-spacing="1.5">▼ 20-DAY PRACTICAL ROAD TRAINING · 8 KM/DAY ▼</text>
+              <text x="14" y="303" font-size="6.5" font-weight="900" fill="#18181b" text-anchor="middle" transform="rotate(-90 14 303)" letter-spacing="1">◀ 8-TRACK</text>
+              <text x="586" y="303" font-size="6.5" font-weight="900" fill="#18181b" text-anchor="middle" transform="rotate(90 586 303)" letter-spacing="1">H-TRACK ▶</text>
+
+              <!-- ANIMATED WHITE DASHED CENTERLINE DIVIDER (FLOWING ROAD) -->
+              <circle cx="300" cy="300" r="267" fill="none" stroke="#ffffff" stroke-width="3" stroke-dasharray="14 16" class="bw-road-dashed-divider" />
+
+              <!-- Inner Clean White Circle Ground (Protected Space for Text & Logo) -->
+              <circle cx="300" cy="300" r="240" fill="url(#innerCircleShine)" stroke="rgba(28, 25, 23, 0.08)" stroke-width="1" />
+              <circle cx="300" cy="300" r="236" fill="none" stroke="rgba(198, 146, 59, 0.28)" stroke-width="1" stroke-dasharray="3 4" />
+            </svg>
+
+            <!-- CENTER CONTENT: TEXT & LOGO LYING ACCURATELY INSIDE CIRCLE -->
+            <div class="hero-circle-inner-content">
+              <!-- Logo Showcase -->
+              <div class="circle-logo-wrap">
+                ${renderBrandLogo({ size: 'lg', className: 'circle-hero-brand-logo' })}
+              </div>
+
+              <!-- AP RTO Accreditation Pill Badge -->
+              <div class="circle-rto-badge">
+                <span class="circle-rto-dot"></span>
+                Walk in &amp; Drive out · AP RTO Accredited
+              </div>
+
+              <!-- Grand Hero Headline Fitting Exactly Inside Circle -->
+              <h1 class="circle-headline">
+                Walk in &amp; Drive out at<br>
+                <span class="circle-brand-name">Gafoor Driving School</span>
+              </h1>
+
+              <!-- Mini Curriculum Details Inside Circle -->
+              <p class="circle-curriculum-meta">
+                20-Day Practical Training · Maruti Swift Fleet · Pulivendula
+              </p>
+            </div>
+
+            <!-- Sleek Status Chip at Bottom of Circle -->
+            <div class="hero-road-chip" id="hero-road-chip">
+              <span class="road-chip-pulse"></span>
+              <span class="road-chip-text">AP RTO CIRCUIT TRACK</span>
+            </div>
+          </div>
+
+          <p class="mnc-hero-sub" style="font-size: 1.15rem; line-height: 1.65; color: var(--slate-body); max-width: 720px; margin: 0 auto 1.75rem;">
+            Pulivendula’s premier motor driving academy. 20-day practical on-road training (8 km/day), dual-control Maruti Swift fleet, certified lady mentors, and 100% 1st-attempt clearance for RTO 8-Track & H-Track test.
+          </p>
+
+          <div class="mnc-cta-group" style="justify-content: center;">
+            <button type="button" class="btn-mnc btn-mnc-primary" id="hero-btn-book" style="padding: 0.8rem 1.85rem; font-size: 0.95rem;">
+              Book a Course (From ₹5,500) →
+            </button>
+            <button type="button" class="btn-mnc btn-mnc-secondary" id="hero-btn-track-scroll" style="padding: 0.8rem 1.85rem; font-size: 0.95rem;">
+              Explore RTO Track Guide ↓
+            </button>
+            <button type="button" class="btn-mnc btn-mnc-secondary" id="hero-btn-upi-modal" style="padding: 0.8rem 1.5rem; font-size: 0.95rem; border-color: var(--terracotta-border); color: var(--terracotta);">
+              Pay via UPI QR ⊞
+            </button>
+          </div>
+
+          <!-- Subtle Muggu Accent -->
+          <div class="muggu-divider">
+            <span class="muggu-symbol">✦ ❖ ✦</span>
+          </div>
+        </section>
+
+        <!-- TRUST INDICATORS & STATISTICS RIBBON -->
+        <section class="mnc-trust-strip" style="background: #ffffff;">
+          <div class="mnc-stats-grid">
+            <div class="mnc-stat-item">
+              <span class="mnc-stat-number" style="color: var(--terracotta);">15,000+</span>
+              <span class="mnc-stat-label">Licensed Drivers Trained</span>
+            </div>
+            <div class="mnc-stat-item">
+              <span class="mnc-stat-number" style="color: var(--neem-green);">99.2%</span>
+              <span class="mnc-stat-label">1st-Attempt RTO DL Pass Rate</span>
+            </div>
+            <div class="mnc-stat-item">
+              <span class="mnc-stat-number" style="color: var(--turmeric);">20 Days</span>
+              <span class="mnc-stat-label">8 km/Day Real Road Practice</span>
+            </div>
+            <div class="mnc-stat-item">
+              <span class="mnc-stat-number" style="color: var(--charcoal);">4.96 ★</span>
+              <span class="mnc-stat-label">Verified Google Student Rating</span>
+            </div>
+          </div>
+
+          <div class="mnc-accreditations-row" style="margin-top: 2rem;">
+            <div class="mnc-accred-item">
+              <span>★ RTO Approved Dual-Control Vehicles</span>
+            </div>
+            <div class="mnc-accred-item">
+              <span>★ Dedicated Lady Instructors for Women</span>
+            </div>
+            <div class="mnc-accred-item">
+              <span>★ Flyover Half-Clutch Hill Hold Drill</span>
+            </div>
+            <div class="mnc-accred-item">
+              <span>★ Govt. Parivahan LLR & DL Assistance</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- INTERACTIVE RTO 8 & H TRACK SIMULATION STUDIO -->
+        <section class="mnc-section-services" id="rto-track-section" style="background: var(--bg-canvas);">
+          <div class="mnc-section-container">
+            <div class="mnc-section-header">
+              <span class="mnc-section-tag" style="background: var(--terracotta-light); color: var(--terracotta); border-color: var(--terracotta-border);">
+                Official RTO Track Preparation
+              </span>
+              <h2 class="mnc-section-title">
+                Interactive RTO 8 & H Track Simulation Studio
+              </h2>
+              <p class="mnc-section-desc">
+                Master every sensor-equipped automated driving test track (ADTT) in Pulivendula & Andhra Pradesh with zero pole penalty points.
+              </p>
+            </div>
+
+            <!-- RTO Track Interactive Component -->
+            <div class="rto-track-studio">
+              <div class="track-tabs-bar">
+                <button type="button" class="track-tab-item ${activeTrackGuide === 'track8' ? 'active' : ''}" data-track="track8">
+                  1. RTO '8' Track Maneuver
+                </button>
+                <button type="button" class="track-tab-item ${activeTrackGuide === 'trackH' ? 'active' : ''}" data-track="trackH">
+                  2. RTO 'H' Track & Reverse Bay
+                </button>
+                <button type="button" class="track-tab-item ${activeTrackGuide === 'flyover' ? 'active' : ''}" data-track="flyover">
+                  3. Flyover Half-Clutch Hill Hold
+                </button>
+                <button type="button" class="track-tab-item ${activeTrackGuide === 'traffic' ? 'active' : ''}" data-track="traffic">
+                  4. Bumper-to-Bumper City Crawl
+                </button>
+              </div>
+
+              ${renderTrackGuideContent(activeTrackGuide)}
+            </div>
+          </div>
+        </section>
+
+        <!-- SERVICES / COURSE ARCHITECTURE (3-COLUMN STRUCTURE IN ₹ INR) -->
+        <section class="mnc-section-services" id="services-grid-section" style="background: #ffffff;">
+          <div class="mnc-section-container">
+            <div class="mnc-section-header">
+              <span class="mnc-section-tag">Curriculum Architecture</span>
+              <h2 class="mnc-section-title">
+                Structured Driver Programs in Indian Rupees
+              </h2>
+              <p class="mnc-section-desc">
+                Transparent all-inclusive fees with zero hidden charges. Dual-control Maruti Swift training with doorstep pickup options.
+              </p>
+            </div>
+
+            <div class="mnc-3col-grid">
+              <!-- COLUMN 1: BASIC COURSE -->
+              <div class="mnc-service-column">
+                <div>
+                  <div class="col-header">
+                    <span class="col-badge" style="background: var(--bg-subtle); color: var(--charcoal); border-color: var(--border-dark);">
+                      Beginner Track
+                    </span>
+                    <h3 class="col-title">Beginner Driving Course</h3>
+                    <p class="col-desc">Foundational ground-up driver education for first-time motorists.</p>
+                  </div>
+
+                  <div class="program-list">
+                    <div class="program-item">
+                      <div class="program-name">
+                        20-Day Program (8 km/day)
+                        <span style="color: var(--terracotta);">₹5,500</span>
+                      </div>
+                      <div class="program-detail">Accelerator-Brake-Clutch sensitivity, creeping, and progressive braking.</div>
+                    </div>
+
+                    <div class="program-item">
+                      <div class="program-name">
+                        Ground Maneuvers & Turning
+                        <span>Included</span>
+                      </div>
+                      <div class="program-detail">Safe field coordination, 3-point turns, and obstacle slalom.</div>
+                    </div>
+
+                    <div class="program-item">
+                      <div class="program-name">
+                        Parivahan LLR Guidance
+                        <span>Included</span>
+                      </div>
+                      <div class="program-detail">Govt. learner licence slot booking and online test prep.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <button type="button" class="btn-mnc btn-mnc-secondary btn-action-program" data-tier="Beginner Driving Course (₹5,500)" style="width: 100%;">
+                    Enroll in Beginner Track →
+                  </button>
+                </div>
+              </div>
+
+              <!-- COLUMN 2: RTO 8 & H TRACK + FLYOVER (MOST POPULAR) -->
+              <div class="mnc-service-column" style="border: 2px solid var(--terracotta); position: relative; box-shadow: var(--shadow-hover);">
+                <div style="position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--terracotta); color: #ffffff; font-size: 0.725rem; font-weight: 800; padding: 3px 12px; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.05em;">
+                  Most Popular Choice
+                </div>
+
+                <div>
+                  <div class="col-header" style="margin-top: 0.5rem;">
+                    <span class="col-badge" style="background: var(--terracotta-light); color: var(--terracotta); border-color: var(--terracotta-border);">
+                      Full Licensure
+                    </span>
+                    <h3 class="col-title">RTO 8-Track & City Mastery</h3>
+                    <p class="col-desc">Complete licensing syllabus with automated test track and highway navigation.</p>
+                  </div>
+
+                  <div class="program-list">
+                    <div class="program-item">
+                      <div class="program-name">
+                        Full 20-Day DL Package
+                        <span style="color: var(--terracotta); font-size: 1.1rem;">₹7,500</span>
+                      </div>
+                      <div class="program-detail">Daily 8 km on real highway and city road corridors (160 km total logged).</div>
+                    </div>
+
+                    <div class="program-item">
+                      <div class="program-name">
+                        RTO '8' & 'H' Track Drills
+                        <span>Special</span>
+                      </div>
+                      <div class="program-detail">Master the RTO sensor track with zero pole touching penalty.</div>
+                    </div>
+
+                    <div class="program-item">
+                      <div class="program-name">
+                        Flyover Clutch & Traffic Crawl
+                        <span>Included</span>
+                      </div>
+                      <div class="program-detail">Half-clutch hold without rollback on steep flyovers and metro bridges.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <button type="button" class="btn-mnc btn-mnc-primary btn-action-program" data-tier="RTO 8-Track & City Mastery (₹7,500)" style="width: 100%;">
+                    Enroll in RTO & City Track →
+                  </button>
+                </div>
+              </div>
+
+              <!-- COLUMN 3: LADIES SPECIAL & VIP DOORSTEP -->
+              <div class="mnc-service-column">
+                <div>
+                  <div class="col-header">
+                    <span class="col-badge" style="background: var(--turmeric-light); color: var(--turmeric-hover); border-color: var(--turmeric-border);">
+                      Women Mentorship
+                    </span>
+                    <h3 class="col-title">Ladies Special & Doorstep Pickup</h3>
+                    <p class="col-desc">Empowering women drivers with senior female mentors and doorstep car dispatch.</p>
+                  </div>
+
+                  <div class="program-list">
+                    <div class="program-item">
+                      <div class="program-name">
+                        Senior Lady Instructor Package
+                        <span style="color: var(--terracotta);">₹8,500</span>
+                      </div>
+                      <div class="program-detail">Patience-driven mentorship eliminating road nervousness.</div>
+                    </div>
+
+                    <div class="program-item">
+                      <div class="program-name">
+                        Doorstep Pickup & Drop
+                        <span>Free</span>
+                      </div>
+                      <div class="program-detail">Vehicle dispatched directly to your apartment / home gates.</div>
+                    </div>
+
+                    <div class="program-item">
+                      <div class="program-name">
+                        Flexible Hours
+                        <span>Included</span>
+                      </div>
+                      <div class="program-detail">Tailored morning or evening batches for working professionals & homemakers.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <button type="button" class="btn-mnc btn-mnc-secondary btn-action-program" data-tier="Ladies Special & Doorstep Pickup (₹8,500)" style="width: 100%;">
+                    Enroll in Ladies Special →
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- FLEET SPOTLIGHT SECTION (AUTHENTIC TRAINING CARS) -->
+        <section class="mnc-fleet-spotlight" style="background: var(--bg-canvas); border-top: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light);">
+          <div class="mnc-section-container">
+            <div class="fleet-banner" style="background: #ffffff; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 2.5rem; box-shadow: var(--shadow-card);">
+              <div>
+                <span class="track-badge-rto">
+                  State Dual-Control Vehicle Fleet
+                </span>
+                <h2 style="font-size: 1.85rem; font-weight: 800; color: var(--charcoal); margin: 0.5rem 0 1rem;">
+                  100% Dual-Control Dual-Pedal Safety Fleet
+                </h2>
+                <p style="color: var(--slate-body); line-height: 1.6; max-width: 540px; margin-bottom: 1.5rem;">
+                  Every vehicle is fitted with passenger-side co-driver dual pedals (brake & clutch) certified under State Transport Department guidelines for fail-safe learner control.
+                </p>
+
+                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                  <button type="button" class="btn-mnc btn-mnc-primary" id="btn-fleet-book">
+                    Book a 1-on-1 Trial Drive
+                  </button>
+                  <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-open-upi-mini">
+                    Pay Fees via UPI QR
+                  </button>
+                </div>
+              </div>
+
+              <div class="fleet-stats-mini">
+                <div class="fleet-stat-card" style="background: var(--bg-canvas); border: 1px solid var(--border-light);">
+                  <span class="num" style="color: var(--terracotta); font-size: 1.35rem;">Swift & Punch</span>
+                  <span class="desc">Maruti Swift, WagonR, Grand i10 & Tata Punch AC units</span>
+                </div>
+                <div class="fleet-stat-card" style="background: var(--bg-canvas); border: 1px solid var(--border-light);">
+                  <span class="num" style="color: var(--neem-green); font-size: 1.35rem;">100% Safety</span>
+                  <span class="desc">Zero accident safety record with secondary trainer brake pedals</span>
+                </div>
+                <div class="fleet-stat-card" style="background: var(--bg-canvas); border: 1px solid var(--border-light);">
+                  <span class="num" style="color: var(--turmeric); font-size: 1.35rem;">RTO Track</span>
+                  <span class="desc">Practiced on actual automated RTO sensor ground circuits</span>
+                </div>
+                <div class="fleet-stat-card" style="background: var(--bg-canvas); border: 1px solid var(--border-light);">
+                  <span class="num" style="color: var(--charcoal); font-size: 1.35rem;">Ladies Wing</span>
+                  <span class="desc">Exclusive lady mentor wing with comfortable doorstep service</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- AUTHENTIC TESTIMONIALS -->
+        <section class="mnc-section-services" style="background: #ffffff; padding: 4rem 2rem;">
+          <div class="mnc-section-container">
+            <div class="mnc-section-header">
+              <span class="mnc-section-tag" style="background: var(--terracotta-light); color: var(--terracotta); border-color: var(--terracotta-border);">
+                Verified Student Reviews
+              </span>
+              <h2 class="mnc-section-title">
+                Real Stories from Drivers in Pulivendula & Kadapa District
+              </h2>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+              <!-- Review 1 -->
+              <div style="background: var(--bg-canvas); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.75rem; box-shadow: var(--shadow-card);">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                  <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--terracotta); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800;">
+                    RB
+                  </div>
+                  <div>
+                    <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--charcoal); margin: 0;">Ramesh Babu</h4>
+                    <span style="font-size: 0.75rem; color: var(--slate-muted);">Bakarapuram, Pulivendula · Software Engineer</span>
+                  </div>
+                </div>
+                <div style="color: var(--turmeric); font-size: 0.85rem; margin-bottom: 0.5rem;">★★★★★</div>
+                <p style="font-size: 0.875rem; color: var(--slate-body); line-height: 1.6; font-style: italic;">
+                  "Gafoor Driving School made learning so simple! Master Srinivas explained clutch balance and the RTO 8-track maneuvers patiently. Cleared my AP RTO test on the first attempt with zero penalty!"
+                </p>
+              </div>
+
+              <!-- Review 2 -->
+              <div style="background: var(--bg-canvas); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.75rem; box-shadow: var(--shadow-card);">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                  <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--turmeric-hover); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800;">
+                    SR
+                  </div>
+                  <div>
+                    <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--charcoal); margin: 0;">Sravani Reddy</h4>
+                    <span style="font-size: 0.75rem; color: var(--slate-muted);">Kadapa Road, Pulivendula · Teacher & Homemaker</span>
+                  </div>
+                </div>
+                <div style="color: var(--turmeric); font-size: 0.85rem; margin-bottom: 0.5rem;">★★★★★</div>
+                <p style="font-size: 0.875rem; color: var(--slate-body); line-height: 1.6; font-style: italic;">
+                  "Lady instructor Anitha Reddy gave me immense confidence. Truly 'Walk in & Drive out'! With convenient doorstep pickup in Pulivendula, I can now navigate town traffic and ring roads effortlessly."
+                </p>
+              </div>
+
+              <!-- Review 3 -->
+              <div style="background: var(--bg-canvas); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.75rem; box-shadow: var(--shadow-card);">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                  <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--neem-green); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800;">
+                    KR
+                  </div>
+                  <div>
+                    <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--charcoal); margin: 0;">Koteswara Rao</h4>
+                    <span style="font-size: 0.75rem; color: var(--slate-muted);">Shilparamam Road, Pulivendula · Business Owner</span>
+                  </div>
+                </div>
+                <div style="color: var(--turmeric); font-size: 0.85rem; margin-bottom: 0.5rem;">★★★★★</div>
+                <p style="font-size: 0.875rem; color: var(--slate-body); line-height: 1.6; font-style: italic;">
+                  "Trained my son with solid practical fundamentals on the Pulivendula bypass circuit. The reverse bay and H-track instructions were crystal clear. Honest fee in ₹ with full transparency!"
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- DASHBOARD PREVIEW SECTION: TABBED INTERFACE (ADMIN / TRAINER / TRAINEE) -->
+        <section class="mnc-section-dashboard" id="dashboard-preview-section" style="background: var(--bg-canvas);">
+          <div class="mnc-section-container">
+            <div class="mnc-section-header">
+              <span class="mnc-section-tag">Academy Cloud Platform</span>
+              <h2 class="mnc-section-title">
+                Integrated Management Platform
+              </h2>
+              <p class="mnc-section-desc">
+                Experience the real-time control software powering our driving school. Preview Admin, Trainer, and Trainee workspaces below.
+              </p>
+            </div>
+
+            <!-- Tabbed Selector -->
+            <div class="dashboard-tab-bar">
+              <button type="button" class="dash-tab-btn ${activeTab === 'admin' ? 'active' : ''}" data-tab="admin">
+                Admin Console
+              </button>
+              <button type="button" class="dash-tab-btn ${activeTab === 'trainer' ? 'active' : ''}" data-tab="trainer">
+                Trainer Dispatch
+              </button>
+              <button type="button" class="dash-tab-btn ${activeTab === 'trainee' ? 'active' : ''}" data-tab="trainee">
+                Trainee Portal
+              </button>
+            </div>
+
+            <!-- Live Dashboard Window Preview -->
+            <div class="dashboard-window">
+              <div class="dashboard-window-top">
+                <div class="window-dots">
+                  <div class="window-dot" style="background: #ef4444;"></div>
+                  <div class="window-dot" style="background: #f59e0b;"></div>
+                  <div class="window-dot" style="background: #10b981;"></div>
+                </div>
+                <div class="window-title">
+                  Gafoor Driving School Cloud v2.6 · 
+                  ${activeTab === 'admin' ? 'Administrative Operations' : (activeTab === 'trainer' ? 'Trainer Schedule & Dispatch' : 'Student Milestone Workspace')}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--slate-muted); font-weight: 700;">
+                  Live RTO Telemetry · Pulivendula
+                </div>
+              </div>
+
+              <div class="dashboard-window-body">
+                ${activeTab === 'admin' ? renderAdminPreview(trainees, trainers, totalCollected, collectionRate) : ''}
+                ${activeTab === 'trainer' ? renderTrainerPreview(schedule) : ''}
+                ${activeTab === 'trainee' ? renderTraineePreview(trainees[0]) : ''}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- INSTITUTIONAL FOOTER -->
+        <footer class="mnc-footer" style="background: var(--charcoal); color: #f7f3eb;">
+          <div class="mnc-footer-grid">
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 0.75rem;">
+                ${renderBrandLogo({ size: 'md' })}
+                <div>
+                  <div style="font-size: 1.2rem; font-weight: 800; color: #ffffff;">GAFOOR DRIVING SCHOOL</div>
+                  <div style="font-size: 0.75rem; color: var(--turmeric); font-weight: 700;">Walk in & Drive out · Pulivendula</div>
+                </div>
+              </div>
+              <p style="font-size: 0.85rem; color: #a8a29e; line-height: 1.6; max-width: 340px;">
+                Andhra Pradesh Transport Department Accredited Motor Driving School. License #AP-04-DS-2024. Cultivating confident, disciplined motorists in Pulivendula and across AP.
+              </p>
+            </div>
+
+            <div>
+              <h4 style="color: #ffffff; margin-bottom: 1rem; font-size: 0.95rem;">Training Tiers</h4>
+              <ul class="mnc-footer-links">
+                <li><a href="#services-grid-section" style="color: #cbd5e1;">Beginner Course (₹5,500)</a></li>
+                <li><a href="#services-grid-section" style="color: #cbd5e1;">RTO 8-Track Special (₹7,500)</a></li>
+                <li><a href="#services-grid-section" style="color: #cbd5e1;">Ladies Special Batch (₹8,500)</a></li>
+                <li><a href="#rto-track-section" style="color: #cbd5e1;">H-Track Parking Mastery</a></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 style="color: #ffffff; margin-bottom: 1rem; font-size: 0.95rem;">Branches & Contact</h4>
+              <ul class="mnc-footer-links">
+                <li style="color: #cbd5e1;">📍 Pulivendula: Kadapa Road (Main Office)</li>
+                <li style="color: #cbd5e1;">📍 Pulivendula: JNTU Bypass Ground</li>
+                <li style="color: #cbd5e1;">📍 Pulivendula: Shilparamam Ring Road</li>
+                <li style="color: #cbd5e1;">📍 Pulivendula: RTC Bus Stand Hub</li>
+                <li style="color: #cbd5e1;">📍 Kadapa: District RTO Driving Ground</li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 style="color: #ffffff; margin-bottom: 1rem; font-size: 0.95rem;">UPI & Payments</h4>
+              <p style="font-size: 0.8rem; color: #a8a29e; line-height: 1.5; margin-bottom: 0.75rem;">
+                Instant tuition settlement via PhonePe, GPay, Paytm & BHIM UPI.
+              </p>
+              <div class="upi-chip" style="background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); color: #f7f3eb; display: inline-block;">
+                UPI ID: <strong>gafoordrive@upi</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="mnc-footer-bottom" style="border-top-color: rgba(255,255,255,0.1); color: #a8a29e;">
+            <div>
+              © 2026 Gafoor Driving School, Pulivendula. All rights reserved. AP RTO Accredited Driving Academy.
+            </div>
+            <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+              <span>Pulivendula Sensor Track</span>
+              <span>Maruti Swift Dual-Brake Fleet</span>
+              <span>AP Transport Parivahan Partner</span>
+            </div>
+          </div>
+        </footer>
+      </div>
+    `;
+
+    container.innerHTML = template;
+    attachEvents();
+  }
+
+  // --- Sub-renderer for Track Simulation Guide ---
+  function renderTrackGuideContent(trackId) {
+    if (trackId === 'track8') {
+      return `
+        <div class="track-display-grid">
+          <div class="track-visual-diagram">
+            <svg class="track-svg-art" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
+              <!-- Figure 8 Track Road Background -->
+              <path d="M 80,90 A 45,45 0 1,0 160,90 A 45,45 0 1,1 240,90 A 45,45 0 1,1 160,90 A 45,45 0 1,0 80,90 Z" fill="none" stroke="#3f3f46" stroke-width="36" stroke-linejoin="round"/>
+              <path d="M 80,90 A 45,45 0 1,0 160,90 A 45,45 0 1,1 240,90 A 45,45 0 1,1 160,90 A 45,45 0 1,0 80,90 Z" fill="none" stroke="#22c55e" stroke-width="4" stroke-dasharray="8 6"/>
+              <!-- Boundary Poles -->
+              <circle cx="80" cy="90" r="16" fill="#1c1917" stroke="#e4e4e7" stroke-width="2"/>
+              <circle cx="240" cy="90" r="16" fill="#1c1917" stroke="#e4e4e7" stroke-width="2"/>
+              <text x="80" y="94" font-size="10" fill="#ffffff" text-anchor="middle" font-weight="bold">L-POLE</text>
+              <text x="240" y="94" font-size="10" fill="#ffffff" text-anchor="middle" font-weight="bold">R-POLE</text>
+              <!-- Car Marker -->
+              <rect x="150" y="78" width="22" height="14" rx="3" fill="#b44a28" stroke="#ffffff" stroke-width="1.5"/>
+              <circle cx="154" cy="80" r="2" fill="#ffffff"/>
+              <circle cx="168" cy="80" r="2" fill="#ffffff"/>
+              <text x="160" y="160" font-size="11" fill="#fde68a" text-anchor="middle" font-weight="bold">RTO Automated Track '8' — Entry ➔ Loop ➔ Exit</text>
+            </svg>
+          </div>
+
+          <div class="track-info-panel">
+            <span class="track-badge-rto">✓ MVI Examiner Key Criteria</span>
+            <h3>Mastering the RTO Automated 8-Track</h3>
+            <p style="font-size: 0.875rem; color: var(--slate-muted); line-height: 1.55;">
+              Automated Driving Test Tracks (ADTT) utilize laser barrier sensors. Avoid any boundary line breach with our 3-step turning rhythm:
+            </p>
+
+            <ul class="track-steps-list">
+              <li class="track-step-item">
+                <span class="track-step-num">1</span>
+                <div>
+                  <strong>Lock in 1st Gear at 10-12 km/h:</strong>
+                  <span>Maintain steady creeping without sudden throttling or abrupt clutch release.</span>
+                </div>
+              </li>
+              <li class="track-step-item">
+                <span class="track-step-num">2</span>
+                <div>
+                  <strong>Hand-Over-Hand Steering Lock:</strong>
+                  <span>Smooth progressive steering rotation keeping the hood aligned to center.</span>
+                </div>
+              </li>
+              <li class="track-step-item">
+                <span class="track-step-num">3</span>
+                <div>
+                  <strong>Inner Pole Reference:</strong>
+                  <span>Maintain 2 feet equidistant clearance from the pivot island pole.</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      `;
+    } else if (trackId === 'trackH') {
+      return `
+        <div class="track-display-grid">
+          <div class="track-visual-diagram">
+            <svg class="track-svg-art" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
+              <!-- H Track Layout -->
+              <rect x="60" y="30" width="30" height="120" fill="#3f3f46"/>
+              <rect x="230" y="30" width="30" height="120" fill="#3f3f46"/>
+              <rect x="90" y="75" width="140" height="30" fill="#3f3f46"/>
+              <!-- Parking Bay -->
+              <rect x="135" y="75" width="50" height="30" fill="#b44a28" opacity="0.35" stroke="#fde68a" stroke-dasharray="4 3"/>
+              <!-- Sensor lines -->
+              <line x1="60" y1="30" x2="60" y2="150" stroke="#ef4444" stroke-width="2"/>
+              <line x1="260" y1="30" x2="260" y2="150" stroke="#ef4444" stroke-width="2"/>
+              <text x="160" y="94" font-size="10" fill="#ffffff" text-anchor="middle" font-weight="bold">REVERSE BAY</text>
+              <rect x="145" y="80" width="20" height="14" rx="2" fill="#b44a28" stroke="#ffffff"/>
+              <text x="160" y="165" font-size="11" fill="#fde68a" text-anchor="middle" font-weight="bold">RTO 'H' Track: Forward ➔ Reverse Parallel Dock</text>
+            </svg>
+          </div>
+
+          <div class="track-info-panel">
+            <span class="track-badge-rto">✓ Reverse Bay Alignment</span>
+            <h3>RTO 'H' Track & Reverse Docking</h3>
+            <p style="font-size: 0.875rem; color: var(--slate-muted); line-height: 1.55;">
+              The H-Track tests spatial reverse orientation and perpendicular bay docking. Our instructors make mirror reference points second nature.
+            </p>
+
+            <ul class="track-steps-list">
+              <li class="track-step-item">
+                <span class="track-step-num">1</span>
+                <div>
+                  <strong>45-Degree Pivot Point:</strong>
+                  <span>Align rear wheel to the entrance pole line before applying full steering lock.</span>
+                </div>
+              </li>
+              <li class="track-step-item">
+                <span class="track-step-num">2</span>
+                <div>
+                  <strong>Dual Mirror Glance Rhythm:</strong>
+                  <span>Alternate mirror checks to keep vehicle centered between sensor poles.</span>
+                </div>
+              </li>
+              <li class="track-step-item">
+                <span class="track-step-num">3</span>
+                <div>
+                  <strong>Inside Bay Stop:</strong>
+                  <span>Halt cleanly inside the white box with wheels straightened.</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      `;
+    } else if (trackId === 'flyover') {
+      return `
+        <div class="track-display-grid">
+          <div class="track-visual-diagram">
+            <svg class="track-svg-art" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
+              <!-- Incline Slope -->
+              <polygon points="40,150 280,60 280,150" fill="#3f3f46"/>
+              <line x1="40" y1="150" x2="280" y2="60" stroke="#22c55e" stroke-width="4"/>
+              <!-- Stop Line on Slope -->
+              <line x1="160" y1="105" x2="190" y2="105" stroke="#ef4444" stroke-width="4"/>
+              <!-- Car on Slope -->
+              <g transform="translate(145, 95) rotate(-20.5)">
+                <rect x="0" y="0" width="28" height="15" rx="3" fill="#b44a28" stroke="#ffffff"/>
+                <circle cx="5" cy="15" r="3" fill="#1c1917"/>
+                <circle cx="23" cy="15" r="3" fill="#1c1917"/>
+              </g>
+              <text x="160" y="165" font-size="11" fill="#fde68a" text-anchor="middle" font-weight="bold">Gradient Incline Stop & Go (Zero Rollback)</text>
+            </svg>
+          </div>
+
+          <div class="track-info-panel">
+            <span class="track-badge-rto">✓ Hill Hold Mastery</span>
+            <h3>Flyover Half-Clutch Stop & Go</h3>
+            <p style="font-size: 0.875rem; color: var(--slate-muted); line-height: 1.55;">
+              Stopping mid-incline on steep city flyovers without rolling back 1 inch is the hallmark of a confident driver:
+            </p>
+
+            <ul class="track-steps-list">
+              <li class="track-step-item">
+                <span class="track-step-num">1</span>
+                <div>
+                  <strong>Apply Handbrake Firmly:</strong>
+                  <span>Engage the handbrake on incline stop to relieve foot pressure.</span>
+                </div>
+              </li>
+              <li class="track-step-item">
+                <span class="track-step-num">2</span>
+                <div>
+                  <strong>Clutch Biting Point Discovery:</strong>
+                  <span>Ease clutch until engine rpm drops slightly and front raises.</span>
+                </div>
+              </li>
+              <li class="track-step-item">
+                <span class="track-step-num">3</span>
+                <div>
+                  <strong>Release Handbrake & Glide:</strong>
+                  <span>Gently apply throttle and release handbrake for a smooth forward surge with zero rollback.</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="track-display-grid">
+          <div class="track-visual-diagram">
+            <svg class="track-svg-art" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
+              <!-- Street Lane -->
+              <rect x="20" y="20" width="280" height="140" fill="#3f3f46"/>
+              <line x1="20" y1="90" x2="300" y2="90" stroke="#fde68a" stroke-width="2" stroke-dasharray="8 6"/>
+              <!-- Traffic Vehicles (Autos, Buses, Cars) -->
+              <rect x="40" y="45" width="38" height="20" rx="3" fill="#166534" stroke="#ffffff"/>
+              <text x="59" y="58" font-size="8" fill="#ffffff" text-anchor="middle">RTC BUS</text>
+              <rect x="110" y="48" width="18" height="14" rx="2" fill="#eab308" stroke="#000"/>
+              <text x="119" y="58" font-size="7" fill="#000" text-anchor="middle">AUTO</text>
+              <rect x="150" y="105" width="26" height="16" rx="3" fill="#b44a28" stroke="#ffffff"/>
+              <text x="163" y="116" font-size="8" fill="#ffffff" text-anchor="middle">SWIFT</text>
+              <text x="160" y="165" font-size="11" fill="#fde68a" text-anchor="middle" font-weight="bold">Bumper-to-Bumper City Navigation & Micro-Steering</text>
+            </svg>
+          </div>
+
+          <div class="track-info-panel">
+            <span class="track-badge-rto">✓ Traffic Mastery</span>
+            <h3>Heavy City Traffic Clutch Crawling</h3>
+            <p style="font-size: 0.875rem; color: var(--slate-muted); line-height: 1.55;">
+              Navigate dense Indian urban traffic with auto-rickshaws, city buses, and motorbikes without engine choking.
+            </p>
+
+            <ul class="track-steps-list">
+              <li class="track-step-item">
+                <span class="track-step-num">1</span>
+                <div>
+                  <strong>Pedal Feathering:</strong>
+                  <span>Micro-crawl in 1st gear using precise clutch friction without gas pedal.</span>
+                </div>
+              </li>
+              <li class="track-step-item">
+                <span class="track-step-num">2</span>
+                <div>
+                  <strong>Tire-to-Tarmac Spacing:</strong>
+                  <span>Always stop where you can see the bottom of the tires of the vehicle in front.</span>
+                </div>
+              </li>
+              <li class="track-step-item">
+                <span class="track-step-num">3</span>
+                <div>
+                  <strong>360° Mirror Vigilance:</strong>
+                  <span>Active scanning for two-wheelers slipping through traffic gaps.</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // --- Sub-renderer for Admin Tab in Preview ---
+  function renderAdminPreview(trainees, trainers, totalCollected, collectionRate) {
+    return `
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--charcoal);">Candidate Operations Directory</h3>
+            <p style="font-size: 0.85rem; color: var(--slate-muted);">Inspect student dossiers, assign faculty, and verify UPI fee collections.</p>
+          </div>
+          <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm" id="btn-launch-full-admin">
+            Launch Full Admin Suite →
+          </button>
+        </div>
+
+        <div class="kpi-row" style="margin-bottom: 1.5rem;">
+          <div class="kpi-card" style="padding: 1rem 1.25rem;">
+            <div class="kpi-top">
+              <span class="kpi-label">Active Students</span>
+              <span class="kpi-pill kpi-pill-blue">${trainees.length} Enrolled</span>
+            </div>
+            <div class="kpi-value" style="font-size: 1.5rem;">${trainees.length} Students</div>
+          </div>
+
+          <div class="kpi-card" style="padding: 1rem 1.25rem;">
+            <div class="kpi-top">
+              <span class="kpi-label">Faculty Fleet</span>
+              <span class="kpi-pill kpi-pill-green">100% Active</span>
+            </div>
+            <div class="kpi-value" style="font-size: 1.5rem;">${trainers.length} Trainers</div>
+          </div>
+
+          <div class="kpi-card" style="padding: 1rem 1.25rem;">
+            <div class="kpi-top">
+              <span class="kpi-label">Tuition Settled</span>
+              <span class="kpi-pill kpi-pill-blue">${collectionRate}%</span>
+            </div>
+            <div class="kpi-value" style="font-size: 1.5rem;">₹${totalCollected.toLocaleString('en-IN')}</div>
+          </div>
+        </div>
+
+        <div style="overflow-x: auto; border: 1px solid var(--border-light); border-radius: var(--radius-sm);">
+          <table class="mnc-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Candidate Name</th>
+                <th>Enrolled Track</th>
+                <th>Instructor</th>
+                <th>Status</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${trainees.slice(0, 4).map(t => {
+                const tr = trainers.find(item => item.id === t.assignedTrainerId) || trainers[0];
+                return `
+                  <tr>
+                    <td style="font-weight: 800; color: var(--charcoal);">${t.id}</td>
+                    <td style="font-weight: 700; color: var(--charcoal);">${t.name}</td>
+                    <td style="font-size: 0.8125rem;">${t.package}</td>
+                    <td style="font-size: 0.8125rem; color: var(--terracotta); font-weight: 600;">${tr.name}</td>
+                    <td>
+                      <span class="kpi-pill ${t.paymentStatus === 'paid' ? 'kpi-pill-green' : 'kpi-pill-orange'}">
+                        ${t.paymentStatus === 'paid' ? 'PAID ✓' : (t.paymentStatus === 'partial' ? 'PARTIAL (₹)' : 'PENDING')}
+                      </span>
+                    </td>
+                    <td style="text-align: right;">
+                      <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-preview-dossier" data-trainee-id="${t.id}">
+                        Access Dossier →
+                      </button>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // --- Sub-renderer for Trainer Tab in Preview ---
+  function renderTrainerPreview(schedule) {
+    return `
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--charcoal);">Today's Practical Driving Schedule</h3>
+            <p style="font-size: 0.85rem; color: var(--slate-muted);">K. Srinivas Rao · Senior Head Trainer (Maruti Swift Dual-Ctrl #AP-04-ED-4041)</p>
+          </div>
+          <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm" id="btn-launch-full-trainer">
+            Launch Trainer Suite →
+          </button>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          ${schedule.map(slot => `
+            <div style="background: var(--bg-offwhite); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+              <div style="display: flex; gap: 1.25rem; align-items: center;">
+                <div style="font-size: 1.1rem; font-weight: 800; color: var(--charcoal); min-width: 130px;">
+                  ${slot.time}
+                </div>
+                <div>
+                  <div style="font-weight: 800; color: var(--charcoal); font-size: 1rem;">${slot.studentName}</div>
+                  <div style="font-size: 0.8rem; color: var(--slate-muted);">${slot.topic} · ${slot.car}</div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 0.75rem; font-weight: 700; color: var(--slate-muted); text-transform: uppercase; margin-right: 0.5rem;">Attendance:</span>
+                <button type="button" class="btn-mnc btn-mnc-sm btn-quick-att" data-slot-id="${slot.id}" data-att="present" style="background: ${slot.attendance === 'present' ? 'var(--neem-green)' : '#ffffff'}; color: ${slot.attendance === 'present' ? '#ffffff' : 'var(--slate-body)'}; border: 1px solid ${slot.attendance === 'present' ? 'var(--neem-green)' : 'var(--border-dark)'};">
+                  Present
+                </button>
+                <button type="button" class="btn-mnc btn-mnc-sm btn-quick-att" data-slot-id="${slot.id}" data-att="absent" style="background: ${slot.attendance === 'absent' ? '#dc2626' : '#ffffff'}; color: ${slot.attendance === 'absent' ? '#ffffff' : 'var(--slate-body)'}; border: 1px solid ${slot.attendance === 'absent' ? '#dc2626' : 'var(--border-dark)'};">
+                  Absent
+                </button>
+                <button type="button" class="btn-mnc btn-mnc-sm btn-quick-att" data-slot-id="${slot.id}" data-att="late" style="background: ${slot.attendance === 'late' ? 'var(--turmeric)' : '#ffffff'}; color: ${slot.attendance === 'late' ? '#1c1917' : 'var(--slate-body)'}; border: 1px solid ${slot.attendance === 'late' ? 'var(--turmeric)' : 'var(--border-dark)'};">
+                  Late
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // --- Sub-renderer for Trainee Tab in Preview ---
+  function renderTraineePreview(trainee) {
+    const progressPercent = Math.round((trainee.currentDay / 20) * 100);
+    return `
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--charcoal);">Student Milestone Workspace</h3>
+            <p style="font-size: 0.85rem; color: var(--slate-muted);">${trainee.name} · ${trainee.id} · ${trainee.package}</p>
+          </div>
+          <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm" id="btn-launch-full-trainee">
+            Launch Trainee Portal →
+          </button>
+        </div>
+
+        <div class="kpi-card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.875rem; font-weight: 700; margin-bottom: 0.5rem;">
+            <span style="color: var(--terracotta);">Curriculum Telemetry: Day ${trainee.currentDay} of 20 Completed (${trainee.currentDay * 8} km Total)</span>
+            <span style="color: var(--charcoal);">${progressPercent}% Completed</span>
+          </div>
+          <div style="width: 100%; height: 8px; background: var(--bg-subtle); border-radius: var(--radius-pill); overflow: hidden; border: 1px solid var(--border-light); margin-bottom: 1rem;">
+            <div style="width: ${progressPercent}%; height: 100%; background: var(--terracotta); border-radius: var(--radius-pill);"></div>
+          </div>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <span class="kpi-pill kpi-pill-green">✓ Days 1-10: Ground & Basic Street (Cleared)</span>
+            <span class="kpi-pill kpi-pill-blue">● Days 11-19: Flyover & Highway (Active)</span>
+            <span class="kpi-pill kpi-pill-purple">Day 20: Official RTO Test</span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-preview-upi-qr">
+            Open Mobile Tuition UPI QR Code ⊞
+          </button>
+          <button type="button" class="btn-mnc btn-mnc-secondary" onclick="alert('Day 20 evaluation form unlocks after completing the practical road syllabus.')">
+            Submit Day 20 Appraisal Form
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function attachEvents() {
+    // Interactive Circular Road Click (Turbo Flow toggle)
+    const roadWrapper = container.querySelector('#hero-road-interactive-circle');
+    const roadChipText = container.querySelector('#hero-road-chip .road-chip-text');
+    if (roadWrapper) {
+      let isTurbo = document.body.classList.contains('turbo-mode-active');
+      if (isTurbo) {
+        roadWrapper.classList.add('turbo-mode');
+        if (roadChipText) roadChipText.textContent = '⚡ TURBO RTO TEST FLOW ACTIVE';
+      }
+
+      roadWrapper.addEventListener('click', () => {
+        isTurbo = !isTurbo;
+        roadWrapper.classList.toggle('turbo-mode', isTurbo);
+        document.body.classList.toggle('turbo-mode-active', isTurbo);
+        if (roadChipText) {
+          roadChipText.textContent = isTurbo
+            ? '⚡ TURBO RTO TEST FLOW ACTIVE'
+            : 'AP RTO CIRCUIT TRACK';
+        }
+        if (typeof showToast === 'function') {
+          showToast(
+            isTurbo
+              ? '⚡ Turbo Road Flow Active! Rapid RTO circuit test speed synced to all pages.'
+              : '🛣️ Standard RTO circuit flow speed resumed across website.',
+            isTurbo ? 'success' : 'info'
+          );
+        }
+      });
+    }
+
+    // Hero Book Button
+    const btnBook = container.querySelector('#hero-btn-book');
+    if (btnBook) {
+      btnBook.addEventListener('click', () => {
+        openBookingModal();
+      });
+    }
+
+    // Scroll to Track Guide
+    const btnTrackScroll = container.querySelector('#hero-btn-track-scroll');
+    if (btnTrackScroll) {
+      btnTrackScroll.addEventListener('click', () => {
+        const sec = document.getElementById('rto-track-section');
+        if (sec) sec.scrollIntoView({ behavior: 'smooth' });
+      });
+    }
+
+    // Open UPI Modal from hero
+    const btnUpiModal = container.querySelector('#hero-btn-upi-modal');
+    if (btnUpiModal) {
+      btnUpiModal.addEventListener('click', () => {
+        openUpiQrModal(7500, 'RTO 8-Track & City Mastery');
+      });
+    }
+
+    // Track Guide selection tabs
+    container.querySelectorAll('[data-track]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeTrackGuide = btn.dataset.track;
+        render();
+      });
+    });
+
+    // Program selection buttons
+    container.querySelectorAll('.btn-action-program').forEach(btn => {
+      btn.addEventListener('click', () => {
+        openBookingModal(btn.dataset.tier);
+      });
+    });
+
+    // Fleet Trial drive button
+    const btnFleet = container.querySelector('#btn-fleet-book');
+    if (btnFleet) {
+      btnFleet.addEventListener('click', () => {
+        openBookingModal('RTO 8-Track & City Mastery (₹7,500)');
+      });
+    }
+
+    // Fleet open UPI
+    const btnFleetUpi = container.querySelector('#btn-open-upi-mini');
+    if (btnFleetUpi) {
+      btnFleetUpi.addEventListener('click', () => {
+        openUpiQrModal(7500, 'RTO 8-Track & City Mastery');
+      });
+    }
+
+    // Dashboard tab switching
+    container.querySelectorAll('[data-tab]').forEach(tabBtn => {
+      tabBtn.addEventListener('click', () => {
+        activeTab = tabBtn.dataset.tab;
+        render();
+      });
+    });
+
+    // Launch full service flows
+    const btnAdmin = container.querySelector('#btn-launch-full-admin');
+    if (btnAdmin) {
+      btnAdmin.addEventListener('click', () => {
+        onNavigate('admin', 'trainees');
+      });
+    }
+
+    const btnTrainer = container.querySelector('#btn-launch-full-trainer');
+    if (btnTrainer) {
+      btnTrainer.addEventListener('click', () => {
+        onNavigate('trainer');
+      });
+    }
+
+    const btnTrainee = container.querySelector('#btn-launch-full-trainee');
+    if (btnTrainee) {
+      btnTrainee.addEventListener('click', () => {
+        onNavigate('trainee');
+      });
+    }
+
+    // Trainee preview click dossier
+    container.querySelectorAll('.btn-preview-dossier').forEach(btn => {
+      btn.addEventListener('click', () => {
+        onNavigate('trainee-profile', btn.dataset.traineeId);
+      });
+    });
+
+    // Quick attendance mark in preview
+    container.querySelectorAll('.btn-quick-att').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slotId = btn.dataset.slotId;
+        const att = btn.dataset.att;
+        store.updateAttendance(slotId, att);
+        render();
+      });
+    });
+
+    // Trainee preview open QR
+    const btnPreviewUpi = container.querySelector('#btn-preview-upi-qr');
+    if (btnPreviewUpi) {
+      btnPreviewUpi.addEventListener('click', () => {
+        openUpiQrModal(3000, 'Tuition Balance Settlement');
+      });
+    }
+  }
+
+  // --- Modal: Book a Course in ₹ INR ---
+  function openBookingModal(initialTier = 'RTO 8-Track & City Mastery (₹7,500)') {
+    const modalRoot = document.getElementById('modal-root');
+    modalRoot.innerHTML = `
+      <div class="mnc-modal-overlay">
+        <div class="mnc-modal" style="max-width: 520px;">
+          <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; background: var(--bg-offwhite);">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              ${renderBrandLogo({ size: 'sm' })}
+              <div>
+                <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--charcoal); margin: 0;">Enroll in Gafoor Driving School</h3>
+                <p style="font-size: 0.8rem; color: var(--slate-muted); margin: 0;">Pulivendula · Certified 1-on-1 dual-control Maruti Swift training.</p>
+              </div>
+            </div>
+            <button type="button" id="btn-close-book" style="background: transparent; border: none; font-size: 1.25rem; cursor: pointer; color: var(--slate-muted);">✕</button>
+          </div>
+
+          <form id="form-booking" style="padding: 1.5rem;">
+            <div style="margin-bottom: 1rem;">
+              <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-muted); text-transform: uppercase; margin-bottom: 0.35rem;">
+                Candidate Full Name
+              </label>
+              <input type="text" class="mnc-input" name="name" required placeholder="e.g. Sai Kiran" />
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div>
+                <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-muted); text-transform: uppercase; margin-bottom: 0.35rem;">
+                  Contact Phone
+                </label>
+                <input type="tel" class="mnc-input" name="phone" required placeholder="+91 98480 00000" />
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-muted); text-transform: uppercase; margin-bottom: 0.35rem;">
+                  Preferred Branch (Pulivendula)
+                </label>
+                <select class="mnc-select" name="branch" style="width: 100%;">
+                  <option value="Pulivendula - Kadapa Road">Pulivendula - Main Office (Kadapa Rd)</option>
+                  <option value="Pulivendula - JNTU Bypass">Pulivendula - JNTU Bypass Ground</option>
+                  <option value="Pulivendula - Shilparamam">Pulivendula - Shilparamam Ring Road</option>
+                  <option value="Pulivendula - RTC Stand">Pulivendula - RTC Bus Stand Hub</option>
+                  <option value="Kadapa RTO Ground">Kadapa - District RTO Ground</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 1.25rem;">
+              <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-muted); text-transform: uppercase; margin-bottom: 0.35rem;">
+                Select Program Package
+              </label>
+              <select class="mnc-select" name="track" style="width: 100%;">
+                <option value="Beginner Driving Course (₹5,500)" ${initialTier.includes('5,500') || initialTier.includes('Beginner') ? 'selected' : ''}>
+                  Beginner Driving Course (₹5,500) · 20 Days Ground & Street
+                </option>
+                <option value="RTO 8-Track & City Mastery (₹7,500)" ${initialTier.includes('7,500') || initialTier.includes('RTO') ? 'selected' : ''}>
+                  RTO 8-Track & City Mastery (₹7,500) · Full DL Prep (Most Popular)
+                </option>
+                <option value="Ladies Special & Doorstep Pickup (₹8,500)" ${initialTier.includes('8,500') || initialTier.includes('Ladies') || initialTier.includes('Women') ? 'selected' : ''}>
+                  Ladies Special & Doorstep Pickup (₹8,500) · Senior Lady Mentor
+                </option>
+              </select>
+            </div>
+
+            <div style="background: var(--bg-offwhite); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.8rem; color: var(--slate-body); display: flex; align-items: center; justify-content: space-between;">
+              <span>Payment Mode: <strong>PhonePe / GPay UPI QR / Cash</strong></span>
+              <span style="color: var(--terracotta); font-weight: 800;">₹0 Registration Fee</span>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--border-light);">
+              <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-cancel-book">Cancel</button>
+              <button type="submit" class="btn-mnc btn-mnc-primary">Confirm Enrollment Reservation →</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    const close = () => { modalRoot.innerHTML = ''; };
+    modalRoot.querySelector('#btn-close-book').addEventListener('click', close);
+    modalRoot.querySelector('#btn-cancel-book').addEventListener('click', close);
+
+    const form = modalRoot.querySelector('#form-booking');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = form.elements['name'].value;
+      const phone = form.elements['phone'].value;
+      const branch = form.elements['branch'].value;
+      const track = form.elements['track'].value;
+      
+      // Add trainee to store
+      store.addTrainee({
+        name,
+        phone,
+        address: `${branch}, Pulivendula, AP`,
+        package: track,
+        paymentStatus: 'pending'
+      });
+
+      close();
+      openUpiQrModal(track.includes('7,500') ? 7500 : (track.includes('8,500') ? 8500 : 5500), track, name);
+      render();
+    });
+  }
+
+  // --- Modal: Indian UPI QR Payment (PhonePe / GPay / Paytm) ---
+  function openUpiQrModal(amount = 7500, packageName = 'RTO 8-Track Course', studentName = 'Student') {
+    const modalRoot = document.getElementById('modal-root');
+    modalRoot.innerHTML = `
+      <div class="mnc-modal-overlay">
+        <div class="mnc-modal" style="max-width: 440px;">
+          <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; background: var(--bg-offwhite);">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              ${renderBrandLogo({ size: 'sm' })}
+              <div>
+                <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--charcoal); margin: 0;">Gafoor Driving School UPI Payment</h3>
+                <p style="font-size: 0.775rem; color: var(--slate-muted); margin: 0;">${packageName} · ${studentName}</p>
+              </div>
+            </div>
+            <button type="button" id="btn-close-upi" style="background: transparent; border: none; font-size: 1.25rem; cursor: pointer; color: var(--slate-muted);">✕</button>
+          </div>
+
+          <div style="padding: 1.5rem; text-align: center;">
+            <div class="upi-qr-box">
+              <div style="font-size: 0.75rem; font-weight: 800; color: var(--terracotta); text-transform: uppercase; margin-bottom: 0.5rem; letter-spacing: 0.05em;">
+                SCAN WITH ANY UPI APP TO PAY
+              </div>
+
+              <!-- High-Fidelity SVG UPI QR Representation -->
+              <div style="display: inline-block; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #e4e4e7; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+                <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Corner Square 1 -->
+                  <rect x="10" y="10" width="46" height="46" rx="6" fill="#1c1917"/>
+                  <rect x="18" y="18" width="30" height="30" rx="3" fill="#ffffff"/>
+                  <rect x="24" y="24" width="18" height="18" rx="2" fill="#0c5836"/>
+
+                  <!-- Corner Square 2 -->
+                  <rect x="124" y="10" width="46" height="46" rx="6" fill="#1c1917"/>
+                  <rect x="132" y="18" width="30" height="30" rx="3" fill="#ffffff"/>
+                  <rect x="138" y="24" width="18" height="18" rx="2" fill="#0c5836"/>
+
+                  <!-- Corner Square 3 -->
+                  <rect x="10" y="124" width="46" height="46" rx="6" fill="#1c1917"/>
+                  <rect x="18" y="132" width="30" height="30" rx="3" fill="#ffffff"/>
+                  <rect x="24" y="138" width="18" height="18" rx="2" fill="#0c5836"/>
+
+                  <!-- Center Logo Badge -->
+                  <rect x="74" y="74" width="32" height="32" rx="6" fill="#0c5836"/>
+                  <text x="90" y="95" font-size="16" fill="#c6923b" text-anchor="middle" font-weight="900">G</text>
+
+                  <!-- Data Matrix Blocks -->
+                  <rect x="68" y="16" width="10" height="10" fill="#1c1917"/>
+                  <rect x="86" y="16" width="12" height="8" fill="#1c1917"/>
+                  <rect x="104" y="22" width="8" height="14" fill="#1c1917"/>
+                  <rect x="16" y="68" width="12" height="10" fill="#1c1917"/>
+                  <rect x="36" y="74" width="14" height="12" fill="#1c1917"/>
+                  <rect x="120" y="68" width="16" height="8" fill="#1c1917"/>
+                  <rect x="144" y="74" width="18" height="14" fill="#1c1917"/>
+                  <rect x="68" y="118" width="14" height="12" fill="#1c1917"/>
+                  <rect x="90" y="124" width="18" height="10" fill="#1c1917"/>
+                  <rect x="120" y="118" width="12" height="16" fill="#1c1917"/>
+                  <rect x="142" y="130" width="16" height="14" fill="#1c1917"/>
+                  <rect x="68" y="148" width="16" height="14" fill="#1c1917"/>
+                  <rect x="94" y="146" width="14" height="16" fill="#1c1917"/>
+                  <rect x="122" y="148" width="18" height="12" fill="#1c1917"/>
+                </svg>
+              </div>
+
+              <div style="font-size: 1.5rem; font-weight: 900; color: var(--charcoal); margin-top: 0.75rem;">
+                ₹${amount.toLocaleString('en-IN')}
+              </div>
+              <div style="font-size: 0.8rem; color: var(--slate-muted); margin-top: 0.2rem;">
+                UPI ID: <strong style="color: var(--charcoal);">gafoordrive@icici</strong>
+              </div>
+
+              <div class="upi-logos-row">
+                <span class="upi-chip">PhonePe</span>
+                <span class="upi-chip">Google Pay</span>
+                <span class="upi-chip">Paytm</span>
+                <span class="upi-chip">BHIM UPI</span>
+              </div>
+            </div>
+
+            <p style="font-size: 0.8rem; color: var(--slate-muted); margin-top: 1rem; line-height: 1.5;">
+              Scan with your mobile UPI banking app or simulate an instant confirmation below.
+            </p>
+
+            <div style="display: flex; gap: 0.75rem; justify-content: center; margin-top: 1.25rem;">
+              <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-close-upi-2">Close</button>
+              <button type="button" class="btn-mnc btn-mnc-primary" id="btn-sim-upi-pay">
+                Simulate UPI Success ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const close = () => { modalRoot.innerHTML = ''; };
+    modalRoot.querySelector('#btn-close-upi').addEventListener('click', close);
+    modalRoot.querySelector('#btn-close-upi-2').addEventListener('click', close);
+
+    const btnSim = modalRoot.querySelector('#btn-sim-upi-pay');
+    if (btnSim) {
+      btnSim.addEventListener('click', () => {
+        close();
+        alert(`Payment of ₹${amount.toLocaleString('en-IN')} received via UPI! Welcome to Gafoor Driving School, Pulivendula.`);
+        render();
+      });
+    }
+  }
+
+  // Initial render
+  render();
+}

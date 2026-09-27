@@ -1,0 +1,93 @@
+/* ==========================================================================
+   APEX DRIVE — SIGNATURE PRODUCT THEME (SWIGGY / CONSUMER TECH STYLE)
+   High-energy, creative, ultra-clean, memorable brand identity.
+   ========================================================================== */
+
+:root {
+  /* Signature Brand Colors: Electric Sunset Tangerine */
+  --brand-orange: #ff5200;
+  --brand-orange-hover: #e04400;
+  --brand-orange-light: #fff2eb;
+  --brand-orange-border: #ffd9c7;
+  
+  /* Modern High-End Neutrals */
+  --canvas: #f4f5f8;
+  --surface: #ffffff;
+  --surface-hover: #fafbfe;
+  --surface-subtle: #f0f2f6;
+
+  /* Typography Colors */
+  --text-title: #1c1c24;
+  --text-body: #4a4c5a;
+  --text-caption: #7e8299;
+  --text-border: #e6e9ee;
+
+  /* Functional Accents */
+  --accent-green: #00b343;
+  --accent-green-bg: #e6f9ed;
+  --accent-green-border: #b8f0cc;
+
+  --accent-purple: #5b34ea;
+  --accent-purple-bg: #efebff;
+  --accent-purple-border: #d4c7ff;
+
+  --accent-blue: #0084ff;
+  --accent-blue-bg: #e8f3ff;
+  --accent-blue-border: #bcdfff;
+
+  --accent-amber: #f59e0b;
+  --accent-amber-bg: #fffbeb;
+  --accent-amber-border: #fde68a;
+
+  --border-light: #e8ebef;
+  --border-card: #e4e7ed;
+
+  /* Typography */
+  --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+
+  /* Geometry */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 9999px;
+
+  /* Tactile Shadows */
+  --shadow-card: 0 4px 18px -2px rgba(28, 28, 36, 0.05), 0 2px 6px -1px rgba(28, 28, 36, 0.02);
+  --shadow-hover: 0 12px 32px -4px rgba(28, 28, 36, 0.09), 0 4px 12px -2px rgba(28, 28, 36, 0.03);
+  --shadow-orange: 0 8px 24px -4px rgba(255, 82, 0, 0.32);
+  --shadow-modal: 0 24px 60px -12px rgba(28, 28, 36, 0.16), 0 0 0 1px rgba(232, 235, 239, 0.9);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--canvas);
+  color: var(--text-body);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--text-title);
+  letter-spacing: -0.025em;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: 0.9rem;
+}
