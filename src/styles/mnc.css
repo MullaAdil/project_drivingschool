@@ -3280,3 +3280,162 @@ body.turbo-mode-active .gafoor-logo-track-wrap {
   color: var(--slate-body);
   margin: 0.2rem 0 0 0;
 }
+
+/* ==========================================================================
+   PORTAL DESIGN SYSTEM — Admin / Trainer / Trainee
+   Flat, premium, dark — no animations, no card grids
+   ========================================================================== */
+
+.portal-shell {
+  background: var(--cred-bg);
+  min-height: 100vh;
+  color: var(--slate-body);
+}
+
+/* Topbar */
+.portal-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.75rem;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--cred-surface);
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.portal-topbar-left  { display: flex; align-items: center; gap: 0.85rem; }
+.portal-topbar-brand { display: flex; flex-direction: column; gap: 0.1rem; }
+.portal-topbar-title { font-size: 0.95rem; font-weight: 800; color: #ffffff; letter-spacing: -0.01em; }
+.portal-topbar-sub   { font-size: 0.72rem; color: var(--slate-muted); font-weight: 600; }
+.portal-topbar-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+/* Page Header */
+.portal-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 1.5rem 1.75rem 1.25rem;
+  border-bottom: 1px solid var(--border-light);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.portal-page-title { font-size: 1.6rem; font-weight: 800; color: #ffffff; letter-spacing: -0.03em; margin: 0 0 0.2rem; line-height: 1.2; }
+.portal-page-sub   { font-size: 0.825rem; color: var(--slate-muted); margin: 0; line-height: 1.5; }
+.portal-page-header-meta { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+/* Flat Stats Strip */
+.portal-stats-strip {
+  display: flex;
+  align-items: center;
+  padding: 1rem 1.75rem;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--cred-surface);
+  overflow-x: auto;
+  gap: 0;
+  flex-wrap: wrap;
+}
+.portal-stat { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.35rem 1.5rem; white-space: nowrap; }
+.portal-stat:first-child { padding-left: 0; }
+.portal-stat-value { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 700; color: #ffffff; line-height: 1; letter-spacing: -0.02em; }
+.portal-stat-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--slate-muted); }
+.portal-stat-div   { width: 1px; height: 32px; background: var(--border-light); flex-shrink: 0; }
+
+/* Progress bar */
+.portal-progress-bar-wrap { height: 2px; background: rgba(255,255,255,0.06); width: 100%; }
+.portal-progress-bar      { height: 100%; background: var(--neem-green); }
+
+/* Sections */
+.portal-section { padding: 1.5rem 1.75rem; border-bottom: 1px solid var(--border-light); }
+.portal-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+.portal-section-title  { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--slate-muted); }
+.portal-section-meta   { font-size: 0.72rem; color: var(--slate-muted); font-weight: 600; }
+
+/* Flat Table */
+.p-table-wrap { overflow-x: auto; }
+.p-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.p-table th {
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--slate-muted);
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border-light);
+  white-space: nowrap;
+}
+.p-table td { padding: 0.85rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+.p-table tr:last-child td { border-bottom: none; }
+.p-table tr:hover td { background: rgba(255,255,255,0.02); }
+.p-row-done td     { opacity: 0.55; }
+.p-row-today td    { background: rgba(243,209,130,0.03); }
+.p-row-pulsed td   { background: rgba(0,245,155,0.04); }
+.p-td-name  { font-weight: 700; color: #ffffff; font-size: 0.875rem; line-height: 1.3; }
+.p-td-sub   { font-size: 0.72rem; color: var(--slate-muted); margin-top: 0.1rem; }
+.p-td-muted { color: var(--slate-muted); }
+.p-td-mono  { font-family: var(--font-mono); font-size: 0.8rem; color: var(--slate-body); }
+
+/* Status indicators */
+.p-status-done     { font-size: 0.7rem; font-weight: 800; color: var(--neem-green);    text-transform: uppercase; letter-spacing: 0.04em; }
+.p-status-today    { font-size: 0.7rem; font-weight: 800; color: var(--primary-gold);  text-transform: uppercase; letter-spacing: 0.04em; }
+.p-status-upcoming { font-size: 0.7rem; font-weight: 700; color: var(--slate-muted);   text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Badges */
+.p-badge { display: inline-flex; align-items: center; font-size: 0.68rem; font-weight: 800; padding: 0.22rem 0.65rem; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+.p-badge-green { background: rgba(0,245,155,0.1);   color: var(--neem-green);   border: 1px solid rgba(0,245,155,0.25); }
+.p-badge-gold  { background: rgba(243,209,130,0.1); color: var(--primary-gold); border: 1px solid rgba(243,209,130,0.25); }
+.p-badge-dim   { background: rgba(255,255,255,0.05); color: var(--slate-body);  border: 1px solid var(--border-light); }
+
+/* Stage nav */
+.portal-stage-nav { display: flex; gap: 0.25rem; flex-wrap: wrap; width: 100%; }
+.p-stage-btn { background: transparent; border: none; font-size: 0.75rem; font-weight: 700; color: var(--slate-muted); padding: 0.4rem 0.85rem; border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap; }
+.p-stage-btn:hover { color: #ffffff; background: rgba(255,255,255,0.05); }
+.p-stage-active    { color: var(--primary-gold) !important; background: rgba(243,209,130,0.08) !important; }
+
+/* Filter chips */
+.portal-filter-bar { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.p-filter-btn { background: transparent; border: 1px solid transparent; font-size: 0.75rem; font-weight: 700; color: var(--slate-muted); padding: 0.3rem 0.75rem; border-radius: var(--radius-pill); cursor: pointer; }
+.p-filter-btn:hover { color: #ffffff; }
+.p-filter-active   { color: var(--primary-gold) !important; border-color: rgba(243,209,130,0.3) !important; background: rgba(243,209,130,0.08) !important; }
+.p-chip-btn { background: rgba(255,255,255,0.04); border: 1px solid var(--border-light); font-size: 0.72rem; font-weight: 700; color: var(--slate-muted); padding: 0.25rem 0.7rem; border-radius: var(--radius-pill); cursor: pointer; white-space: nowrap; }
+.p-chip-btn:hover { color: #ffffff; border-color: rgba(255,255,255,0.18); }
+.p-chip-active    { color: var(--primary-gold) !important; border-color: rgba(243,209,130,0.35) !important; background: rgba(243,209,130,0.08) !important; }
+
+/* Attendance group */
+.p-att-group   { display: inline-flex; background: rgba(255,255,255,0.04); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 2px; gap: 2px; }
+.p-att-btn     { background: transparent; border: none; padding: 0.3rem 0.65rem; font-size: 0.72rem; font-weight: 700; color: var(--slate-muted); border-radius: 6px; cursor: pointer; }
+.p-att-present { background: rgba(0,245,155,0.18) !important;   color: var(--neem-green) !important; }
+.p-att-absent  { background: rgba(220,38,38,0.18) !important;   color: #f87171 !important; }
+.p-att-late    { background: rgba(243,209,130,0.18) !important; color: var(--primary-gold) !important; }
+
+/* Utility buttons */
+.p-link-btn  { background: none; border: none; font-size: 0.8rem; font-weight: 700; color: var(--slate-body); cursor: pointer; padding: 0.2rem 0.4rem; border-radius: 4px; white-space: nowrap; }
+.p-link-btn:hover { color: #ffffff; }
+.p-ghost-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--border-light); color: var(--slate-body); font-size: 0.825rem; font-weight: 700; padding: 0.5rem 1rem; border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap; }
+.p-ghost-btn:hover { background: rgba(255,255,255,0.09); color: #ffffff; border-color: rgba(255,255,255,0.2); }
+
+/* Nav list (hub) */
+.p-nav-list { display: flex; flex-direction: column; }
+.p-nav-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); gap: 1rem; flex-wrap: wrap; }
+.p-nav-item:last-child { border-bottom: none; }
+.p-nav-title { font-size: 0.925rem; font-weight: 700; color: #ffffff; margin-bottom: 0.15rem; }
+.p-nav-sub   { font-size: 0.78rem; color: var(--slate-muted); line-height: 1.4; }
+
+/* Info row */
+.p-info-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 0.85rem 0; }
+
+/* Modal */
+.p-modal { background: var(--cred-surface-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); width: 100%; max-width: 520px; overflow: hidden; box-shadow: 0 32px 80px rgba(0,0,0,0.7); }
+.p-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.15rem 1.5rem; border-bottom: 1px solid var(--border-light); background: rgba(255,255,255,0.02); }
+.p-modal-title  { font-size: 1rem; font-weight: 800; color: #ffffff; margin: 0; }
+.p-modal-sub    { font-size: 0.75rem; color: var(--slate-muted); margin: 0.15rem 0 0; }
+.p-modal-close  { background: none; border: none; color: var(--slate-muted); font-size: 1.1rem; cursor: pointer; padding: 0.25rem; border-radius: 4px; line-height: 1; }
+.p-modal-close:hover { color: #ffffff; }
+.p-modal-body   { padding: 1.5rem; }
+.p-modal-footer { display: flex; justify-content: flex-end; gap: 0.75rem; padding-top: 1.25rem; border-top: 1px solid var(--border-light); margin-top: 1.25rem; }
+
+/* Form */
+.p-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem 1.25rem; }
+.p-form-row  { display: flex; flex-direction: column; gap: 0.35rem; }
+.p-label     { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--slate-muted); }
+.p-input     { width: 100%; }
