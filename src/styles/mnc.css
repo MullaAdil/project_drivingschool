@@ -1943,8 +1943,132 @@ textarea {
 }
 
 /* ==========================================================================
-   CIRCULAR BLACK & WHITE ROAD CIRCUIT (FRAMING LOGO & HEADING IN CIRCLE)
+   CLEAN CENTERED BRAND HERO (REPLACES CIRCULAR ROAD)
    ========================================================================== */
+
+.hero-brand-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin: 0 auto 2rem;
+  max-width: 680px;
+  padding: 2rem 1.5rem;
+}
+
+.hero-logo-wrap {
+  margin-bottom: 1.25rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.hero-logo-wrap::after {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(243, 209, 130, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+  animation: heroLogoGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes heroLogoGlow {
+  from { opacity: 0.5; transform: scale(0.95); }
+  to   { opacity: 1;   transform: scale(1.05); }
+}
+
+.hero-rto-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--terracotta);
+  background: var(--terracotta-light);
+  border: 1px solid var(--terracotta-border);
+  padding: 0.28rem 0.9rem;
+  border-radius: var(--radius-pill);
+  margin-bottom: 1rem;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.hero-rto-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--neem-green);
+  display: inline-block;
+  box-shadow: 0 0 6px var(--neem-green);
+  animation: roadChipBlink 1.8s infinite;
+}
+
+.mnc-hero-headline {
+  font-family: var(--font-sans);
+  font-size: 3.2rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--charcoal);
+  line-height: 1.15;
+  margin: 0 0 0.75rem;
+}
+
+.hero-brand-name {
+  color: var(--terracotta);
+  display: block;
+}
+
+.hero-curriculum-meta {
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--slate-muted);
+  line-height: 1.5;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+/* Keep these for backward compat if referenced anywhere */
+.hero-circle-road-arena { display: none; }
+.hero-circle-inner-content {}
+.circle-logo-wrap { margin-bottom: 0.75rem; display: flex; justify-content: center; align-items: center; }
+.circle-rto-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--terracotta);
+  background: var(--terracotta-light);
+  border: 1px solid var(--terracotta-border);
+  padding: 0.25rem 0.85rem;
+  border-radius: var(--radius-pill);
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.circle-rto-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--neem-green); display: inline-block; }
+.circle-headline { font-family: var(--font-sans); font-size: 2.15rem; font-weight: 800; letter-spacing: -0.035em; color: var(--charcoal); line-height: 1.2; margin: 0 0 0.65rem; max-width: 380px; }
+.circle-brand-name { color: var(--terracotta); }
+.circle-curriculum-meta { font-size: 0.775rem; font-weight: 600; color: var(--slate-muted); line-height: 1.4; max-width: 300px; margin: 0; }
+.hero-road-chip { display: none; }
+.road-chip-pulse { display: none; }
+.hero-circle-road-svg { display: none; }
+.bw-road-dashed-divider {}
+
+@keyframes roadChipBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+
+@media (max-width: 640px) {
+  .mnc-hero-headline { font-size: 2.15rem; }
+}
+@media (max-width: 400px) {
+  .mnc-hero-headline { font-size: 1.75rem; }
+}
 
 .hero-circle-road-arena {
   position: relative;
@@ -2858,23 +2982,24 @@ body.turbo-mode-active .gafoor-logo-track-wrap {
    CLEAN INSTITUTIONAL PAGE HEADER BANNER (ADMIN / TRAINER / TRAINEE)
    ========================================================================== */
 .clean-page-banner {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 251, 248, 0.95) 100%);
-  border: 1px solid rgba(198, 146, 59, 0.28);
-  border-left: 5px solid var(--primary-green);
+  background: linear-gradient(135deg, rgba(20, 23, 32, 0.95) 0%, rgba(10, 13, 20, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 5px solid var(--primary-gold);
   border-radius: var(--radius-md);
   padding: 1.25rem 1.75rem;
   margin-bottom: 1.75rem;
-  box-shadow: 0 6px 24px -4px rgba(12, 88, 54, 0.08), 0 1px 3px 0 rgba(0, 0, 0, 0.02);
+  box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 1.25rem;
-  transition: box-shadow 0.25s ease;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .clean-page-banner:hover {
-  box-shadow: 0 10px 30px -4px rgba(12, 88, 54, 0.12);
+  box-shadow: 0 28px 64px -12px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  border-left-color: var(--terracotta-hover);
 }
 
 .clean-page-banner .banner-brand-left {
@@ -2886,19 +3011,19 @@ body.turbo-mode-active .gafoor-logo-track-wrap {
 .clean-page-banner .banner-title-block h2 {
   font-size: 1.35rem;
   font-weight: 800;
-  color: var(--charcoal);
+  color: #ffffff;
   letter-spacing: -0.02em;
   margin: 0;
   line-height: 1.2;
 }
 
 .clean-page-banner .banner-title-block h2 span {
-  color: var(--terracotta);
+  color: var(--primary-gold);
 }
 
 .clean-page-banner .banner-sub-meta {
   font-size: 0.775rem;
-  color: var(--slate-muted);
+  color: var(--slate-body);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -2908,7 +3033,7 @@ body.turbo-mode-active .gafoor-logo-track-wrap {
 }
 
 .clean-page-banner .banner-sub-meta .tagline-quote {
-  color: var(--turmeric);
+  color: var(--primary-gold);
   font-weight: 800;
   letter-spacing: 0.02em;
 }
@@ -2921,9 +3046,9 @@ body.turbo-mode-active .gafoor-logo-track-wrap {
 }
 
 .clean-info-badge {
-  background: var(--terracotta-light);
-  color: var(--terracotta);
-  border: 1px solid var(--terracotta-border);
+  background: rgba(255, 255, 255, 0.06);
+  color: #c4cdd8;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   padding: 0.35rem 0.75rem;
   border-radius: var(--radius-pill);
   font-size: 0.75rem;
@@ -2934,9 +3059,9 @@ body.turbo-mode-active .gafoor-logo-track-wrap {
 }
 
 .clean-gold-badge {
-  background: var(--turmeric-light);
-  color: #92400e;
-  border: 1px solid var(--turmeric-border);
+  background: rgba(243, 209, 130, 0.12);
+  color: var(--primary-gold);
+  border: 1px solid rgba(243, 209, 130, 0.32);
   padding: 0.35rem 0.75rem;
   border-radius: var(--radius-pill);
   font-size: 0.75rem;
@@ -3070,21 +3195,21 @@ body.turbo-mode-active .gafoor-logo-track-wrap {
 }
 
 .clean-telemetry-card {
-  background: #ffffff;
-  border: 1px solid var(--border-light);
+  background: linear-gradient(180deg, rgba(22, 26, 36, 0.8) 0%, rgba(14, 17, 24, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-md);
   padding: 1rem 1.25rem;
-  box-shadow: 0 2px 8px -2px rgba(12, 88, 54, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 24px -8px rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .clean-telemetry-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 18px -4px rgba(12, 88, 54, 0.08);
-  border-color: rgba(12, 88, 54, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 14px 34px -8px rgba(0, 0, 0, 0.7);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .telemetry-icon-box {
@@ -3124,9 +3249,9 @@ body.turbo-mode-active .gafoor-logo-track-wrap {
 
 /* Route Advisory Card for Instructor Dispatch */
 .route-advisory-box {
-  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
-  border: 1px solid var(--emerald-border);
-  border-left: 4px solid #059669;
+  background: linear-gradient(135deg, rgba(0, 245, 155, 0.06) 0%, rgba(14, 17, 24, 0.95) 100%);
+  border: 1px solid rgba(0, 245, 155, 0.2);
+  border-left: 4px solid var(--neem-green);
   border-radius: var(--radius-md);
   padding: 1.15rem 1.5rem;
   margin-bottom: 1.75rem;
@@ -3146,12 +3271,12 @@ body.turbo-mode-active .gafoor-logo-track-wrap {
 .route-advisory-text h4 {
   font-size: 0.925rem;
   font-weight: 800;
-  color: #065f46;
+  color: var(--neem-green);
   margin: 0;
 }
 
 .route-advisory-text p {
   font-size: 0.775rem;
-  color: #047857;
+  color: var(--slate-body);
   margin: 0.2rem 0 0 0;
 }

@@ -45,111 +45,29 @@ export function renderHomeWebsiteView(container, onNavigate) {
 
         <!-- HERO SECTION -->
         <section class="mnc-hero" style="text-align: center;">
-          <!-- CIRCULAR BLACK & WHITE ROAD ARENA (TEXT & LOGO STRICTLY INSIDE CIRCLE) -->
-          <div class="hero-circle-road-arena" id="hero-road-interactive-circle" title="Click to toggle Turbo Training Flow!">
-            
-            <!-- BLACK & WHITE CIRCULAR ROAD SVG (NO CAR) -->
-            <svg class="hero-circle-road-svg" viewBox="0 0 600 600" width="100%" height="100%" aria-label="Circular Black and White Driver Training Road Circuit">
-              <defs>
-                <!-- Depth shadow for realistic road elevation -->
-                <filter id="bwRoadDepth" x="-15%" y="-15%" width="130%" height="130%">
-                  <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.3" />
-                  <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000000" flood-opacity="0.2" />
-                </filter>
-                <radialGradient id="innerCircleShine" cx="50%" cy="38%" r="62%">
-                  <stop offset="0%" stop-color="#141824" />
-                  <stop offset="70%" stop-color="#0d1017" />
-                  <stop offset="100%" stop-color="#080a0f" />
-                </radialGradient>
-              </defs>
-
-              <!-- Outer Black & White Rumble Kerb (Classic Motorsport & RTO Track Style) -->
-              <circle cx="300" cy="300" r="293" fill="none" stroke="#18181b" stroke-width="6" />
-              <circle cx="300" cy="300" r="293" fill="none" stroke="#ffffff" stroke-width="6" stroke-dasharray="15 15" />
-              <circle cx="300" cy="300" r="296" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1" />
-
-              <!-- Main Solid Black Asphalt Road Ring -->
-              <circle cx="300" cy="300" r="267" fill="none" stroke="#12151e" stroke-width="44" filter="url(#bwRoadDepth)" />
-
-              <!-- Outer Solid White Road Boundary Line -->
-              <circle cx="300" cy="300" r="289" fill="none" stroke="rgba(255, 255, 255, 0.85)" stroke-width="2.5" />
-
-              <!-- Inner Solid White Road Boundary Line -->
-              <circle cx="300" cy="300" r="245" fill="none" stroke="rgba(255, 255, 255, 0.85)" stroke-width="2.5" />
-
-              <!-- Inner Black & White Island Kerb -->
-              <circle cx="300" cy="300" r="242" fill="none" stroke="#12151e" stroke-width="3.5" />
-              <circle cx="300" cy="300" r="242" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-dasharray="10 10" />
-
-              <!-- Crisp White Zebra Crossing at 12 O'Clock (Top) -->
-              <g class="bw-zebra-crossing" opacity="0.95">
-                <rect x="272" y="24" width="4.5" height="42" rx="1.5" fill="#ffffff" />
-                <rect x="280" y="23.5" width="4.5" height="43" rx="1.5" fill="#ffffff" />
-                <rect x="288" y="23" width="4.5" height="44" rx="1.5" fill="#ffffff" />
-                <rect x="296" y="23" width="4.5" height="44" rx="1.5" fill="#ffffff" />
-                <rect x="304" y="23" width="4.5" height="44" rx="1.5" fill="#ffffff" />
-                <rect x="312" y="23.5" width="4.5" height="43" rx="1.5" fill="#ffffff" />
-                <rect x="320" y="24" width="4.5" height="42" rx="1.5" fill="#ffffff" />
-              </g>
-
-              <!-- Stenciled Road Direction Arrows (Clockwise Flow) -->
-              <g transform="translate(300, 300) rotate(90) translate(-300, -300)" opacity="0.85">
-                <path d="M 288,45 A 267 267 0 0 1 312,45" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" />
-                <polygon points="314,45 306,40 307,49" fill="#ffffff" />
-              </g>
-              <g transform="translate(300, 300) rotate(180) translate(-300, -300)" opacity="0.85">
-                <path d="M 288,45 A 267 267 0 0 1 312,45" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" />
-                <polygon points="314,45 306,40 307,49" fill="#ffffff" />
-              </g>
-              <g transform="translate(300, 300) rotate(270) translate(-300, -300)" opacity="0.85">
-                <path d="M 288,45 A 267 267 0 0 1 312,45" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" />
-                <polygon points="314,45 306,40 307,49" fill="#ffffff" />
-              </g>
-
-              <!-- Stenciled Text On Road Ring -->
-              <text x="300" y="16" font-size="6.5" font-weight="900" fill="#8e9aa8" text-anchor="middle" letter-spacing="1.5">▲ AP RTO TEST CIRCUIT · START / FINISH ▲</text>
-              <text x="300" y="588" font-size="6.5" font-weight="900" fill="#8e9aa8" text-anchor="middle" letter-spacing="1.5">▼ 20-DAY PRACTICAL ROAD TRAINING · 8 KM/DAY ▼</text>
-              <text x="14" y="303" font-size="6.5" font-weight="900" fill="#8e9aa8" text-anchor="middle" transform="rotate(-90 14 303)" letter-spacing="1">◀ 8-TRACK</text>
-              <text x="586" y="303" font-size="6.5" font-weight="900" fill="#8e9aa8" text-anchor="middle" transform="rotate(90 586 303)" letter-spacing="1">H-TRACK ▶</text>
-
-              <!-- ANIMATED WHITE DASHED CENTERLINE DIVIDER (FLOWING ROAD) -->
-              <circle cx="300" cy="300" r="267" fill="none" stroke="#ffffff" stroke-width="3" stroke-dasharray="14 16" class="bw-road-dashed-divider" />
-
-              <!-- Inner Clean Obsidian Circle Ground (Protected Space for Text & Logo) -->
-              <circle cx="300" cy="300" r="240" fill="url(#innerCircleShine)" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1" />
-              <circle cx="300" cy="300" r="236" fill="none" stroke="rgba(243, 209, 130, 0.35)" stroke-width="1" stroke-dasharray="3 4" />
-            </svg>
-
-            <!-- CENTER CONTENT: TEXT & LOGO LYING ACCURATELY INSIDE CIRCLE -->
-            <div class="hero-circle-inner-content">
-              <!-- Logo Showcase -->
-              <div class="circle-logo-wrap">
-                ${renderBrandLogo({ size: 'lg', className: 'circle-hero-brand-logo' })}
-              </div>
-
-              <!-- AP RTO Accreditation Pill Badge -->
-              <div class="circle-rto-badge">
-                <span class="circle-rto-dot"></span>
-                Walk in &amp; Drive out · AP RTO Accredited
-              </div>
-
-              <!-- Grand Hero Headline Fitting Exactly Inside Circle -->
-              <h1 class="circle-headline">
-                Walk in &amp; Drive out at<br>
-                <span class="circle-brand-name">Gafoor Driving School</span>
-              </h1>
-
-              <!-- Mini Curriculum Details Inside Circle -->
-              <p class="circle-curriculum-meta">
-                20-Day Practical Training · Maruti Swift Fleet · Pulivendula
-              </p>
+          <!-- CLEAN CENTERED BRAND HERO -->
+          <div class="hero-brand-center">
+            <!-- Logo Showcase -->
+            <div class="hero-logo-wrap">
+              ${renderBrandLogo({ size: 'lg', className: 'hero-brand-logo' })}
             </div>
 
-            <!-- Sleek Status Chip at Bottom of Circle -->
-            <div class="hero-road-chip" id="hero-road-chip">
-              <span class="road-chip-pulse"></span>
-              <span class="road-chip-text">AP RTO CIRCUIT TRACK</span>
+            <!-- AP RTO Accreditation Pill Badge -->
+            <div class="hero-rto-badge">
+              <span class="hero-rto-dot"></span>
+              Walk in &amp; Drive out · AP RTO Accredited
             </div>
+
+            <!-- Grand Hero Headline -->
+            <h1 class="mnc-hero-headline">
+              Walk in &amp; Drive out at<br>
+              <span class="hero-brand-name">Gafoor Driving School</span>
+            </h1>
+
+            <!-- Curriculum meta -->
+            <p class="hero-curriculum-meta">
+              20-Day Practical Training · Maruti Swift Fleet · Pulivendula
+            </p>
           </div>
 
           <p class="mnc-hero-sub" style="font-size: 1.15rem; line-height: 1.65; color: var(--slate-body); max-width: 720px; margin: 0 auto 1.75rem;">

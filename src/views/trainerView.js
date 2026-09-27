@@ -43,7 +43,7 @@ export function renderTrainerView(container, showToast) {
         <!-- Pulivendula Route & Fleet Inspection Advisory Strip -->
         <div class="route-advisory-box">
           <div class="route-advisory-left">
-            <div style="width: 44px; height: 44px; border-radius: var(--radius-sm); background: #ecfdf5; border: 1px solid var(--emerald-border); display: flex; align-items: center; justify-content: center; font-size: 1.35rem; color: #059669; flex-shrink: 0;">
+            <div style="width: 44px; height: 44px; border-radius: var(--radius-sm); background: rgba(0, 245, 155, 0.1); border: 1px solid rgba(0, 245, 155, 0.28); display: flex; align-items: center; justify-content: center; font-size: 1.35rem; flex-shrink: 0;">
               🛡️
             </div>
             <div class="route-advisory-text">
