@@ -138,10 +138,10 @@ function renderHeader(activeNav) {
       <div class="mnc-brand" id="brand-home" style="gap: 0.85rem; cursor: pointer;">
         ${renderBrandLogo({ size: 'header' })}
         <div style="display: flex; flex-direction: column;">
-          <div class="mnc-brand-mark" style="font-size: 1.15rem; line-height: 1.15; font-weight: 800; color: #1c1917;">
-            GAFOOR <span style="color: var(--terracotta);">DRIVING SCHOOL</span>
+          <div class="mnc-brand-mark" style="font-size: 1.15rem; line-height: 1.15; font-weight: 800; color: #ffffff;">
+            GAFOOR <span style="color: var(--primary-gold);">DRIVING SCHOOL</span>
           </div>
-          <span style="font-size: 0.65rem; color: var(--turmeric); font-weight: 800; letter-spacing: 0.03em;">WALK IN & DRIVE OUT · PULIVENDULA (AP RTO)</span>
+          <span style="font-size: 0.65rem; color: var(--primary-gold); font-weight: 800; letter-spacing: 0.06em;">WALK IN &amp; DRIVE OUT · PULIVENDULA (AP RTO)</span>
         </div>
         <span class="mnc-brand-tag" style="font-size: 0.65rem;">${roleBadge}</span>
       </div>
@@ -243,6 +243,8 @@ function render() {
       } else {
         navigateTo('trainee');
       }
+    }, () => {
+      navigateTo('home');
     });
     return;
   }

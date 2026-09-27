@@ -32,14 +32,14 @@ export function renderHomeWebsiteView(container, onNavigate) {
     const template = `
       <div class="natu-page-wrapper">
         <!-- TOP NOTIFICATION STRIP -->
-        <div style="background: var(--charcoal); color: #f7f3eb; padding: 0.5rem 1.5rem; font-size: 0.775rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <div style="background: var(--cred-bg-darkest); color: #9da4b4; padding: 0.55rem 1.5rem; font-size: 0.775rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
           <div style="display: flex; align-items: center; gap: 0.65rem;">
-            <span style="background: var(--turmeric); color: #1c1917; font-weight: 800; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem;">AP RTO</span>
-            <span>Govt. Accredited Motor Driving School · Reg #AP-04-DS-2024 · Pulivendula, YSR Kadapa Dist.</span>
+            <span style="background: rgba(243, 209, 130, 0.15); color: var(--primary-gold); border: 1px solid rgba(243, 209, 130, 0.3); font-weight: 800; padding: 2px 7px; border-radius: 4px; font-size: 0.7rem; letter-spacing: 0.05em;">AP RTO</span>
+            <span style="color: #cbd5e1;">Govt. Accredited Motor Driving School · Reg #AP-04-DS-2024 · Pulivendula, YSR Kadapa Dist.</span>
           </div>
 
           <div style="display: flex; align-items: center; gap: 1rem;">
-            <span style="color: #cbd5e1;">📍 Kadapa Road, Pulivendula · 📞 +91 98480 22334 / +91 94401 55678</span>
+            <span style="color: #9da4b4;">📍 Kadapa Road, Pulivendula · 📞 +91 98480 22334 / +91 94401 55678</span>
           </div>
         </div>
 
@@ -53,32 +53,32 @@ export function renderHomeWebsiteView(container, onNavigate) {
               <defs>
                 <!-- Depth shadow for realistic road elevation -->
                 <filter id="bwRoadDepth" x="-15%" y="-15%" width="130%" height="130%">
-                  <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.12" />
-                  <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000000" flood-opacity="0.08" />
+                  <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.3" />
+                  <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000000" flood-opacity="0.2" />
                 </filter>
                 <radialGradient id="innerCircleShine" cx="50%" cy="38%" r="62%">
-                  <stop offset="0%" stop-color="#ffffff" />
-                  <stop offset="80%" stop-color="#faf8f5" />
-                  <stop offset="100%" stop-color="#f4ede2" />
+                  <stop offset="0%" stop-color="#141824" />
+                  <stop offset="70%" stop-color="#0d1017" />
+                  <stop offset="100%" stop-color="#080a0f" />
                 </radialGradient>
               </defs>
 
               <!-- Outer Black & White Rumble Kerb (Classic Motorsport & RTO Track Style) -->
               <circle cx="300" cy="300" r="293" fill="none" stroke="#18181b" stroke-width="6" />
               <circle cx="300" cy="300" r="293" fill="none" stroke="#ffffff" stroke-width="6" stroke-dasharray="15 15" />
-              <circle cx="300" cy="300" r="296" fill="none" stroke="rgba(0,0,0,0.15)" stroke-width="1" />
+              <circle cx="300" cy="300" r="296" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1" />
 
               <!-- Main Solid Black Asphalt Road Ring -->
-              <circle cx="300" cy="300" r="267" fill="none" stroke="#18181b" stroke-width="44" filter="url(#bwRoadDepth)" />
+              <circle cx="300" cy="300" r="267" fill="none" stroke="#12151e" stroke-width="44" filter="url(#bwRoadDepth)" />
 
               <!-- Outer Solid White Road Boundary Line -->
-              <circle cx="300" cy="300" r="289" fill="none" stroke="#ffffff" stroke-width="2.5" />
+              <circle cx="300" cy="300" r="289" fill="none" stroke="rgba(255, 255, 255, 0.85)" stroke-width="2.5" />
 
               <!-- Inner Solid White Road Boundary Line -->
-              <circle cx="300" cy="300" r="245" fill="none" stroke="#ffffff" stroke-width="2.5" />
+              <circle cx="300" cy="300" r="245" fill="none" stroke="rgba(255, 255, 255, 0.85)" stroke-width="2.5" />
 
               <!-- Inner Black & White Island Kerb -->
-              <circle cx="300" cy="300" r="242" fill="none" stroke="#18181b" stroke-width="3.5" />
+              <circle cx="300" cy="300" r="242" fill="none" stroke="#12151e" stroke-width="3.5" />
               <circle cx="300" cy="300" r="242" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-dasharray="10 10" />
 
               <!-- Crisp White Zebra Crossing at 12 O'Clock (Top) -->
@@ -106,18 +106,18 @@ export function renderHomeWebsiteView(container, onNavigate) {
                 <polygon points="314,45 306,40 307,49" fill="#ffffff" />
               </g>
 
-              <!-- White Stenciled Text On Road Ring -->
-              <text x="300" y="16" font-size="6.5" font-weight="900" fill="#18181b" text-anchor="middle" letter-spacing="1.5">▲ AP RTO TEST CIRCUIT · START / FINISH ▲</text>
-              <text x="300" y="588" font-size="6.5" font-weight="900" fill="#18181b" text-anchor="middle" letter-spacing="1.5">▼ 20-DAY PRACTICAL ROAD TRAINING · 8 KM/DAY ▼</text>
-              <text x="14" y="303" font-size="6.5" font-weight="900" fill="#18181b" text-anchor="middle" transform="rotate(-90 14 303)" letter-spacing="1">◀ 8-TRACK</text>
-              <text x="586" y="303" font-size="6.5" font-weight="900" fill="#18181b" text-anchor="middle" transform="rotate(90 586 303)" letter-spacing="1">H-TRACK ▶</text>
+              <!-- Stenciled Text On Road Ring -->
+              <text x="300" y="16" font-size="6.5" font-weight="900" fill="#8e9aa8" text-anchor="middle" letter-spacing="1.5">▲ AP RTO TEST CIRCUIT · START / FINISH ▲</text>
+              <text x="300" y="588" font-size="6.5" font-weight="900" fill="#8e9aa8" text-anchor="middle" letter-spacing="1.5">▼ 20-DAY PRACTICAL ROAD TRAINING · 8 KM/DAY ▼</text>
+              <text x="14" y="303" font-size="6.5" font-weight="900" fill="#8e9aa8" text-anchor="middle" transform="rotate(-90 14 303)" letter-spacing="1">◀ 8-TRACK</text>
+              <text x="586" y="303" font-size="6.5" font-weight="900" fill="#8e9aa8" text-anchor="middle" transform="rotate(90 586 303)" letter-spacing="1">H-TRACK ▶</text>
 
               <!-- ANIMATED WHITE DASHED CENTERLINE DIVIDER (FLOWING ROAD) -->
               <circle cx="300" cy="300" r="267" fill="none" stroke="#ffffff" stroke-width="3" stroke-dasharray="14 16" class="bw-road-dashed-divider" />
 
-              <!-- Inner Clean White Circle Ground (Protected Space for Text & Logo) -->
-              <circle cx="300" cy="300" r="240" fill="url(#innerCircleShine)" stroke="rgba(28, 25, 23, 0.08)" stroke-width="1" />
-              <circle cx="300" cy="300" r="236" fill="none" stroke="rgba(198, 146, 59, 0.28)" stroke-width="1" stroke-dasharray="3 4" />
+              <!-- Inner Clean Obsidian Circle Ground (Protected Space for Text & Logo) -->
+              <circle cx="300" cy="300" r="240" fill="url(#innerCircleShine)" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1" />
+              <circle cx="300" cy="300" r="236" fill="none" stroke="rgba(243, 209, 130, 0.35)" stroke-width="1" stroke-dasharray="3 4" />
             </svg>
 
             <!-- CENTER CONTENT: TEXT & LOGO LYING ACCURATELY INSIDE CIRCLE -->
@@ -163,7 +163,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
             <button type="button" class="btn-mnc btn-mnc-secondary" id="hero-btn-track-scroll" style="padding: 0.8rem 1.85rem; font-size: 0.95rem;">
               Explore RTO Track Guide ↓
             </button>
-            <button type="button" class="btn-mnc btn-mnc-secondary" id="hero-btn-upi-modal" style="padding: 0.8rem 1.5rem; font-size: 0.95rem; border-color: var(--terracotta-border); color: var(--terracotta);">
+            <button type="button" class="btn-mnc btn-cred-gold" id="hero-btn-upi-modal" style="padding: 0.8rem 1.65rem; font-size: 0.95rem;">
               Pay via UPI QR ⊞
             </button>
           </div>
@@ -175,22 +175,22 @@ export function renderHomeWebsiteView(container, onNavigate) {
         </section>
 
         <!-- TRUST INDICATORS & STATISTICS RIBBON -->
-        <section class="mnc-trust-strip" style="background: #ffffff;">
+        <section class="mnc-trust-strip">
           <div class="mnc-stats-grid">
             <div class="mnc-stat-item">
-              <span class="mnc-stat-number" style="color: var(--terracotta);">15,000+</span>
+              <span class="mnc-stat-number stat-gold">15,000+</span>
               <span class="mnc-stat-label">Licensed Drivers Trained</span>
             </div>
             <div class="mnc-stat-item">
-              <span class="mnc-stat-number" style="color: var(--neem-green);">99.2%</span>
+              <span class="mnc-stat-number stat-green">99.2%</span>
               <span class="mnc-stat-label">1st-Attempt RTO DL Pass Rate</span>
             </div>
             <div class="mnc-stat-item">
-              <span class="mnc-stat-number" style="color: var(--turmeric);">20 Days</span>
+              <span class="mnc-stat-number stat-cyan">20 Days</span>
               <span class="mnc-stat-label">8 km/Day Real Road Practice</span>
             </div>
             <div class="mnc-stat-item">
-              <span class="mnc-stat-number" style="color: var(--charcoal);">4.96 ★</span>
+              <span class="mnc-stat-number">4.96 ★</span>
               <span class="mnc-stat-label">Verified Google Student Rating</span>
             </div>
           </div>
@@ -212,10 +212,10 @@ export function renderHomeWebsiteView(container, onNavigate) {
         </section>
 
         <!-- INTERACTIVE RTO 8 & H TRACK SIMULATION STUDIO -->
-        <section class="mnc-section-services" id="rto-track-section" style="background: var(--bg-canvas);">
+        <section class="mnc-section-services" id="rto-track-section">
           <div class="mnc-section-container">
             <div class="mnc-section-header">
-              <span class="mnc-section-tag" style="background: var(--terracotta-light); color: var(--terracotta); border-color: var(--terracotta-border);">
+              <span class="mnc-section-tag">
                 Official RTO Track Preparation
               </span>
               <h2 class="mnc-section-title">
@@ -249,7 +249,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
         </section>
 
         <!-- SERVICES / COURSE ARCHITECTURE (3-COLUMN STRUCTURE IN ₹ INR) -->
-        <section class="mnc-section-services" id="services-grid-section" style="background: #ffffff;">
+        <section class="mnc-section-services" id="services-grid-section">
           <div class="mnc-section-container">
             <div class="mnc-section-header">
               <span class="mnc-section-tag">Curriculum Architecture</span>
@@ -266,7 +266,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
               <div class="mnc-service-column">
                 <div>
                   <div class="col-header">
-                    <span class="col-badge" style="background: var(--bg-subtle); color: var(--charcoal); border-color: var(--border-dark);">
+                    <span class="col-badge">
                       Beginner Track
                     </span>
                     <h3 class="col-title">Beginner Driving Course</h3>
@@ -277,7 +277,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
                     <div class="program-item">
                       <div class="program-name">
                         20-Day Program (8 km/day)
-                        <span style="color: var(--terracotta);">₹5,500</span>
+                        <span style="color: var(--primary-cyan); font-weight: 800; font-family: var(--font-mono); font-size: 1.15rem;">₹5,500</span>
                       </div>
                       <div class="program-detail">Accelerator-Brake-Clutch sensitivity, creeping, and progressive braking.</div>
                     </div>
@@ -308,14 +308,14 @@ export function renderHomeWebsiteView(container, onNavigate) {
               </div>
 
               <!-- COLUMN 2: RTO 8 & H TRACK + FLYOVER (MOST POPULAR) -->
-              <div class="mnc-service-column" style="border: 2px solid var(--terracotta); position: relative; box-shadow: var(--shadow-hover);">
-                <div style="position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--terracotta); color: #ffffff; font-size: 0.725rem; font-weight: 800; padding: 3px 12px; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.05em;">
+              <div class="mnc-service-column popular-tier" style="position: relative;">
+                <div style="position: absolute; top: -14px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #f3d182 0%, #e0aa3e 100%); color: #08090c; font-size: 0.725rem; font-weight: 800; padding: 4px 14px; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.08em; box-shadow: 0 4px 14px rgba(243, 209, 130, 0.35);">
                   Most Popular Choice
                 </div>
 
                 <div>
                   <div class="col-header" style="margin-top: 0.5rem;">
-                    <span class="col-badge" style="background: var(--terracotta-light); color: var(--terracotta); border-color: var(--terracotta-border);">
+                    <span class="col-badge" style="background: rgba(243, 209, 130, 0.12); color: var(--primary-gold); border-color: rgba(243, 209, 130, 0.3);">
                       Full Licensure
                     </span>
                     <h3 class="col-title">RTO 8-Track & City Mastery</h3>
@@ -326,7 +326,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
                     <div class="program-item">
                       <div class="program-name">
                         Full 20-Day DL Package
-                        <span style="color: var(--terracotta); font-size: 1.1rem;">₹7,500</span>
+                        <span style="color: var(--primary-gold); font-size: 1.25rem; font-weight: 800; font-family: var(--font-mono);">₹7,500</span>
                       </div>
                       <div class="program-detail">Daily 8 km on real highway and city road corridors (160 km total logged).</div>
                     </div>
@@ -360,7 +360,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
               <div class="mnc-service-column">
                 <div>
                   <div class="col-header">
-                    <span class="col-badge" style="background: var(--turmeric-light); color: var(--turmeric-hover); border-color: var(--turmeric-border);">
+                    <span class="col-badge" style="background: rgba(0, 245, 155, 0.12); color: var(--primary-green); border-color: rgba(0, 245, 155, 0.3);">
                       Women Mentorship
                     </span>
                     <h3 class="col-title">Ladies Special & Doorstep Pickup</h3>
@@ -371,7 +371,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
                     <div class="program-item">
                       <div class="program-name">
                         Senior Lady Instructor Package
-                        <span style="color: var(--terracotta);">₹8,500</span>
+                        <span style="color: var(--primary-green); font-size: 1.15rem; font-weight: 800; font-family: var(--font-mono);">₹8,500</span>
                       </div>
                       <div class="program-detail">Patience-driven mentorship eliminating road nervousness.</div>
                     </div>
@@ -405,45 +405,45 @@ export function renderHomeWebsiteView(container, onNavigate) {
         </section>
 
         <!-- FLEET SPOTLIGHT SECTION (AUTHENTIC TRAINING CARS) -->
-        <section class="mnc-fleet-spotlight" style="background: var(--bg-canvas); border-top: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light);">
+        <section class="mnc-fleet-spotlight">
           <div class="mnc-section-container">
-            <div class="fleet-banner" style="background: #ffffff; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 2.5rem; box-shadow: var(--shadow-card);">
+            <div class="fleet-banner">
               <div>
                 <span class="track-badge-rto">
                   State Dual-Control Vehicle Fleet
                 </span>
-                <h2 style="font-size: 1.85rem; font-weight: 800; color: var(--charcoal); margin: 0.5rem 0 1rem;">
+                <h2>
                   100% Dual-Control Dual-Pedal Safety Fleet
                 </h2>
-                <p style="color: var(--slate-body); line-height: 1.6; max-width: 540px; margin-bottom: 1.5rem;">
-                  Every vehicle is fitted with passenger-side co-driver dual pedals (brake & clutch) certified under State Transport Department guidelines for fail-safe learner control.
+                <p>
+                  Every vehicle is fitted with passenger-side co-driver dual pedals (brake &amp; clutch) certified under State Transport Department guidelines for fail-safe learner control.
                 </p>
 
                 <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
                   <button type="button" class="btn-mnc btn-mnc-primary" id="btn-fleet-book">
                     Book a 1-on-1 Trial Drive
                   </button>
-                  <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-open-upi-mini">
-                    Pay Fees via UPI QR
+                  <button type="button" class="btn-mnc btn-cred-gold" id="btn-open-upi-mini">
+                    Pay Fees via UPI QR ⊞
                   </button>
                 </div>
               </div>
 
               <div class="fleet-stats-mini">
-                <div class="fleet-stat-card" style="background: var(--bg-canvas); border: 1px solid var(--border-light);">
-                  <span class="num" style="color: var(--terracotta); font-size: 1.35rem;">Swift & Punch</span>
-                  <span class="desc">Maruti Swift, WagonR, Grand i10 & Tata Punch AC units</span>
+                <div class="fleet-stat-card">
+                  <span class="num" style="color: var(--primary-cyan);">Swift &amp; Punch</span>
+                  <span class="desc">Maruti Swift, WagonR, Grand i10 &amp; Tata Punch AC units</span>
                 </div>
-                <div class="fleet-stat-card" style="background: var(--bg-canvas); border: 1px solid var(--border-light);">
-                  <span class="num" style="color: var(--neem-green); font-size: 1.35rem;">100% Safety</span>
+                <div class="fleet-stat-card">
+                  <span class="num" style="color: var(--primary-green);">100% Safety</span>
                   <span class="desc">Zero accident safety record with secondary trainer brake pedals</span>
                 </div>
-                <div class="fleet-stat-card" style="background: var(--bg-canvas); border: 1px solid var(--border-light);">
-                  <span class="num" style="color: var(--turmeric); font-size: 1.35rem;">RTO Track</span>
+                <div class="fleet-stat-card">
+                  <span class="num" style="color: var(--primary-gold);">RTO Track</span>
                   <span class="desc">Practiced on actual automated RTO sensor ground circuits</span>
                 </div>
-                <div class="fleet-stat-card" style="background: var(--bg-canvas); border: 1px solid var(--border-light);">
-                  <span class="num" style="color: var(--charcoal); font-size: 1.35rem;">Ladies Wing</span>
+                <div class="fleet-stat-card">
+                  <span class="num" style="color: #ffffff;">Ladies Wing</span>
                   <span class="desc">Exclusive lady mentor wing with comfortable doorstep service</span>
                 </div>
               </div>
@@ -452,10 +452,10 @@ export function renderHomeWebsiteView(container, onNavigate) {
         </section>
 
         <!-- AUTHENTIC TESTIMONIALS -->
-        <section class="mnc-section-services" style="background: #ffffff; padding: 4rem 2rem;">
+        <section class="mnc-section-services" style="padding: 5rem 2rem;">
           <div class="mnc-section-container">
             <div class="mnc-section-header">
-              <span class="mnc-section-tag" style="background: var(--terracotta-light); color: var(--terracotta); border-color: var(--terracotta-border);">
+              <span class="mnc-section-tag">
                 Verified Student Reviews
               </span>
               <h2 class="mnc-section-title">
@@ -463,54 +463,54 @@ export function renderHomeWebsiteView(container, onNavigate) {
               </h2>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.75rem; margin-top: 2.5rem;">
               <!-- Review 1 -->
-              <div style="background: var(--bg-canvas); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.75rem; box-shadow: var(--shadow-card);">
-                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
-                  <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--terracotta); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800;">
+              <div style="background: linear-gradient(180deg, rgba(22, 26, 36, 0.75) 0%, rgba(13, 16, 23, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-card); padding: 2rem; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 20px 48px -12px rgba(0, 0, 0, 0.7);">
+                <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.25rem;">
+                  <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #f3d182, #e0aa3e); color: #08090c; display: flex; align-items: center; justify-content: center; font-weight: 800; font-family: var(--font-display);">
                     RB
                   </div>
                   <div>
-                    <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--charcoal); margin: 0;">Ramesh Babu</h4>
-                    <span style="font-size: 0.75rem; color: var(--slate-muted);">Bakarapuram, Pulivendula · Software Engineer</span>
+                    <h4 style="font-size: 0.95rem; font-weight: 800; color: #ffffff; margin: 0;">Ramesh Babu</h4>
+                    <span style="font-size: 0.75rem; color: var(--slate-body);">Bakarapuram, Pulivendula · Software Engineer</span>
                   </div>
                 </div>
-                <div style="color: var(--turmeric); font-size: 0.85rem; margin-bottom: 0.5rem;">★★★★★</div>
-                <p style="font-size: 0.875rem; color: var(--slate-body); line-height: 1.6; font-style: italic;">
+                <div style="color: var(--primary-gold); font-size: 0.9rem; margin-bottom: 0.75rem; letter-spacing: 0.08em;">★★★★★</div>
+                <p style="font-size: 0.875rem; color: #cbd5e1; line-height: 1.65; margin: 0;">
                   "Gafoor Driving School made learning so simple! Master Srinivas explained clutch balance and the RTO 8-track maneuvers patiently. Cleared my AP RTO test on the first attempt with zero penalty!"
                 </p>
               </div>
 
               <!-- Review 2 -->
-              <div style="background: var(--bg-canvas); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.75rem; box-shadow: var(--shadow-card);">
-                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
-                  <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--turmeric-hover); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800;">
+              <div style="background: linear-gradient(180deg, rgba(22, 26, 36, 0.75) 0%, rgba(13, 16, 23, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-card); padding: 2rem; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 20px 48px -12px rgba(0, 0, 0, 0.7);">
+                <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.25rem;">
+                  <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #00f59b, #059669); color: #08090c; display: flex; align-items: center; justify-content: center; font-weight: 800; font-family: var(--font-display);">
                     SR
                   </div>
                   <div>
-                    <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--charcoal); margin: 0;">Sravani Reddy</h4>
-                    <span style="font-size: 0.75rem; color: var(--slate-muted);">Kadapa Road, Pulivendula · Teacher & Homemaker</span>
+                    <h4 style="font-size: 0.95rem; font-weight: 800; color: #ffffff; margin: 0;">Sravani Reddy</h4>
+                    <span style="font-size: 0.75rem; color: var(--slate-body);">Kadapa Road, Pulivendula · Teacher & Homemaker</span>
                   </div>
                 </div>
-                <div style="color: var(--turmeric); font-size: 0.85rem; margin-bottom: 0.5rem;">★★★★★</div>
-                <p style="font-size: 0.875rem; color: var(--slate-body); line-height: 1.6; font-style: italic;">
-                  "Lady instructor Anitha Reddy gave me immense confidence. Truly 'Walk in & Drive out'! With convenient doorstep pickup in Pulivendula, I can now navigate town traffic and ring roads effortlessly."
+                <div style="color: var(--primary-gold); font-size: 0.9rem; margin-bottom: 0.75rem; letter-spacing: 0.08em;">★★★★★</div>
+                <p style="font-size: 0.875rem; color: #cbd5e1; line-height: 1.65; margin: 0;">
+                  "Lady instructor Anitha Reddy gave me immense confidence. Truly 'Walk in &amp; Drive out'! With convenient doorstep pickup in Pulivendula, I can now navigate town traffic and ring roads effortlessly."
                 </p>
               </div>
 
               <!-- Review 3 -->
-              <div style="background: var(--bg-canvas); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.75rem; box-shadow: var(--shadow-card);">
-                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
-                  <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--neem-green); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800;">
+              <div style="background: linear-gradient(180deg, rgba(22, 26, 36, 0.75) 0%, rgba(13, 16, 23, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-card); padding: 2rem; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 20px 48px -12px rgba(0, 0, 0, 0.7);">
+                <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.25rem;">
+                  <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #00d2ff, #0284c7); color: #08090c; display: flex; align-items: center; justify-content: center; font-weight: 800; font-family: var(--font-display);">
                     KR
                   </div>
                   <div>
-                    <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--charcoal); margin: 0;">Koteswara Rao</h4>
-                    <span style="font-size: 0.75rem; color: var(--slate-muted);">Shilparamam Road, Pulivendula · Business Owner</span>
+                    <h4 style="font-size: 0.95rem; font-weight: 800; color: #ffffff; margin: 0;">Koteswara Rao</h4>
+                    <span style="font-size: 0.75rem; color: var(--slate-body);">Shilparamam Road, Pulivendula · Business Owner</span>
                   </div>
                 </div>
-                <div style="color: var(--turmeric); font-size: 0.85rem; margin-bottom: 0.5rem;">★★★★★</div>
-                <p style="font-size: 0.875rem; color: var(--slate-body); line-height: 1.6; font-style: italic;">
+                <div style="color: var(--primary-gold); font-size: 0.9rem; margin-bottom: 0.75rem; letter-spacing: 0.08em;">★★★★★</div>
+                <p style="font-size: 0.875rem; color: #cbd5e1; line-height: 1.65; margin: 0;">
                   "Trained my son with solid practical fundamentals on the Pulivendula bypass circuit. The reverse bay and H-track instructions were crystal clear. Honest fee in ₹ with full transparency!"
                 </p>
               </div>
@@ -519,7 +519,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
         </section>
 
         <!-- DASHBOARD PREVIEW SECTION: TABBED INTERFACE (ADMIN / TRAINER / TRAINEE) -->
-        <section class="mnc-section-dashboard" id="dashboard-preview-section" style="background: var(--bg-canvas);">
+        <section class="mnc-section-dashboard" id="dashboard-preview-section">
           <div class="mnc-section-container">
             <div class="mnc-section-header">
               <span class="mnc-section-tag">Academy Cloud Platform</span>
@@ -571,7 +571,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
         </section>
 
         <!-- INSTITUTIONAL FOOTER -->
-        <footer class="mnc-footer" style="background: var(--charcoal); color: #f7f3eb;">
+        <footer class="mnc-footer">
           <div class="mnc-footer-grid">
             <div>
               <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 0.75rem;">
@@ -1171,37 +1171,37 @@ export function renderHomeWebsiteView(container, onNavigate) {
     modalRoot.innerHTML = `
       <div class="mnc-modal-overlay">
         <div class="mnc-modal" style="max-width: 520px;">
-          <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; background: var(--bg-offwhite);">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div style="padding: 1.35rem 1.75rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03);">
+            <div style="display: flex; align-items: center; gap: 0.85rem;">
               ${renderBrandLogo({ size: 'sm' })}
               <div>
-                <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--charcoal); margin: 0;">Enroll in Gafoor Driving School</h3>
-                <p style="font-size: 0.8rem; color: var(--slate-muted); margin: 0;">Pulivendula · Certified 1-on-1 dual-control Maruti Swift training.</p>
+                <h3 style="font-size: 1.15rem; font-weight: 800; color: #ffffff; margin: 0; letter-spacing: -0.01em;">Enroll in Gafoor Driving School</h3>
+                <p style="font-size: 0.78rem; color: var(--slate-body); margin: 0.2rem 0 0;">Pulivendula · Certified 1-on-1 dual-control Maruti Swift training.</p>
               </div>
             </div>
-            <button type="button" id="btn-close-book" style="background: transparent; border: none; font-size: 1.25rem; cursor: pointer; color: var(--slate-muted);">✕</button>
+            <button type="button" id="btn-close-book" style="background: transparent; border: none; font-size: 1.25rem; cursor: pointer; color: var(--slate-body); line-height: 1;">✕</button>
           </div>
 
-          <form id="form-booking" style="padding: 1.5rem;">
-            <div style="margin-bottom: 1rem;">
-              <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-muted); text-transform: uppercase; margin-bottom: 0.35rem;">
+          <form id="form-booking" style="padding: 1.75rem;">
+            <div style="margin-bottom: 1.2rem;">
+              <label style="display: block; font-size: 0.725rem; font-weight: 800; color: #8e9aa8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem;">
                 Candidate Full Name
               </label>
-              <input type="text" class="mnc-input" name="name" required placeholder="e.g. Sai Kiran" />
+              <input type="text" class="mnc-input" name="name" required placeholder="e.g. Sai Kiran" style="width: 100%; box-sizing: border-box;" />
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.2rem;">
               <div>
-                <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-muted); text-transform: uppercase; margin-bottom: 0.35rem;">
+                <label style="display: block; font-size: 0.725rem; font-weight: 800; color: #8e9aa8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem;">
                   Contact Phone
                 </label>
-                <input type="tel" class="mnc-input" name="phone" required placeholder="+91 98480 00000" />
+                <input type="tel" class="mnc-input" name="phone" required placeholder="+91 98480 00000" style="width: 100%; box-sizing: border-box;" />
               </div>
               <div>
-                <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-muted); text-transform: uppercase; margin-bottom: 0.35rem;">
+                <label style="display: block; font-size: 0.725rem; font-weight: 800; color: #8e9aa8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem;">
                   Preferred Branch (Pulivendula)
                 </label>
-                <select class="mnc-select" name="branch" style="width: 100%;">
+                <select class="mnc-select" name="branch" style="width: 100%; box-sizing: border-box;">
                   <option value="Pulivendula - Kadapa Road">Pulivendula - Main Office (Kadapa Rd)</option>
                   <option value="Pulivendula - JNTU Bypass">Pulivendula - JNTU Bypass Ground</option>
                   <option value="Pulivendula - Shilparamam">Pulivendula - Shilparamam Ring Road</option>
@@ -1211,29 +1211,29 @@ export function renderHomeWebsiteView(container, onNavigate) {
               </div>
             </div>
 
-            <div style="margin-bottom: 1.25rem;">
-              <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-muted); text-transform: uppercase; margin-bottom: 0.35rem;">
+            <div style="margin-bottom: 1.35rem;">
+              <label style="display: block; font-size: 0.725rem; font-weight: 800; color: #8e9aa8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem;">
                 Select Program Package
               </label>
-              <select class="mnc-select" name="track" style="width: 100%;">
+              <select class="mnc-select" name="track" style="width: 100%; box-sizing: border-box;">
                 <option value="Beginner Driving Course (₹5,500)" ${initialTier.includes('5,500') || initialTier.includes('Beginner') ? 'selected' : ''}>
-                  Beginner Driving Course (₹5,500) · 20 Days Ground & Street
+                  Beginner Driving Course (₹5,500) · 20 Days Ground &amp; Street
                 </option>
                 <option value="RTO 8-Track & City Mastery (₹7,500)" ${initialTier.includes('7,500') || initialTier.includes('RTO') ? 'selected' : ''}>
-                  RTO 8-Track & City Mastery (₹7,500) · Full DL Prep (Most Popular)
+                  RTO 8-Track &amp; City Mastery (₹7,500) · Full DL Prep (Most Popular)
                 </option>
                 <option value="Ladies Special & Doorstep Pickup (₹8,500)" ${initialTier.includes('8,500') || initialTier.includes('Ladies') || initialTier.includes('Women') ? 'selected' : ''}>
-                  Ladies Special & Doorstep Pickup (₹8,500) · Senior Lady Mentor
+                  Ladies Special &amp; Doorstep Pickup (₹8,500) · Senior Lady Mentor
                 </option>
               </select>
             </div>
 
-            <div style="background: var(--bg-offwhite); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.8rem; color: var(--slate-body); display: flex; align-items: center; justify-content: space-between;">
-              <span>Payment Mode: <strong>PhonePe / GPay UPI QR / Cash</strong></span>
-              <span style="color: var(--terracotta); font-weight: 800;">₹0 Registration Fee</span>
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-sm); padding: 0.85rem 1.15rem; margin-bottom: 1.5rem; font-size: 0.8rem; color: #cbd5e1; display: flex; align-items: center; justify-content: space-between;">
+              <span>Payment Mode: <strong style="color: #ffffff;">PhonePe / GPay UPI QR / Cash</strong></span>
+              <span style="color: var(--primary-green); font-weight: 800;">₹0 Registration Fee</span>
             </div>
 
-            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--border-light);">
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; padding-top: 1.25rem; border-top: 1px solid rgba(255, 255, 255, 0.08);">
               <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-cancel-book">Cancel</button>
               <button type="submit" class="btn-mnc btn-mnc-primary">Confirm Enrollment Reservation →</button>
             </div>
@@ -1275,25 +1275,25 @@ export function renderHomeWebsiteView(container, onNavigate) {
     modalRoot.innerHTML = `
       <div class="mnc-modal-overlay">
         <div class="mnc-modal" style="max-width: 440px;">
-          <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; background: var(--bg-offwhite);">
+          <div style="padding: 1.35rem 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03);">
             <div style="display: flex; align-items: center; gap: 0.75rem;">
               ${renderBrandLogo({ size: 'sm' })}
               <div>
-                <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--charcoal); margin: 0;">Gafoor Driving School UPI Payment</h3>
-                <p style="font-size: 0.775rem; color: var(--slate-muted); margin: 0;">${packageName} · ${studentName}</p>
+                <h3 style="font-size: 1.05rem; font-weight: 800; color: #ffffff; margin: 0; letter-spacing: -0.01em;">Gafoor Driving School UPI Payment</h3>
+                <p style="font-size: 0.75rem; color: var(--slate-body); margin: 0.2rem 0 0;">${packageName} · ${studentName}</p>
               </div>
             </div>
-            <button type="button" id="btn-close-upi" style="background: transparent; border: none; font-size: 1.25rem; cursor: pointer; color: var(--slate-muted);">✕</button>
+            <button type="button" id="btn-close-upi" style="background: transparent; border: none; font-size: 1.25rem; cursor: pointer; color: var(--slate-body); line-height: 1;">✕</button>
           </div>
 
-          <div style="padding: 1.5rem; text-align: center;">
+          <div style="padding: 1.75rem 1.5rem; text-align: center;">
             <div class="upi-qr-box">
-              <div style="font-size: 0.75rem; font-weight: 800; color: var(--terracotta); text-transform: uppercase; margin-bottom: 0.5rem; letter-spacing: 0.05em;">
+              <div style="font-size: 0.725rem; font-weight: 800; color: var(--primary-gold); text-transform: uppercase; margin-bottom: 0.75rem; letter-spacing: 0.08em;">
                 SCAN WITH ANY UPI APP TO PAY
               </div>
 
               <!-- High-Fidelity SVG UPI QR Representation -->
-              <div style="display: inline-block; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #e4e4e7; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+              <div style="display: inline-block; background: #ffffff; padding: 14px; border-radius: 14px; border: 1px solid rgba(243, 209, 130, 0.4); box-shadow: 0 0 28px rgba(243, 209, 130, 0.2);">
                 <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <!-- Corner Square 1 -->
                   <rect x="10" y="10" width="46" height="46" rx="6" fill="#1c1917"/>
@@ -1332,14 +1332,14 @@ export function renderHomeWebsiteView(container, onNavigate) {
                 </svg>
               </div>
 
-              <div style="font-size: 1.5rem; font-weight: 900; color: var(--charcoal); margin-top: 0.75rem;">
+              <div style="font-size: 2rem; font-weight: 900; color: #ffffff; margin-top: 1rem; font-family: var(--font-mono); letter-spacing: -0.02em;">
                 ₹${amount.toLocaleString('en-IN')}
               </div>
-              <div style="font-size: 0.8rem; color: var(--slate-muted); margin-top: 0.2rem;">
-                UPI ID: <strong style="color: var(--charcoal);">gafoordrive@icici</strong>
+              <div style="font-size: 0.825rem; color: var(--slate-body); margin-top: 0.3rem;">
+                UPI ID: <strong style="color: var(--primary-gold); font-family: var(--font-mono);">gafoordrive@icici</strong>
               </div>
 
-              <div class="upi-logos-row">
+              <div class="upi-logos-row" style="margin-top: 1rem;">
                 <span class="upi-chip">PhonePe</span>
                 <span class="upi-chip">Google Pay</span>
                 <span class="upi-chip">Paytm</span>
@@ -1347,13 +1347,13 @@ export function renderHomeWebsiteView(container, onNavigate) {
               </div>
             </div>
 
-            <p style="font-size: 0.8rem; color: var(--slate-muted); margin-top: 1rem; line-height: 1.5;">
-              Scan with your mobile UPI banking app or simulate an instant confirmation below.
+            <p style="font-size: 0.825rem; color: var(--slate-body); margin-top: 1.25rem; line-height: 1.55;">
+              Scan with any mobile UPI banking app or simulate instant payment verification below.
             </p>
 
-            <div style="display: flex; gap: 0.75rem; justify-content: center; margin-top: 1.25rem;">
+            <div style="display: flex; gap: 0.75rem; justify-content: center; margin-top: 1.5rem;">
               <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-close-upi-2">Close</button>
-              <button type="button" class="btn-mnc btn-mnc-primary" id="btn-sim-upi-pay">
+              <button type="button" class="btn-mnc btn-cred-gold" id="btn-sim-upi-pay">
                 Simulate UPI Success ✓
               </button>
             </div>
