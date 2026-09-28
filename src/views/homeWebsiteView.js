@@ -31,17 +31,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
 
     const template = `
       <div class="natu-page-wrapper">
-        <!-- TOP NOTIFICATION STRIP -->
-        <div style="background: var(--cred-bg-darkest); color: #9da4b4; padding: 0.55rem 1.5rem; font-size: 0.775rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
-          <div style="display: flex; align-items: center; gap: 0.65rem;">
-            <span style="background: rgba(243, 209, 130, 0.15); color: var(--primary-gold); border: 1px solid rgba(243, 209, 130, 0.3); font-weight: 800; padding: 2px 7px; border-radius: 4px; font-size: 0.7rem; letter-spacing: 0.05em;">AP RTO</span>
-            <span style="color: #cbd5e1;">Govt. Accredited Motor Driving School · Reg #AP-04-DS-2024 · Pulivendula, YSR Kadapa Dist.</span>
-          </div>
 
-          <div style="display: flex; align-items: center; gap: 1rem;">
-            <span style="color: #9da4b4;">📍 Kadapa Road, Pulivendula · 📞 +91 98480 22334 / +91 94401 55678</span>
-          </div>
-        </div>
 
         <!-- HERO SECTION -->
         <section class="mnc-hero" style="text-align: center;">
@@ -472,10 +462,10 @@ export function renderHomeWebsiteView(container, onNavigate) {
                 </div>
                 <div class="window-title">
                   Gafoor Driving School Cloud v2.6 · 
-                  ${activeTab === 'admin' ? 'Administrative Operations' : (activeTab === 'trainer' ? 'Trainer Schedule & Dispatch' : 'Student Milestone Workspace')}
+                  ${activeTab === 'admin' ? 'Administrative Operations' : (activeTab === 'trainer' ? 'Instructor Schedule & Attendance' : 'Student Driving Course Dashboard')}
                 </div>
                 <div style="font-size: 0.75rem; color: var(--slate-muted); font-weight: 700;">
-                  Live RTO Telemetry · Pulivendula
+                  Pulivendula RTO Track System
                 </div>
               </div>
 
@@ -777,11 +767,11 @@ export function renderHomeWebsiteView(container, onNavigate) {
       <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
           <div>
-            <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--charcoal);">Candidate Operations Directory</h3>
-            <p style="font-size: 0.85rem; color: var(--slate-muted);">Inspect student dossiers, assign faculty, and verify UPI fee collections.</p>
+            <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--charcoal);">Students Directory</h3>
+            <p style="font-size: 0.85rem; color: var(--slate-muted);">View student records, assign instructors, and verify course fee payments.</p>
           </div>
           <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm" id="btn-launch-full-admin">
-            Launch Full Admin Suite →
+            Open Admin Office →
           </button>
         </div>
 
@@ -796,15 +786,15 @@ export function renderHomeWebsiteView(container, onNavigate) {
 
           <div class="kpi-card" style="padding: 1rem 1.25rem;">
             <div class="kpi-top">
-              <span class="kpi-label">Faculty Fleet</span>
+              <span class="kpi-label">Instructors</span>
               <span class="kpi-pill kpi-pill-green">100% Active</span>
             </div>
-            <div class="kpi-value" style="font-size: 1.5rem;">${trainers.length} Trainers</div>
+            <div class="kpi-value" style="font-size: 1.5rem;">${trainers.length} Instructors</div>
           </div>
 
           <div class="kpi-card" style="padding: 1rem 1.25rem;">
             <div class="kpi-top">
-              <span class="kpi-label">Tuition Settled</span>
+              <span class="kpi-label">Fees Collected</span>
               <span class="kpi-pill kpi-pill-blue">${collectionRate}%</span>
             </div>
             <div class="kpi-value" style="font-size: 1.5rem;">₹${totalCollected.toLocaleString('en-IN')}</div>
@@ -816,7 +806,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Candidate Name</th>
+                <th>Student Name</th>
                 <th>Enrolled Track</th>
                 <th>Instructor</th>
                 <th>Status</th>
@@ -909,13 +899,13 @@ export function renderHomeWebsiteView(container, onNavigate) {
             <p style="font-size: 0.85rem; color: var(--slate-muted);">${trainee.name} · ${trainee.id} · ${trainee.package}</p>
           </div>
           <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm" id="btn-launch-full-trainee">
-            Launch Trainee Portal →
+            Open Student Portal →
           </button>
         </div>
 
         <div class="kpi-card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
           <div style="display: flex; justify-content: space-between; font-size: 0.875rem; font-weight: 700; margin-bottom: 0.5rem;">
-            <span style="color: var(--terracotta);">Curriculum Telemetry: Day ${trainee.currentDay} of 20 Completed (${trainee.currentDay * 8} km Total)</span>
+            <span style="color: var(--terracotta);">Daily Driving Progress: Day ${trainee.currentDay} of 20 Completed (${trainee.currentDay * 8} km Total)</span>
             <span style="color: var(--charcoal);">${progressPercent}% Completed</span>
           </div>
           <div style="width: 100%; height: 8px; background: var(--bg-subtle); border-radius: var(--radius-pill); overflow: hidden; border: 1px solid var(--border-light); margin-bottom: 1rem;">
@@ -930,7 +920,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
 
         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
           <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-preview-upi-qr">
-            Open Mobile Tuition UPI QR Code ⊞
+            Open Course Fee UPI QR Code ⊞
           </button>
           <button type="button" class="btn-mnc btn-mnc-secondary" onclick="alert('Day 20 evaluation form unlocks after completing the practical road syllabus.')">
             Submit Day 20 Appraisal Form
@@ -1103,7 +1093,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
           <form id="form-booking" style="padding: 1.75rem;">
             <div style="margin-bottom: 1.2rem;">
               <label style="display: block; font-size: 0.725rem; font-weight: 800; color: #8e9aa8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem;">
-                Candidate Full Name
+                Student Full Name
               </label>
               <input type="text" class="mnc-input" name="name" required placeholder="e.g. Sai Kiran" style="width: 100%; box-sizing: border-box;" />
             </div>
@@ -1172,8 +1162,8 @@ export function renderHomeWebsiteView(container, onNavigate) {
       const branch = form.elements['branch'].value;
       const track = form.elements['track'].value;
       
-      // Add trainee to store
-      store.addTrainee({
+      // Add trainee to store (generates unique code: e.g. MA-G01)
+      const trainee = store.addTrainee({
         name,
         phone,
         address: `${branch}, Pulivendula, AP`,
@@ -1182,8 +1172,84 @@ export function renderHomeWebsiteView(container, onNavigate) {
       });
 
       close();
-      openUpiQrModal(track.includes('7,500') ? 7500 : (track.includes('8,500') ? 8500 : 5500), track, name);
+      openRegistrationSuccessModal(trainee, () => {
+        openUpiQrModal(track.includes('7,500') ? 7500 : (track.includes('8,500') ? 8500 : 5500), track, name);
+      });
       render();
+    });
+  }
+
+  // --- Modal: Unique Student Registration Code ---
+  function openRegistrationSuccessModal(trainee, onProceed) {
+    const modalRoot = document.getElementById('modal-root');
+    const studentCode = trainee.studentCode || trainee.id;
+    const seqPart = studentCode.includes('-') ? studentCode.split('-')[1] : studentCode;
+    const namePart = studentCode.includes('-') ? studentCode.split('-')[0] : (trainee.avatar || 'ST');
+
+    modalRoot.innerHTML = `
+      <div class="mnc-modal-overlay">
+        <div class="p-modal" style="max-width:500px; text-align:center;">
+          <div class="p-modal-header" style="justify-content:center; position:relative; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:1.25rem;">
+            <div>
+              <div style="font-size:0.7rem; font-weight:800; color:#a1a1aa; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:0.25rem;">ADMISSION CONFIRMED</div>
+              <div class="p-modal-title" style="font-size:1.35rem;">Welcome to Gafoor Driving School!</div>
+            </div>
+            <button type="button" id="btn-close-home-reg" class="p-modal-close" style="position:absolute; right:1.5rem; top:1.5rem;">✕</button>
+          </div>
+
+          <div class="p-modal-body" style="padding:2rem 1.75rem;">
+            <p style="font-size:0.875rem; color:#a1a1aa; margin:0 0 1.25rem; line-height:1.5;">
+              Registration confirmed for <strong>${trainee.name}</strong>. Here is your official unique login code:
+            </p>
+
+            <!-- CODE CARD -->
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.18); border-radius:18px; padding:1.5rem 1.25rem; margin-bottom:1.5rem;">
+              <div style="font-size:0.7rem; font-weight:800; color:#8e9aa8; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.6rem;">
+                Your Student Login Code
+              </div>
+              <div id="home-student-code" style="font-size:2.6rem; font-weight:900; letter-spacing:0.06em; font-family:var(--font-mono); color:#ffffff; margin-bottom:0.6rem; user-select:all;">
+                ${studentCode}
+              </div>
+              <div style="font-size:0.75rem; color:#a1a1aa; line-height:1.4;">
+                <span style="color:#ffffff; font-weight:700;">${namePart}</span> (Initials of ${trainee.name}) · 
+                <span style="color:#ffffff; font-weight:700;">${seqPart}</span> (Gafoor Student Sequential Index)
+              </div>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:0.85rem; font-size:0.8rem; color:#a1a1aa; text-align:left; margin-bottom:1.75rem;">
+              <div style="font-weight:700; color:#ffffff; margin-bottom:0.25rem;">Candidate Access Note:</div>
+              Please note or screenshot this code. You can use <strong>${studentCode}</strong> anytime to sign in to the Student Portal to track your 20-day driving classes and RTO exam status.
+            </div>
+
+            <div style="display:flex; gap:0.75rem;">
+              <button type="button" id="btn-copy-home-code" class="p-ghost-btn" style="flex:1; justify-content:center; padding:0.85rem;">
+                📋 Copy Code
+              </button>
+              <button type="button" id="btn-proceed-upi" class="btn-mnc btn-mnc-primary" style="flex:1; justify-content:center; padding:0.85rem;">
+                Pay Fee (UPI) →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const close = () => { modalRoot.innerHTML = ''; };
+    modalRoot.querySelector('#btn-close-home-reg').addEventListener('click', close);
+
+    const btnCopy = modalRoot.querySelector('#btn-copy-home-code');
+    btnCopy.addEventListener('click', () => {
+      navigator.clipboard.writeText(studentCode).then(() => {
+        btnCopy.textContent = '✓ Copied!';
+        setTimeout(() => { btnCopy.textContent = '📋 Copy Code'; }, 2000);
+      }).catch(() => {
+        btnCopy.textContent = 'Code: ' + studentCode;
+      });
+    });
+
+    modalRoot.querySelector('#btn-proceed-upi').addEventListener('click', () => {
+      close();
+      if (onProceed) onProceed();
     });
   }
 

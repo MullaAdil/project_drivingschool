@@ -1,76 +1,85 @@
 /* ==========================================================================
-   GAFOOR DRIVING SCHOOL — TRAINEE PORTAL
-   Redesigned: flat premium dark layout, no animated blocks
+   GAFOOR DRIVING SCHOOL — CANDIDATE PORTAL
+   Full-page layout fitting 100% viewport width without spaces.
+   Dedicated candidate services:
+   - Service 01: 20-Day Practical Curriculum Roadmap (8 km/day)
+   - Service 02: Tuition Account, Invoices & UPI QR Voucher Payment
+   - Service 03: Candidate Master KYC, LLR Permit & RTO Readiness Dossier
    ========================================================================== */
 
 import { store } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
 
-export function renderTraineeView(container, showToast) {
+export function renderTraineeView(container, showToast, subService = 'curriculum', onNavigate) {
   let activeFilter = 'all';
 
   function render() {
-    const trainee = store.trainees.find(t => t.id === 'APX-9021') || store.trainees[0];
-    const currentDay = store.traineeTestDay;
-    const progressPercent = Math.round((currentDay / 20) * 100);
-    const trainer = store.trainers.find(t => t.id === trainee.assignedTrainerId) || store.trainers[0];
+    const trainee  = store.getCurrentTrainee();
+    const currentDay = trainee.currentDay || store.traineeTestDay;
+    const progressPercent = Math.min(100, Math.round((currentDay / 20) * 100));
+    const trainer  = store.trainers.find(t => t.id === trainee.assignedTrainerId) || store.trainers[0];
     const curriculum = store.getCurriculum();
-    const invoice = store.payments.find(p => p.traineeId === trainee.id) || store.payments[0];
-    const isDay20 = currentDay >= 20;
+    const invoice  = store.payments.find(p => p.traineeId === trainee.id) || store.payments[0];
+    const kmDriven = currentDay * 8;
+    const kmRemaining = Math.max(0, (20 - currentDay) * 8);
+
+    const currentSub = subService || 'curriculum';
 
     const filteredCurriculum = curriculum.filter(item =>
       activeFilter === 'all' ? true : item.category === activeFilter
     );
 
-    const template = `
-      <div class="portal-shell">
+    const topbar = '';
 
-        <!-- PORTAL TOPBAR -->
-        <div class="portal-topbar">
-          <div class="portal-topbar-left">
-            ${renderBrandLogo({ size: 'sm' })}
-            <div class="portal-topbar-brand">
-              <span class="portal-topbar-title">Gafoor Driving School</span>
-              <span class="portal-topbar-sub">Candidate Portal · Pulivendula</span>
-            </div>
-          </div>
-          <div class="portal-topbar-right">
-            <span class="p-badge p-badge-dim">${trainee.id}</span>
-            <span class="p-badge ${invoice.balance === 0 ? 'p-badge-green' : 'p-badge-gold'}">${invoice.balance === 0 ? 'Fully Paid ✓' : '₹' + invoice.balance.toLocaleString('en-IN') + ' Due'}</span>
-          </div>
-        </div>
+    let contentHtml = '';
 
-        <!-- PAGE HEADER -->
+    // =========================================================
+    // SERVICE 01: 20-DAY CURRICULUM ROADMAP (8 KM/DAY)
+    // =========================================================
+    if (currentSub === 'curriculum') {
+      contentHtml = `
         <div class="portal-page-header">
           <div>
-            <h1 class="portal-page-title">${trainee.name}</h1>
-            <p class="portal-page-sub">${trainee.package} · Instructor: ${trainer.name} · ${trainer.car}</p>
+            <h1 class="portal-page-title">${trainee.name} — 20-Day Practical Driving Course</h1>
+            <p class="portal-page-sub">${trainee.package} · LLR Permit: ${trainee.permitNumber || 'AP004/LLR/2026/8941'} · Instructor: ${trainer.name}</p>
           </div>
-          <button type="button" class="btn-mnc btn-mnc-primary" id="btn-show-qr-voucher" style="font-size:0.85rem; padding:0.55rem 1.25rem;">Pay via UPI →</button>
+          <div style="display:flex; gap:0.65rem; align-items:center;">
+            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-show-qr-voucher">Pay Course Fee (UPI QR) →</button>
+          </div>
         </div>
 
-        <!-- FLAT STATS STRIP -->
+        <!-- STATS STRIP -->
         <div class="portal-stats-strip">
           <div class="portal-stat">
-            <span class="portal-stat-value">${currentDay}<span style="font-size:1rem; color:var(--slate-muted);">/20</span></span>
+            <span class="portal-stat-value">${currentDay}<span style="font-size:1rem; color:var(--slate-muted);"> / 20</span></span>
             <span class="portal-stat-label">Days Completed</span>
           </div>
           <div class="portal-stat-div"></div>
           <div class="portal-stat">
-            <span class="portal-stat-value">${currentDay * 8} km</span>
-            <span class="portal-stat-label">Total Distance</span>
+            <span class="portal-stat-value" style="color:var(--primary-cyan);">${kmDriven} km</span>
+            <span class="portal-stat-label">Distance Driven</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value">${kmRemaining} km</span>
+            <span class="portal-stat-label">Remaining</span>
           </div>
           <div class="portal-stat-div"></div>
           <div class="portal-stat">
             <span class="portal-stat-value">${progressPercent}%</span>
-            <span class="portal-stat-label">Progress</span>
+            <span class="portal-stat-label">Course Progress</span>
           </div>
           <div class="portal-stat-div"></div>
           <div class="portal-stat">
             <span class="portal-stat-value" style="color:${invoice.balance > 0 ? 'var(--primary-gold)' : 'var(--neem-green)'};">
-              ${invoice.balance > 0 ? '₹' + invoice.balance.toLocaleString('en-IN') : 'Cleared'}
+              ${invoice.balance > 0 ? '₹' + invoice.balance.toLocaleString('en-IN') : 'Cleared ✓'}
             </span>
             <span class="portal-stat-label">Fee Balance</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:var(--neem-green);">${trainee.attendanceRate || '96%'}</span>
+            <span class="portal-stat-label">Attendance Rate</span>
           </div>
         </div>
 
@@ -79,59 +88,63 @@ export function renderTraineeView(container, showToast) {
           <div class="portal-progress-bar" style="width:${progressPercent}%;"></div>
         </div>
 
-        <!-- SIMULATOR STRIP -->
-        <div class="portal-section" style="padding-bottom:0;">
+        <!-- CURRICULUM TABLE -->
+        <div class="portal-section">
           <div class="portal-section-header">
-            <span class="portal-section-title">Curriculum — 20-Day Program</span>
+            <span class="portal-section-title">20-Day Practical Driving Lessons (8 km per day)</span>
             <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-              <span style="font-size:0.72rem; color:var(--slate-muted);">Simulate:</span>
-              <button type="button" class="p-chip-btn ${currentDay === 7  ? 'p-chip-active' : ''}" data-test-day="7">Day 7</button>
-              <button type="button" class="p-chip-btn ${currentDay === 14 ? 'p-chip-active' : ''}" data-test-day="14">Day 14</button>
-              <button type="button" class="p-chip-btn ${currentDay === 20 ? 'p-chip-active' : ''}" data-test-day="20">Day 20 (RTO)</button>
+              <span style="font-size:0.75rem; color:var(--slate-muted);">Check day status:</span>
+              <button type="button" class="p-chip-btn ${currentDay === 7  ? 'p-chip-active':''}" data-test-day="7">Day 7</button>
+              <button type="button" class="p-chip-btn ${currentDay === 14 ? 'p-chip-active':''}" data-test-day="14">Day 14</button>
+              <button type="button" class="p-chip-btn ${currentDay === 20 ? 'p-chip-active':''}" data-test-day="20">Day 20 (RTO)</button>
             </div>
           </div>
 
+          <!-- Category filter buttons -->
           <div class="portal-filter-bar">
-            <button type="button" class="p-filter-btn ${activeFilter === 'all'     ? 'p-filter-active' : ''}" data-cat="all">All Days</button>
-            <button type="button" class="p-filter-btn ${activeFilter === 'street'  ? 'p-filter-active' : ''}" data-cat="street">Ground & City</button>
-            <button type="button" class="p-filter-btn ${activeFilter === 'highway' ? 'p-filter-active' : ''}" data-cat="highway">Highway & Flyover</button>
-            <button type="button" class="p-filter-btn ${activeFilter === 'test'    ? 'p-filter-active' : ''}" data-cat="test">RTO Test</button>
+            <button type="button" class="p-filter-btn ${activeFilter==='all'     ?'p-filter-active':''}" data-cat="all">All 20 Days</button>
+            <button type="button" class="p-filter-btn ${activeFilter==='street'  ?'p-filter-active':''}" data-cat="street">Ground &amp; Town (Days 1–10)</button>
+            <button type="button" class="p-filter-btn ${activeFilter==='highway' ?'p-filter-active':''}" data-cat="highway">Highway &amp; Flyover (Days 11–19)</button>
+            <button type="button" class="p-filter-btn ${activeFilter==='test'    ?'p-filter-active':''}" data-cat="test">RTO 8-Track Test (Day 20)</button>
           </div>
-        </div>
 
-        <!-- CURRICULUM TABLE -->
-        <div class="portal-section">
           <div class="p-table-wrap">
             <table class="p-table">
               <thead>
                 <tr>
-                  <th style="width:60px;">Day</th>
-                  <th>Topic</th>
-                  <th>Module</th>
-                  <th style="width:80px; text-align:center;">Distance</th>
-                  <th style="width:110px; text-align:right;">Status</th>
+                  <th>Course Day</th>
+                  <th>Practical Driving Lesson</th>
+                  <th>Stage</th>
+                  <th>Daily Distance</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 ${filteredCurriculum.map(item => {
                   const isDone  = item.day < currentDay;
                   const isToday = item.day === currentDay;
-                  const moduleLabel = item.category === 'street' ? 'Ground & City' : item.category === 'highway' ? 'Highway & Flyover' : 'RTO Test';
-                  const statusHtml  = isDone
-                    ? '<span class="p-status-done">Done</span>'
-                    : isToday
-                      ? '<span class="p-status-today">Today</span>'
-                      : '<span class="p-status-upcoming">Upcoming</span>';
                   return `
-                    <tr class="${isDone ? 'p-row-done' : isToday ? 'p-row-today' : ''}">
-                      <td class="p-td-mono" style="color:var(--slate-muted);">Day ${item.day}</td>
-                      <td>
-                        <div class="p-td-name" style="font-size:0.875rem;">${item.title || item.topic}</div>
-                        <div class="p-td-sub">${item.desc || item.notes || ''}</div>
+                    <tr class="${isDone?'p-row-done':isToday?'p-row-today':''}">
+                      <td class="p-td-mono" style="font-size:0.875rem; font-weight:800; color:${isDone?'var(--neem-green)':isToday?'var(--primary-gold)':'#ffffff'};">
+                        Day ${item.day}
                       </td>
-                      <td class="p-td-muted">${moduleLabel}</td>
-                      <td style="text-align:center; font-size:0.8rem; color:var(--slate-muted);">8 km</td>
-                      <td style="text-align:right;">${statusHtml}</td>
+                      <td>
+                        <div class="p-td-name" style="${isDone?'opacity:0.75;':''}">
+                          ${isDone?'<span style="color:var(--neem-green); margin-right:0.35rem;">✓</span>':isToday?'<span style="color:var(--primary-gold); margin-right:0.35rem;">●</span>':''}${item.topic}
+                        </div>
+                        <div class="p-td-sub">${item.details || 'Standard RTO Practical Syllabus'}</div>
+                      </td>
+                      <td>
+                        <span class="p-badge p-badge-dim" style="font-size:0.62rem;">${item.category.toUpperCase()}</span>
+                      </td>
+                      <td class="p-td-muted">
+                        ${item.distance || '8 km'}
+                      </td>
+                      <td>
+                        <span class="${isDone?'p-status-done':isToday?'p-status-today':'p-status-upcoming'}">
+                          ${isDone ? '✓ Completed' : isToday ? '● Today’s Lesson' : 'Upcoming'}
+                        </span>
+                      </td>
                     </tr>
                   `;
                 }).join('')}
@@ -139,214 +152,255 @@ export function renderTraineeView(container, showToast) {
             </table>
           </div>
         </div>
+      `;
+    }
 
-        <!-- DAY 20 GRADUATION / FEEDBACK -->
+    // =========================================================
+    // SERVICE 02: TUITION FEE STATEMENT & UPI PAYMENT
+    // =========================================================
+    if (currentSub === 'billing') {
+      contentHtml = `
+        <div class="portal-page-header">
+          <div>
+            <h1 class="portal-page-title">Course Fee Payment &amp; Receipts</h1>
+            <p class="portal-page-sub">Pay course fees conveniently using PhonePe, Google Pay, or Paytm UPI QR code.</p>
+          </div>
+          <button type="button" class="btn-mnc btn-mnc-primary" id="btn-show-qr-voucher-billing">Show UPI QR Code →</button>
+        </div>
+
+        <div class="portal-stats-strip">
+          <div class="portal-stat">
+            <span class="portal-stat-value">₹${invoice.amount.toLocaleString('en-IN')}</span>
+            <span class="portal-stat-label">Total Course Fee</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:var(--neem-green);">₹${invoice.paid.toLocaleString('en-IN')}</span>
+            <span class="portal-stat-label">Fee Paid</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:${invoice.balance > 0 ? 'var(--primary-gold)' : 'var(--neem-green)'};">
+              ₹${invoice.balance.toLocaleString('en-IN')}
+            </span>
+            <span class="portal-stat-label">Balance Fee</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value">${invoice.status.toUpperCase()}</span>
+            <span class="portal-stat-label">Fee Status</span>
+          </div>
+        </div>
+
         <div class="portal-section">
           <div class="portal-section-header">
-            <span class="portal-section-title">Graduation Review</span>
+            <span class="portal-section-title">Fee Receipt &amp; Statement</span>
+            <span class="portal-section-meta">Receipt #${invoice.id}</span>
           </div>
-          ${!isDay20 ? `
-            <div class="p-info-row">
-              <p class="p-td-muted">Feedback unlocks after Day 20 completion. You are on Day ${currentDay}.</p>
-              <button type="button" class="p-link-btn" id="btn-unlock-day20-now">Simulate Day 20 →</button>
-            </div>
-          ` : store.feedbackSubmitted ? `
-            <div class="p-info-row">
-              <span class="p-status-done">Graduation Confirmed ✓</span>
-              <button type="button" class="btn-mnc btn-mnc-primary" id="btn-open-cert-modal" style="font-size:0.8rem; padding:0.45rem 1rem;">View Certificate →</button>
+          <div class="p-summary-row">
+            <span class="p-summary-key">Course Package</span>
+            <span class="p-summary-value">${trainee.package}</span>
+          </div>
+          <div class="p-summary-row">
+            <span class="p-summary-key">Total Course Fee</span>
+            <span class="p-summary-value" style="font-family:var(--font-mono);">₹${invoice.amount.toLocaleString('en-IN')}</span>
+          </div>
+          <div class="p-summary-row">
+            <span class="p-summary-key">Amount Paid</span>
+            <span class="p-summary-value" style="color:var(--neem-green); font-family:var(--font-mono);">₹${invoice.paid.toLocaleString('en-IN')}</span>
+          </div>
+          <div class="p-summary-row">
+            <span class="p-summary-key">Balance Due</span>
+            <span class="p-summary-value" style="color:${invoice.balance > 0 ? 'var(--primary-gold)' : 'var(--neem-green)'}; font-family:var(--font-mono);">₹${invoice.balance.toLocaleString('en-IN')}</span>
+          </div>
+          <div class="p-summary-row">
+            <span class="p-summary-key">Due Date</span>
+            <span class="p-summary-value">${invoice.dueDate || '2026-09-30'}</span>
+          </div>
+          <div class="p-summary-row">
+            <span class="p-summary-key">Accepted Payment Modes</span>
+            <span class="p-summary-value">PhonePe UPI / Google Pay / BHIM / Cash at Desk</span>
+          </div>
+          ${invoice.balance > 0 ? `
+            <div style="margin-top:1.5rem;">
+              <button type="button" class="btn-mnc btn-mnc-primary" id="btn-pay-now-action" style="padding:0.8rem 1.8rem;">
+                Pay Balance of ₹${invoice.balance.toLocaleString('en-IN')} via UPI QR →
+              </button>
             </div>
           ` : `
-            <form id="form-day20-feedback" class="p-form-grid">
-              <div class="p-form-row">
-                <label class="p-label">Clutch & Hill-Hold Confidence</label>
-                <select class="mnc-select p-input" name="clutchConfidence">
-                  <option value="5">★★★★★ Completely Confident</option>
-                  <option value="4">★★★★☆ Good</option>
-                  <option value="3">★★★☆☆ Moderate</option>
-                </select>
-              </div>
-              <div class="p-form-row">
-                <label class="p-label">RTO 8 & H Track Readiness</label>
-                <select class="mnc-select p-input" name="trackReadiness">
-                  <option value="5">★★★★★ 100% Ready</option>
-                  <option value="4">★★★★☆ Good Control</option>
-                  <option value="3">★★★☆☆ Needs Minor Practice</option>
-                </select>
-              </div>
-              <div class="p-form-row">
-                <label class="p-label">Instructor Rating</label>
-                <select class="mnc-select p-input" name="trainerRating">
-                  <option value="5">★★★★★ Outstanding</option>
-                  <option value="4">★★★★☆ Very Good</option>
-                  <option value="3">★★★☆☆ Satisfactory</option>
-                </select>
-              </div>
-              <div class="p-form-row" style="grid-column:1/-1;">
-                <label class="p-label">Your Feedback</label>
-                <textarea class="mnc-input p-input" rows="3" name="comments" placeholder="Describe your experience..." style="resize:vertical;"></textarea>
-              </div>
-              <div style="grid-column:1/-1; display:flex; justify-content:flex-end;">
-                <button type="submit" class="btn-mnc btn-mnc-primary">Submit Feedback & Graduate →</button>
-              </div>
-            </form>
+            <div style="margin-top:1.5rem; padding:1rem; border-radius:var(--radius-sm); background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.18); font-size:0.9rem; color:#ffffff; font-weight:800;">
+              ✓ Your course fee is fully paid and cleared! No further payment is due.
+            </div>
           `}
         </div>
-
-      </div>
-    `;
-
-    container.innerHTML = template;
-    attachEvents();
-  }
-
-  function attachEvents() {
-    container.querySelectorAll('[data-cat]').forEach(btn => {
-      btn.addEventListener('click', () => { activeFilter = btn.dataset.cat; render(); });
-    });
-
-    container.querySelectorAll('[data-test-day]').forEach(btn => {
-      btn.addEventListener('click', () => { store.setTraineeTestDay(btn.dataset.testDay); render(); });
-    });
-
-    const btnUnlock = container.querySelector('#btn-unlock-day20-now');
-    if (btnUnlock) btnUnlock.addEventListener('click', () => { store.setTraineeTestDay(20); render(); });
-
-    const btnOpenCert = container.querySelector('#btn-open-cert-modal');
-    if (btnOpenCert) {
-      btnOpenCert.addEventListener('click', () => {
-        const trainee = store.trainees.find(t => t.id === 'APX-9021') || store.trainees[0];
-        const trainer = store.trainers.find(t => t.id === trainee.assignedTrainerId) || store.trainers[0];
-        openCertificateModal(trainee, trainer);
-      });
+      `;
     }
 
-    const btnShowQR = container.querySelector('#btn-show-qr-voucher');
-    if (btnShowQR) btnShowQR.addEventListener('click', openQRModal);
-
-    const feedbackForm = container.querySelector('#form-day20-feedback');
-    if (feedbackForm) {
-      feedbackForm.addEventListener('submit', e => {
-        e.preventDefault();
-        store.submitFeedback({
-          clutchConfidence: feedbackForm.elements['clutchConfidence'].value,
-          trackReadiness:   feedbackForm.elements['trackReadiness'].value,
-          trainerRating:    feedbackForm.elements['trainerRating'].value,
-          comments:         feedbackForm.elements['comments'].value,
-        });
-        showToast('Feedback recorded. Congratulations on completing the course!', 'success');
-        render();
-      });
-    }
-  }
-
-  function openCertificateModal(trainee, trainer) {
-    const modalRoot = document.getElementById('modal-root');
-    modalRoot.innerHTML = `
-      <div class="mnc-modal-overlay">
-        <div class="p-modal" style="max-width:620px; text-align:center;">
-          <div class="p-modal-header">
-            <div class="p-modal-title">Certificate of Driving Competency</div>
-            <button type="button" id="btn-close-cert" class="p-modal-close">✕</button>
+    // =========================================================
+    // SERVICE 03: STUDENT PROFILE & LEARNER LICENSE
+    // =========================================================
+    if (currentSub === 'profile') {
+      contentHtml = `
+        <div class="portal-page-header">
+          <div>
+            <h1 class="portal-page-title">Student Profile &amp; Learner License (LLR)</h1>
+            <p class="portal-page-sub">Official Government Learner's Licence (LLR) details, instructor assignment, and contact records.</p>
           </div>
-          <div class="p-modal-body" style="text-align:center; padding:2rem 2.5rem;">
-            <div style="margin-bottom:1rem;">${renderBrandLogo({ size: 'lg' })}</div>
-            <div style="font-size:0.7rem; font-weight:800; letter-spacing:0.15em; color:var(--slate-muted); margin-bottom:0.5rem;">GAFOOR DRIVING SCHOOL · PULIVENDULA · AP-04-DS-2024</div>
-            <div style="width:100%; height:1px; background:rgba(243,209,130,0.25); margin:1rem 0;"></div>
-            <p style="font-size:0.825rem; color:var(--slate-body); line-height:1.7; margin-bottom:0.75rem;">
-              This certifies that <strong style="color:#fff;">${trainee.name}</strong> (ID: ${trainee.id}) has successfully completed the
-              <strong style="color:#fff;">20-Day Practical Driving Program</strong> — 160 km total distance, RTO 8-Track & H-Track cleared.
-            </p>
-            <div style="display:flex; justify-content:center; gap:0.65rem; flex-wrap:wrap; margin-bottom:1.5rem;">
-              <span class="p-badge p-badge-green">RTO Form 5 Cleared ✓</span>
-              <span class="p-badge p-badge-gold">Academy Seal Verified</span>
+          <div class="portal-page-header-meta">
+            <span class="p-badge p-badge-green">Govt. Verified</span>
+            <span class="p-badge p-badge-dim">Pulivendula Academy</span>
+          </div>
+        </div>
+
+        <div class="portal-section">
+          <div class="portal-section-header">
+            <span class="portal-section-title">Student Information &amp; Contact Details</span>
+          </div>
+          <div class="p-detail-grid">
+            <div class="p-detail-cell">
+              <div class="p-detail-key">Full Name</div>
+              <div class="p-detail-value">${trainee.name}</div>
+              <div class="p-detail-sub">As registered with RTO Parivahan</div>
             </div>
-            <div style="display:flex; justify-content:space-around; border-top:1px solid var(--border-light); padding-top:1.25rem; margin-bottom:1.5rem;">
-              <div>
-                <div style="font-size:0.875rem; font-weight:700; color:#fff;">${trainer.name}</div>
-                <div style="font-size:0.7rem; color:var(--slate-muted);">Senior Master Examiner</div>
-              </div>
-              <div>
-                <div style="font-size:0.875rem; font-weight:700; color:#fff;">M. A. Gafoor</div>
-                <div style="font-size:0.7rem; color:var(--slate-muted);">Director, Gafoor Driving School</div>
-              </div>
+            <div class="p-detail-cell">
+              <div class="p-detail-key">Student Admission ID</div>
+              <div class="p-detail-value" style="font-family:var(--font-mono);">${trainee.id}</div>
+              <div class="p-detail-sub">School registration number</div>
             </div>
-            <div style="display:flex; justify-content:center; gap:0.75rem;">
-              <button type="button" class="p-ghost-btn" id="btn-close-cert-2">Close</button>
-              <button type="button" class="btn-mnc btn-mnc-primary" id="btn-print-cert">Print / Save PDF ⎙</button>
+            <div class="p-detail-cell">
+              <div class="p-detail-key">LLR Permit Number</div>
+              <div class="p-detail-value" style="font-family:var(--font-mono); color:var(--primary-cyan);">${trainee.permitNumber || 'AP004/LLR/2026/8941'}</div>
+              <div class="p-detail-sub">Learner's Licence — Govt. of Andhra Pradesh</div>
+            </div>
+            <div class="p-detail-cell">
+              <div class="p-detail-key">Mobile Number</div>
+              <div class="p-detail-value">${trainee.phone || '+91 98480 22334'}</div>
+              <div class="p-detail-sub">Primary WhatsApp Contact</div>
+            </div>
+            <div class="p-detail-cell">
+              <div class="p-detail-key">Assigned Driving Instructor</div>
+              <div class="p-detail-value">${trainer.name}</div>
+              <div class="p-detail-sub">${trainer.role} · ${trainer.car}</div>
+            </div>
+            <div class="p-detail-cell">
+              <div class="p-detail-key">Emergency Contact</div>
+              <div class="p-detail-value">${trainee.emergencyContact || 'Guardian / Family Contact'}</div>
+              <div class="p-detail-sub">${trainee.emergencyPhone || '+91 98480 11222'}</div>
             </div>
           </div>
         </div>
+      `;
+    }
+
+    container.innerHTML = `
+      <div class="portal-shell">
+        ${contentHtml}
       </div>
     `;
-    const close = () => { modalRoot.innerHTML = ''; };
-    modalRoot.querySelector('#btn-close-cert').addEventListener('click', close);
-    modalRoot.querySelector('#btn-close-cert-2').addEventListener('click', close);
-    modalRoot.querySelector('#btn-print-cert').addEventListener('click', () => window.print());
+
+    // Service Navigation Events
+    container.querySelectorAll('[data-trainee-nav]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetSub = btn.dataset.traineeNav;
+        if (onNavigate) {
+          onNavigate(targetSub);
+        } else {
+          renderTraineeView(container, showToast, targetSub, onNavigate);
+        }
+      });
+    });
+
+    // Day simulation buttons
+    container.querySelectorAll('[data-test-day]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const day = parseInt(btn.dataset.testDay, 10);
+        store.setTraineeTestDay(day);
+        showToast(`Simulating Day ${day} curriculum status`, 'info');
+        render();
+      });
+    });
+
+    // Category filter buttons
+    container.querySelectorAll('[data-cat]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeFilter = btn.dataset.cat;
+        render();
+      });
+    });
+
+    // UPI QR modals
+    const attachQrBtn = (id) => {
+      const el = container.querySelector(id);
+      if (el) {
+        el.addEventListener('click', () => {
+          openQrVoucherModal(invoice.id, invoice.balance, trainee.name);
+        });
+      }
+    };
+    attachQrBtn('#btn-show-qr-voucher');
+    attachQrBtn('#btn-show-qr-voucher-billing');
+    attachQrBtn('#btn-pay-now-action');
   }
 
-  function openQRModal() {
+  function openQrVoucherModal(invoiceId, balance, student) {
     const modalRoot = document.getElementById('modal-root');
-    const trainee = store.trainees.find(t => t.id === 'APX-9021') || store.trainees[0];
-    const invoice = store.payments.find(p => p.traineeId === trainee.id) || store.payments[0];
-
     modalRoot.innerHTML = `
       <div class="mnc-modal-overlay">
-        <div class="p-modal" style="max-width:400px; text-align:center;">
+        <div class="p-modal" style="max-width: 440px;">
           <div class="p-modal-header">
             <div>
-              <div class="p-modal-title">UPI Payment</div>
-              <div class="p-modal-sub">${trainee.name} · ${invoice.id}</div>
+              <div class="p-modal-title">Official UPI Payment QR</div>
+              <div class="p-modal-sub">Gafoor Driving School · Pulivendula</div>
             </div>
             <button type="button" id="btn-close-qr" class="p-modal-close">✕</button>
           </div>
-          <div class="p-modal-body" style="text-align:center; padding:1.75rem;">
-            <svg width="160" height="160" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:1rem;">
-              <rect x="10" y="10" width="46" height="46" rx="6" fill="#1c1917"/>
-              <rect x="18" y="18" width="30" height="30" rx="3" fill="#ffffff"/>
-              <rect x="24" y="24" width="18" height="18" rx="2" fill="#0c5836"/>
-              <rect x="124" y="10" width="46" height="46" rx="6" fill="#1c1917"/>
-              <rect x="132" y="18" width="30" height="30" rx="3" fill="#ffffff"/>
-              <rect x="138" y="24" width="18" height="18" rx="2" fill="#0c5836"/>
-              <rect x="10" y="124" width="46" height="46" rx="6" fill="#1c1917"/>
-              <rect x="18" y="132" width="30" height="30" rx="3" fill="#ffffff"/>
-              <rect x="24" y="138" width="18" height="18" rx="2" fill="#0c5836"/>
-              <rect x="74" y="74" width="32" height="32" rx="6" fill="#0c5836"/>
-              <text x="90" y="95" font-size="16" fill="#c6923b" text-anchor="middle" font-weight="900">G</text>
-              <rect x="68" y="16" width="10" height="10" fill="#1c1917"/>
-              <rect x="86" y="16" width="12" height="8" fill="#1c1917"/>
-              <rect x="104" y="22" width="8" height="14" fill="#1c1917"/>
-              <rect x="16" y="68" width="12" height="10" fill="#1c1917"/>
-              <rect x="36" y="74" width="14" height="12" fill="#1c1917"/>
-              <rect x="120" y="68" width="16" height="8" fill="#1c1917"/>
-              <rect x="144" y="74" width="18" height="14" fill="#1c1917"/>
-              <rect x="68" y="118" width="14" height="12" fill="#1c1917"/>
-              <rect x="90" y="124" width="18" height="10" fill="#1c1917"/>
-              <rect x="120" y="118" width="12" height="16" fill="#1c1917"/>
-              <rect x="142" y="130" width="16" height="14" fill="#1c1917"/>
-            </svg>
-            <div style="font-size:1.6rem; font-weight:800; color:#fff; margin-bottom:0.25rem;">₹${(invoice.balance > 0 ? invoice.balance : invoice.amount).toLocaleString('en-IN')}</div>
-            <div style="font-size:0.8rem; color:var(--primary-gold); font-weight:700; margin-bottom:0.25rem;">gafoordrive@icici</div>
-            <div style="font-size:0.75rem; color:var(--slate-muted); margin-bottom:1.5rem;">${invoice.balance > 0 ? 'Outstanding balance' : 'Fully settled ✓'} · PhonePe / GPay / Paytm</div>
-            <div style="display:flex; justify-content:center; gap:0.75rem;">
-              <button type="button" class="p-ghost-btn" id="btn-close-qr-2">Close</button>
-              ${invoice.balance > 0 ? `<button type="button" class="btn-mnc btn-mnc-primary" id="btn-sim-qr-pay">Simulate Pay ✓</button>` : ''}
+          <div class="p-modal-body" style="text-align: center;">
+            <div style="background: #ffffff; padding: 1.25rem; border-radius: 8px; display: inline-block; margin: 0 auto 1.25rem;">
+              <svg width="180" height="180" viewBox="0 0 100 100" style="display:block;">
+                <rect width="100" height="100" fill="#ffffff"/>
+                <rect x="5" y="5" width="30" height="30" fill="#0f172a"/>
+                <rect x="10" y="10" width="20" height="20" fill="#ffffff"/>
+                <rect x="13" y="13" width="14" height="14" fill="#0f172a"/>
+                <rect x="65" y="5" width="30" height="30" fill="#0f172a"/>
+                <rect x="70" y="10" width="20" height="20" fill="#ffffff"/>
+                <rect x="73" y="13" width="14" height="14" fill="#0f172a"/>
+                <rect x="5" y="65" width="30" height="30" fill="#0f172a"/>
+                <rect x="10" y="70" width="20" height="20" fill="#ffffff"/>
+                <rect x="13" y="73" width="14" height="14" fill="#0f172a"/>
+                <rect x="42" y="10" width="8" height="8" fill="#0f172a"/>
+                <rect x="45" y="25" width="6" height="12" fill="#0f172a"/>
+                <rect x="55" y="30" width="8" height="8" fill="#0f172a"/>
+                <rect x="40" y="45" width="20" height="12" fill="#0f172a"/>
+                <rect x="68" y="45" width="10" height="6" fill="#0f172a"/>
+                <rect x="45" y="65" width="15" height="10" fill="#0f172a"/>
+                <rect x="65" y="65" width="10" height="20" fill="#0f172a"/>
+                <rect x="80" y="75" width="12" height="10" fill="#0f172a"/>
+              </svg>
             </div>
+            <div style="font-size: 0.95rem; font-weight: 800; color: #ffffff;">Scan with Any UPI App</div>
+            <div style="font-size: 0.8rem; color: var(--slate-muted); margin-top: 0.25rem;">PhonePe · Google Pay · Paytm · BHIM</div>
+            <div style="font-family: var(--font-mono); font-size: 1.5rem; font-weight: 900; color: var(--primary-gold); margin: 0.75rem 0;">
+              ₹${balance.toLocaleString('en-IN')}
+            </div>
+            <div style="font-size: 0.75rem; color: var(--slate-muted);">VPA: <strong>gafoordrivingschool@sbi</strong></div>
+          </div>
+          <div class="p-modal-footer">
+            <button type="button" class="p-ghost-btn" id="btn-cancel-qr">Close</button>
+            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-sim-pay">I Have Paid (Confirm) ✓</button>
           </div>
         </div>
       </div>
     `;
+
     const close = () => { modalRoot.innerHTML = ''; };
     modalRoot.querySelector('#btn-close-qr').addEventListener('click', close);
-    modalRoot.querySelector('#btn-close-qr-2').addEventListener('click', close);
-    const btnSim = modalRoot.querySelector('#btn-sim-qr-pay');
-    if (btnSim) {
-      btnSim.addEventListener('click', () => {
-        store.recordPayment(invoice.id, invoice.balance);
-        close();
-        showToast('Payment cleared via UPI ✓', 'success');
-        render();
-      });
-    }
+    modalRoot.querySelector('#btn-cancel-qr').addEventListener('click', close);
+    modalRoot.querySelector('#btn-sim-pay').addEventListener('click', () => {
+      store.recordPayment(invoiceId, balance);
+      close();
+      showToast(`Payment of ₹${balance.toLocaleString('en-IN')} confirmed! Thank you.`, 'success');
+      render();
+    });
   }
 
   render();

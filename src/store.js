@@ -6,11 +6,15 @@
    All copy, roles, and candidate records formatted in English words only.
    ========================================================================== */
 
+import { extractInitials, getNextStudentSequence, generateStudentCode, generateTrainerCode, getNextTrainerSequence, normalizeCode } from './utils/studentCode.js';
+import { saveStudentToSupabase, fetchStudentsFromSupabase, updateStudentInSupabase } from './supabase.js';
+
 const STORAGE_KEY = 'gafoor_driving_school_v1_pulivendula_state';
 
 const INITIAL_TRAINERS = [
   { 
-    id: 'TRN-1', 
+    id: 'TRN-1',
+    trainerCode: 'SR-TG01',
     name: 'K. Srinivas Rao', 
     role: 'Senior Master Instructor (18+ Years Experience)', 
     specialty: 'Pulivendula RTO 8-Track & Half-Clutch Balance Mastery', 
@@ -18,10 +22,13 @@ const INITIAL_TRAINERS = [
     activeStudents: 8, 
     car: 'Maruti Suzuki Swift Dual-Ctrl #AP-04-ED-4041',
     phone: '+91 98480 11223',
-    email: 'srinivas.rao@gafoordriving.in'
+    email: 'srinivas.rao@gafoordriving.in',
+    isFirstLogin: true,
+    password: null
   },
   { 
-    id: 'TRN-2', 
+    id: 'TRN-2',
+    trainerCode: 'AR-TG02',
     name: 'Anitha Reddy', 
     role: 'Senior Lady Driving Specialist & Mentor', 
     specialty: 'Confidence Building & Pulivendula Town Traffic Navigation', 
@@ -29,10 +36,13 @@ const INITIAL_TRAINERS = [
     activeStudents: 7, 
     car: 'Hyundai Grand i10 Dual-Ctrl #AP-04-AB-2020',
     phone: '+91 94401 22334',
-    email: 'anitha.reddy@gafoordriving.in'
+    email: 'anitha.reddy@gafoordriving.in',
+    isFirstLogin: true,
+    password: null
   },
   { 
-    id: 'TRN-3', 
+    id: 'TRN-3',
+    trainerCode: 'VR-TG03',
     name: 'M. Venkataramana', 
     role: 'Kadapa Highway & Ghat Road Lead Trainer', 
     specialty: 'Pulivendula Ghat Incline, Night Driving & Highway Speed Control', 
@@ -40,10 +50,13 @@ const INITIAL_TRAINERS = [
     activeStudents: 6, 
     car: 'Tata Punch Dual-Ctrl #AP-04-CT-7072',
     phone: '+91 98665 33445',
-    email: 'm.venkat@gafoordriving.in'
+    email: 'm.venkat@gafoordriving.in',
+    isFirstLogin: true,
+    password: null
   },
   { 
-    id: 'TRN-4', 
+    id: 'TRN-4',
+    trainerCode: 'RK-TG04',
     name: 'D. Ravi Kumar', 
     role: 'AP RTO Ground Test Specialist', 
     specialty: 'H-Track, Reverse Bay Docking & Pulivendula Sensor Compliance', 
@@ -51,13 +64,16 @@ const INITIAL_TRAINERS = [
     activeStudents: 7, 
     car: 'Maruti WagonR Dual-Ctrl #AP-04-KL-8088',
     phone: '+91 99890 55667',
-    email: 'ravi.kumar@gafoordriving.in'
+    email: 'ravi.kumar@gafoordriving.in',
+    isFirstLogin: true,
+    password: null
   }
 ];
 
 const INITIAL_TRAINEES = [
   {
-    id: 'APX-9021',
+    id: 'SK- GS01',
+    studentCode: 'SK- GS01',
     name: 'Sai Kiran Varma',
     email: 'sai.kiran@gafoordriving.in',
     phone: '+91 98480 22334',
@@ -74,10 +90,13 @@ const INITIAL_TRAINEES = [
     package: '20-Day Comprehensive Licensing Package',
     avatar: 'SK',
     attendanceRate: '100%',
-    paymentStatus: 'partial'
+    paymentStatus: 'partial',
+    isFirstLogin: true,
+    password: null
   },
   {
-    id: 'APX-9022',
+    id: 'LG- GS02',
+    studentCode: 'LG- GS02',
     name: 'Lavanya Goud',
     email: 'lavanya.goud@gafoordriving.in',
     phone: '+91 94401 55678',
@@ -94,10 +113,13 @@ const INITIAL_TRAINEES = [
     package: 'Ladies Special Mentorship Package',
     avatar: 'LG',
     attendanceRate: '95%',
-    paymentStatus: 'paid'
+    paymentStatus: 'paid',
+    isFirstLogin: true,
+    password: null
   },
   {
-    id: 'APX-9023',
+    id: 'HC- GS03',
+    studentCode: 'HC- GS03',
     name: 'Harika Chowdary',
     email: 'harika.c@gafoordriving.in',
     phone: '+91 98665 12090',
@@ -114,10 +136,13 @@ const INITIAL_TRAINEES = [
     package: '20-Day Comprehensive Licensing Package',
     avatar: 'HC',
     attendanceRate: '100%',
-    paymentStatus: 'paid'
+    paymentStatus: 'paid',
+    isFirstLogin: true,
+    password: null
   },
   {
-    id: 'APX-9024',
+    id: 'VK- GS04',
+    studentCode: 'VK- GS04',
     name: 'Vamshi Krishna',
     email: 'vamshi.k@gafoordriving.in',
     phone: '+91 99890 44321',
@@ -134,10 +159,13 @@ const INITIAL_TRAINEES = [
     package: 'City Traffic & 8-Track Mastery',
     avatar: 'VK',
     attendanceRate: '100%',
-    paymentStatus: 'pending'
+    paymentStatus: 'pending',
+    isFirstLogin: true,
+    password: null
   },
   {
-    id: 'APX-9025',
+    id: 'SR- GS05',
+    studentCode: 'SR- GS05',
     name: 'Sneha Reddy',
     email: 'sneha.r@gafoordriving.in',
     phone: '+91 97012 33445',
@@ -154,10 +182,13 @@ const INITIAL_TRAINEES = [
     package: '20-Day Comprehensive Licensing Package',
     avatar: 'SR',
     attendanceRate: '92%',
-    paymentStatus: 'paid'
+    paymentStatus: 'paid',
+    isFirstLogin: true,
+    password: null
   },
   {
-    id: 'APX-9026',
+    id: 'KR- GS06',
+    studentCode: 'KR- GS06',
     name: 'Karthik Raju',
     email: 'karthik.raju@gafoordriving.in',
     phone: '+91 91210 77889',
@@ -174,10 +205,13 @@ const INITIAL_TRAINEES = [
     package: 'City Traffic & 8-Track Mastery',
     avatar: 'KR',
     attendanceRate: '88%',
-    paymentStatus: 'partial'
+    paymentStatus: 'partial',
+    isFirstLogin: true,
+    password: null
   },
   {
-    id: 'APX-9027',
+    id: 'DB- GS07',
+    studentCode: 'DB- GS07',
     name: 'Divya Bharathi',
     email: 'divya.b@gafoordriving.in',
     phone: '+91 93901 88900',
@@ -194,10 +228,13 @@ const INITIAL_TRAINEES = [
     package: '20-Day Comprehensive Licensing Package',
     avatar: 'DB',
     attendanceRate: '96%',
-    paymentStatus: 'overdue'
+    paymentStatus: 'overdue',
+    isFirstLogin: true,
+    password: null
   },
   {
-    id: 'APX-9028',
+    id: 'MK- GS08',
+    studentCode: 'MK- GS08',
     name: 'Manoj Kumar',
     email: 'manoj.k@gafoordriving.in',
     phone: '+91 98499 11223',
@@ -214,26 +251,28 @@ const INITIAL_TRAINEES = [
     package: 'City Traffic & 8-Track Mastery',
     avatar: 'MK',
     attendanceRate: '100%',
-    paymentStatus: 'pending'
+    paymentStatus: 'pending',
+    isFirstLogin: true,
+    password: null
   }
 ];
 
 const INITIAL_PAYMENTS = [
-  { id: 'INV-4011', traineeId: 'APX-9021', traineeName: 'Sai Kiran Varma', package: '20-Day Comprehensive', amount: 7500, paid: 4500, balance: 3000, dueDate: '2026-09-22', status: 'partial', method: 'UPI (PhonePe QR)' },
-  { id: 'INV-4012', traineeId: 'APX-9022', traineeName: 'Lavanya Goud', package: 'Ladies Special Batch', amount: 8500, paid: 8500, balance: 0, dueDate: '2026-09-10', status: 'paid', method: 'Google Pay UPI' },
-  { id: 'INV-4013', traineeId: 'APX-9023', traineeName: 'Harika Chowdary', package: '20-Day Comprehensive', amount: 7500, paid: 7500, balance: 0, dueDate: '2026-08-20', status: 'paid', method: 'BHIM UPI Transfer' },
-  { id: 'INV-4014', traineeId: 'APX-9024', traineeName: 'Vamshi Krishna', package: 'City & Track Mastery', amount: 5500, paid: 0, balance: 5500, dueDate: '2026-09-20', status: 'pending', method: 'Pending UPI Verification' },
-  { id: 'INV-4015', traineeId: 'APX-9025', traineeName: 'Sneha Reddy', package: '20-Day Comprehensive', amount: 7500, paid: 7500, balance: 0, dueDate: '2026-08-28', status: 'paid', method: 'Paytm UPI' },
-  { id: 'INV-4016', traineeId: 'APX-9026', traineeName: 'Karthik Raju', package: 'City & Track Mastery', amount: 5500, paid: 2500, balance: 3000, dueDate: '2026-09-25', status: 'partial', method: 'Cash at Branch' },
-  { id: 'INV-4017', traineeId: 'APX-9027', traineeName: 'Divya Bharathi', package: '20-Day Comprehensive', amount: 7500, paid: 3500, balance: 4000, dueDate: '2026-09-02', status: 'overdue', method: 'Late Notice Sent' },
-  { id: 'INV-4018', traineeId: 'APX-9028', traineeName: 'Manoj Kumar', package: 'City & Track Mastery', amount: 5500, paid: 0, balance: 5500, dueDate: '2026-09-29', status: 'pending', method: 'Awaiting UPI Deposit' }
+  { id: 'INV-4011', traineeId: 'SK- GS01', traineeName: 'Sai Kiran Varma', package: '20-Day Comprehensive', amount: 7500, paid: 4500, balance: 3000, dueDate: '2026-09-22', status: 'partial', method: 'UPI (PhonePe QR)' },
+  { id: 'INV-4012', traineeId: 'LG- GS02', traineeName: 'Lavanya Goud', package: 'Ladies Special Batch', amount: 8500, paid: 8500, balance: 0, dueDate: '2026-09-10', status: 'paid', method: 'Google Pay UPI' },
+  { id: 'INV-4013', traineeId: 'HC- GS03', traineeName: 'Harika Chowdary', package: '20-Day Comprehensive', amount: 7500, paid: 7500, balance: 0, dueDate: '2026-08-20', status: 'paid', method: 'BHIM UPI Transfer' },
+  { id: 'INV-4014', traineeId: 'VK- GS04', traineeName: 'Vamshi Krishna', package: 'City & Track Mastery', amount: 5500, paid: 0, balance: 5500, dueDate: '2026-09-20', status: 'pending', method: 'Pending UPI Verification' },
+  { id: 'INV-4015', traineeId: 'SR- GS05', traineeName: 'Sneha Reddy', package: '20-Day Comprehensive', amount: 7500, paid: 7500, balance: 0, dueDate: '2026-08-28', status: 'paid', method: 'Paytm UPI' },
+  { id: 'INV-4016', traineeId: 'KR- GS06', traineeName: 'Karthik Raju', package: 'City & Track Mastery', amount: 5500, paid: 2500, balance: 3000, dueDate: '2026-09-25', status: 'partial', method: 'Cash at Branch' },
+  { id: 'INV-4017', traineeId: 'DB- GS07', traineeName: 'Divya Bharathi', package: '20-Day Comprehensive', amount: 7500, paid: 3500, balance: 4000, dueDate: '2026-09-02', status: 'overdue', method: 'Late Notice Sent' },
+  { id: 'INV-4018', traineeId: 'MK- GS08', traineeName: 'Manoj Kumar', package: 'City & Track Mastery', amount: 5500, paid: 0, balance: 5500, dueDate: '2026-09-29', status: 'pending', method: 'Awaiting UPI Deposit' }
 ];
 
 const INITIAL_SCHEDULE = [
-  { id: 'SLOT-1', time: '07:30 AM – 09:00 AM', traineeId: 'APX-9022', studentName: 'Lavanya Goud', topic: 'Day 7: Pulivendula RTO H-Track & Reverse Bay Docking', car: 'Hyundai Grand i10 Dual-Ctrl #AP-04-AB-2020', attendance: 'present' },
-  { id: 'SLOT-2', time: '09:30 AM – 11:00 AM', traineeId: 'APX-9021', studentName: 'Sai Kiran Varma', topic: 'Day 14: Pulivendula Bypass Incline & Half-Clutch Hold', car: 'Maruti Suzuki Swift Dual-Ctrl #AP-04-ED-4041', attendance: 'present' },
-  { id: 'SLOT-3', time: '02:00 PM – 03:30 PM', traineeId: 'APX-9023', studentName: 'Harika Chowdary', topic: 'Day 20: Official Pulivendula RTO Automated Driving Test Mock Exam', car: 'Hyundai Grand i10 Dual-Ctrl #AP-04-AB-2020', attendance: 'late' },
-  { id: 'SLOT-4', time: '04:00 PM – 05:30 PM', traineeId: 'APX-9024', studentName: 'Vamshi Krishna', topic: 'Day 3: Clutch Modulation, Biting Point & 3-Point Turn', car: 'Tata Punch Dual-Ctrl #AP-04-CT-7072', attendance: 'none' }
+  { id: 'SLOT-1', time: '07:30 AM – 09:00 AM', traineeId: 'LG- GS02', studentName: 'Lavanya Goud', topic: 'Day 7: Pulivendula RTO H-Track & Reverse Bay Docking', car: 'Hyundai Grand i10 Dual-Ctrl #AP-04-AB-2020', attendance: 'present' },
+  { id: 'SLOT-2', time: '09:30 AM – 11:00 AM', traineeId: 'SK- GS01', studentName: 'Sai Kiran Varma', topic: 'Day 14: Pulivendula Bypass Incline & Half-Clutch Hold', car: 'Maruti Suzuki Swift Dual-Ctrl #AP-04-ED-4041', attendance: 'present' },
+  { id: 'SLOT-3', time: '02:00 PM – 03:30 PM', traineeId: 'HC- GS03', studentName: 'Harika Chowdary', topic: 'Day 20: Official Pulivendula RTO Automated Driving Test Mock Exam', car: 'Hyundai Grand i10 Dual-Ctrl #AP-04-AB-2020', attendance: 'late' },
+  { id: 'SLOT-4', time: '04:00 PM – 05:30 PM', traineeId: 'VK- GS04', studentName: 'Vamshi Krishna', topic: 'Day 3: Clutch Modulation, Biting Point & 3-Point Turn', car: 'Tata Punch Dual-Ctrl #AP-04-CT-7072', attendance: 'none' }
 ];
 
 const CURRICULUM_DAYS = [
@@ -263,6 +302,8 @@ class Store {
   constructor() {
     this.listeners = [];
     this.loadState();
+    // Auto-sync with Supabase in background if configured
+    this.syncWithSupabase();
   }
 
   loadState() {
@@ -271,12 +312,34 @@ class Store {
       if (cached) {
         const parsed = JSON.parse(cached);
         this.currentRole = parsed.currentRole || 'admin';
+        this.currentTraineeId = parsed.currentTraineeId || 'SK- GS01';
         this.trainers = parsed.trainers || INITIAL_TRAINERS;
         this.trainees = parsed.trainees || INITIAL_TRAINEES;
         this.payments = parsed.payments || INITIAL_PAYMENTS;
         this.schedule = parsed.schedule || INITIAL_SCHEDULE;
         this.traineeTestDay = parsed.traineeTestDay || 14;
         this.feedbackSubmitted = parsed.feedbackSubmitted || false;
+
+        // Ensure all trainees have studentCode and isFirstLogin flag, migrating legacy IDs
+        this.trainees.forEach((t, i) => {
+          if (!t.studentCode || t.studentCode.startsWith('APX-') || /-G\d+$/i.test(t.studentCode)) {
+            const initials = extractInitials(t.name);
+            const pad = String(i + 1).padStart(2, '0');
+            t.studentCode = `${initials}- GS${pad}`;
+            if (!t.id || t.id.startsWith('APX-')) t.id = t.studentCode;
+          }
+          if (t.isFirstLogin === undefined) t.isFirstLogin = !t.password;
+        });
+
+        // Ensure all trainers have trainerCode and isFirstLogin flag, migrating legacy IDs
+        this.trainers.forEach((tr, i) => {
+          if (!tr.trainerCode || tr.trainerCode.startsWith('TRN-') || /-T\d+$/i.test(tr.trainerCode)) {
+            const initials = extractInitials(tr.name);
+            const pad = String(i + 1).padStart(2, '0');
+            tr.trainerCode = `${initials}-TG${pad}`;
+          }
+          if (tr.isFirstLogin === undefined) tr.isFirstLogin = !tr.password;
+        });
         return;
       }
     } catch (e) {
@@ -284,12 +347,34 @@ class Store {
     }
 
     this.currentRole = 'admin';
+    this.currentTraineeId = 'SK- GS01';
     this.trainers = INITIAL_TRAINERS;
     this.trainees = INITIAL_TRAINEES;
     this.payments = INITIAL_PAYMENTS;
     this.schedule = INITIAL_SCHEDULE;
     this.traineeTestDay = 14;
     this.feedbackSubmitted = false;
+
+    // Ensure all trainees have studentCode and isFirstLogin
+    this.trainees.forEach((t, i) => {
+      if (!t.studentCode) {
+        const initials = extractInitials(t.name);
+        const pad = String(i + 1).padStart(2, '0');
+        t.studentCode = `${initials}- GS${pad}`;
+      }
+      if (t.isFirstLogin === undefined) t.isFirstLogin = !t.password;
+    });
+
+    // Ensure all trainers have trainerCode and isFirstLogin
+    this.trainers.forEach((tr, i) => {
+      if (!tr.trainerCode) {
+        const initials = extractInitials(tr.name);
+        const pad = String(i + 1).padStart(2, '0');
+        tr.trainerCode = `${initials}-TG${pad}`;
+      }
+      if (tr.isFirstLogin === undefined) tr.isFirstLogin = !tr.password;
+    });
+
     this.saveState();
   }
 
@@ -297,6 +382,7 @@ class Store {
     try {
       const payload = {
         currentRole: this.currentRole,
+        currentTraineeId: this.currentTraineeId,
         trainers: this.trainers,
         trainees: this.trainees,
         payments: this.payments,
@@ -331,20 +417,122 @@ class Store {
     return this.currentRole;
   }
 
+  getCurrentTrainee() {
+    return this.trainees.find(t => t.id === this.currentTraineeId || t.studentCode === this.currentTraineeId) || this.trainees[0];
+  }
+
+  setCurrentTrainee(idOrCode) {
+    const found = this.findTrainee(idOrCode);
+    if (found) {
+      this.currentTraineeId = found.id;
+      this.saveState();
+      this.notify('CURRENT_TRAINEE_CHANGED', found);
+      return found;
+    }
+    return null;
+  }
+
+  findTrainee(identifier) {
+    if (!identifier) return null;
+    const norm = normalizeCode(identifier);
+    const clean = identifier.trim().toLowerCase();
+    return this.trainees.find(t => 
+      (t.id && normalizeCode(t.id) === norm) ||
+      (t.studentCode && normalizeCode(t.studentCode) === norm) ||
+      (t.email && t.email.toLowerCase() === clean) ||
+      (t.phone && t.phone.replace(/\s+/g, '') === clean.replace(/\s+/g, ''))
+    ) || null;
+  }
+
+  setTraineePassword(traineeId, password) {
+    const trainee = this.findTrainee(traineeId);
+    if (!trainee) return false;
+    trainee.password = password;
+    trainee.isFirstLogin = false;
+    this.saveState();
+    this.notify('TRAINEE_UPDATED', trainee);
+    updateStudentInSupabase(trainee.id, { password, isFirstLogin: false }).catch(() => {});
+    return true;
+  }
+
+  findTrainer(identifier) {
+    if (!identifier) return null;
+    const norm = normalizeCode(identifier);
+    const clean = identifier.trim().toLowerCase();
+    return this.trainers.find(tr => 
+      (tr.id && normalizeCode(tr.id) === norm) ||
+      (tr.trainerCode && normalizeCode(tr.trainerCode) === norm) ||
+      (tr.email && tr.email.toLowerCase() === clean) ||
+      (tr.phone && tr.phone.replace(/\s+/g, '') === clean.replace(/\s+/g, ''))
+    ) || null;
+  }
+
+  setTrainerPassword(trainerId, password) {
+    const trainer = this.findTrainer(trainerId);
+    if (!trainer) return false;
+    trainer.password = password;
+    trainer.isFirstLogin = false;
+    this.saveState();
+    this.notify('TRAINER_UPDATED', trainer);
+    return true;
+  }
+
+  verifyAdminLogin(username, password) {
+    const clean = (username || '').trim().toLowerCase();
+    const validUsers = ['admin@gafoordriving.in', 'admin', 'admin-hq'];
+    if (!validUsers.includes(clean)) {
+      return { success: false, message: 'Invalid Admin username. Only one master administrator account is authorized.' };
+    }
+    const validPasswords = ['admin', 'admin123', '••••••••••••'];
+    if (validPasswords.includes(password)) {
+      return { success: true };
+    }
+    return { success: false, message: 'Incorrect Administrator security password.' };
+  }
+
+  async syncWithSupabase() {
+    try {
+      const res = await fetchStudentsFromSupabase();
+      if (res && res.success && res.data && res.data.length > 0) {
+        let changed = false;
+        res.data.forEach(remoteStudent => {
+          const exists = this.trainees.find(t => t.id === remoteStudent.id || t.studentCode === remoteStudent.studentCode);
+          if (!exists) {
+            this.trainees.unshift(remoteStudent);
+            changed = true;
+          } else {
+            Object.assign(exists, remoteStudent);
+            changed = true;
+          }
+        });
+        if (changed) {
+          this.saveState();
+          this.notify('SUPABASE_SYNC_COMPLETE', this.trainees);
+        }
+      }
+    } catch (e) {
+      console.warn('Sync with Supabase failed or skipped:', e);
+    }
+  }
+
   assignTrainer(traineeId, newTrainerId) {
-    const trainee = this.trainees.find(t => t.id === traineeId);
+    const trainee = this.trainees.find(t => t.id === traineeId || t.studentCode === traineeId);
     const trainer = this.trainers.find(tr => tr.id === newTrainerId);
     if (!trainee || !trainer) return false;
 
     trainee.assignedTrainerId = newTrainerId;
     this.notify('TRAINER_ASSIGNED', { trainee, trainer });
+    updateStudentInSupabase(trainee.id, { assignedTrainerId: newTrainerId }).catch(() => {});
     return true;
   }
 
   addTrainer(data) {
+    const seq = getNextTrainerSequence(this.trainers);
+    const trainerCode = generateTrainerCode(data.name, seq);
     const newId = `TRN-${this.trainers.length + 1}`;
     const newTrainer = {
       id: newId,
+      trainerCode: trainerCode,
       name: data.name,
       role: data.role || 'Certified Motor Driving Instructor',
       specialty: data.specialty || 'RTO Track & City Traffic Navigation',
@@ -352,7 +540,9 @@ class Store {
       activeStudents: 0,
       car: data.car || 'Maruti Suzuki Swift Dual-Ctrl #AP-04-ED-9001',
       phone: data.phone || '+91 98480 00112',
-      email: `${data.name.toLowerCase().replace(/\s+/g, '.')}@gafoordriving.in`
+      email: `${data.name.toLowerCase().replace(/\s+/g, '.')}@gafoordriving.in`,
+      isFirstLogin: true,
+      password: null
     };
     this.trainers.push(newTrainer);
     this.notify('TRAINER_ADDED', newTrainer);
@@ -369,10 +559,15 @@ class Store {
   }
 
   addTrainee(data) {
-    const newId = `APX-${9020 + this.trainees.length + 1}`;
-    const initials = data.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || 'ST';
+    // Generate unique student code in requested format: e.g. "Mulla adil" -> "MA-G01"
+    const seq = getNextStudentSequence(this.trainees);
+    const code = generateStudentCode(data.name, seq);
+    const initials = extractInitials(data.name);
+    const newId = code;
+
     const trainee = {
       id: newId,
+      studentCode: code,
       name: data.name,
       email: data.email || `${data.name.toLowerCase().replace(/\s+/g, '.')}@gafoordriving.in`,
       phone: data.phone || '+91 98480 00000',
@@ -389,7 +584,9 @@ class Store {
       package: data.package || '20-Day Comprehensive Licensing Package',
       avatar: initials,
       attendanceRate: '100%',
-      paymentStatus: data.paymentStatus || 'pending'
+      paymentStatus: data.paymentStatus || 'pending',
+      isFirstLogin: true,
+      password: null
     };
 
     this.trainees.unshift(trainee);
@@ -412,15 +609,31 @@ class Store {
     });
 
     this.notify('TRAINEE_ADDED', trainee);
+
+    // Push directly to Supabase cloud database (non-blocking)
+    saveStudentToSupabase(trainee).then(res => {
+      if (res && res.success) {
+        console.log('✓ Successfully synced student to Supabase cloud DB:', trainee.studentCode);
+      }
+    }).catch(err => {
+      console.warn('Supabase sync skipped/deferred:', err);
+    });
+
     return trainee;
   }
 
   updateTrainee(traineeId, updatedFields) {
-    const trainee = this.trainees.find(t => t.id === traineeId);
+    const trainee = this.trainees.find(t => t.id === traineeId || t.studentCode === traineeId);
     if (!trainee) return false;
 
     Object.assign(trainee, updatedFields);
     this.notify('TRAINEE_UPDATED', trainee);
+
+    // Sync field update with Supabase
+    updateStudentInSupabase(trainee.id, updatedFields).catch(err => {
+      console.warn('Supabase update warning:', err);
+    });
+
     return true;
   }
 
