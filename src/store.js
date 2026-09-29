@@ -581,7 +581,7 @@ class Store {
       category: 'street',
       status: 'Active',
       registeredDate: new Date().toISOString().split('T')[0],
-      package: data.package || 'With Licence (₹7,000)',
+      package: data.package || 'With Licence (₹11,000)',
       avatar: initials,
       attendanceRate: '100%',
       paymentStatus: data.paymentStatus || 'pending',
@@ -593,7 +593,7 @@ class Store {
 
     // Create payment ledger entry in ₹ INR
     const invoiceId = `INV-${4010 + this.payments.length + 1}`;
-    const amount = trainee.package.includes('Without Licence') ? 11000 : 7000;
+    const amount = trainee.package.includes('Without Licence') ? 7000 : 11000;
     const paid = trainee.paymentStatus === 'paid' ? amount : (trainee.paymentStatus === 'partial' ? 3500 : 0);
     this.payments.unshift({
       id: invoiceId,

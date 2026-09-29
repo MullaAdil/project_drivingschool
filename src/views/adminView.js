@@ -462,10 +462,10 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
             </div>
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1rem; margin-bottom:1.5rem;">
               <label class="p-pkg-option" id="pkg-without-licence">
-                <input type="radio" name="package_choice" value="Without Licence (₹11,000)" />
+                <input type="radio" name="package_choice" value="Without Licence (₹7,000)" />
                 <div class="p-pkg-name">Without Licence</div>
                 <div class="p-pkg-desc">Full package for students who do not yet hold a driving licence. Includes LLR guidance, training, and RTO test support.</div>
-                <div class="p-pkg-price">₹11,000</div>
+                <div class="p-pkg-price">₹7,000</div>
                 <ul class="p-pkg-feats">
                   <li>20-Day Practical Training (8 km/day)</li>
                   <li>Parivahan LLR Slot Booking</li>
@@ -475,11 +475,11 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
                 </ul>
               </label>
               <label class="p-pkg-option selected" id="pkg-with-licence" style="border-color:rgba(243,209,130,0.4); background:rgba(243,209,130,0.04);">
-                <input type="radio" name="package_choice" value="With Licence (₹7,000)" checked />
+                <input type="radio" name="package_choice" value="With Licence (₹11,000)" checked />
                 <div style="font-size:0.65rem; font-weight:800; color:var(--primary-gold); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.5rem;">⭐ Already Licensed</div>
                 <div class="p-pkg-name">With Licence</div>
                 <div class="p-pkg-desc">For students who already hold a valid driving licence and want to improve their skills with professional training.</div>
-                <div class="p-pkg-price">₹7,000</div>
+                <div class="p-pkg-price">₹11,000</div>
                 <ul class="p-pkg-feats">
                   <li>20-Day Practical Training (8 km/day)</li>
                   <li>City Traffic & Highway Sessions</li>
