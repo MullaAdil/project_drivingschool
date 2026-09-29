@@ -242,9 +242,8 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
         const q = searchQuery.toLowerCase();
         const matchSearch = t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q) || (t.permitNumber||'').toLowerCase().includes(q) || (t.phone||'').includes(q);
         const matchPkg = activePackageFilter==='all' ||
-          (activePackageFilter==='20-day' && t.package.includes('20-Day')) ||
-          (activePackageFilter==='standard' && (t.package.includes('Standard')||t.package.includes('Beginner')||t.package.includes('City'))) ||
-          (activePackageFilter==='ladies' && t.package.includes('Ladies'));
+          (activePackageFilter==='without-licence' && t.package.includes('Without Licence')) ||
+          (activePackageFilter==='with-licence' && t.package.includes('With Licence'));
         let matchStage = true;
         if (activeStageFilter==='intake') matchStage = t.currentDay<=2;
         else if (activeStageFilter==='ground') matchStage = t.currentDay>=3&&t.currentDay<=7;
@@ -274,10 +273,9 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
         <div style="padding:1.1rem 2rem; border-bottom:1px solid var(--border-light); display:flex; gap:0.85rem; align-items:center; flex-wrap:wrap; background:rgba(255,255,255,0.01);">
           <input type="text" class="mnc-input" id="search-trainee" placeholder="Search by name, ID, LLR permit, phone…" value="${searchQuery}" style="width:300px; flex-shrink:0;" />
           <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
-            <button type="button" class="p-chip-btn ${activePackageFilter==='all'      ? 'p-chip-active':''}" data-pkg="all">All Packages</button>
-            <button type="button" class="p-chip-btn ${activePackageFilter==='20-day'   ? 'p-chip-active':''}" data-pkg="20-day">20-Day Course</button>
-            <button type="button" class="p-chip-btn ${activePackageFilter==='standard' ? 'p-chip-active':''}" data-pkg="standard">Beginner Track</button>
-            <button type="button" class="p-chip-btn ${activePackageFilter==='ladies'   ? 'p-chip-active':''}" data-pkg="ladies">Ladies Special</button>
+            <button type="button" class="p-chip-btn ${activePackageFilter==='all'             ? 'p-chip-active':''}" data-pkg="all">All Courses</button>
+            <button type="button" class="p-chip-btn ${activePackageFilter==='without-licence' ? 'p-chip-active':''}" data-pkg="without-licence">Without Licence</button>
+            <button type="button" class="p-chip-btn ${activePackageFilter==='with-licence'    ? 'p-chip-active':''}" data-pkg="with-licence">With Licence</button>
           </div>
         </div>
 
@@ -460,45 +458,33 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
           <!-- Section 2: Course Package -->
           <div class="portal-section">
             <div class="portal-section-header">
-              <span class="portal-section-title">Section 2 — Course Package & Curriculum Track</span>
+              <span class="portal-section-title">Section 2 — Course Selection</span>
             </div>
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1rem; margin-bottom:1.5rem;">
-              <label class="p-pkg-option selected" id="pkg-beginner">
-                <input type="radio" name="package_choice" value="Beginner Driving Course (₹5,500)" />
-                <div class="p-pkg-name">Beginner Course</div>
-                <div class="p-pkg-desc">Foundational training for first-time drivers. ABC pedals, gear control, basic city navigation.</div>
-                <div class="p-pkg-price">₹5,500</div>
+              <label class="p-pkg-option" id="pkg-without-licence">
+                <input type="radio" name="package_choice" value="Without Licence (₹11,000)" />
+                <div class="p-pkg-name">Without Licence</div>
+                <div class="p-pkg-desc">Full package for students who do not yet hold a driving licence. Includes LLR guidance, training, and RTO test support.</div>
+                <div class="p-pkg-price">₹11,000</div>
                 <ul class="p-pkg-feats">
-                  <li>20-Day Program (8 km/day)</li>
-                  <li>Ground & ABC Pedal Controls</li>
-                  <li>Parivahan LLR Support</li>
-                  <li>City Traffic Navigation</li>
-                </ul>
-              </label>
-              <label class="p-pkg-option" id="pkg-rto" style="border-color:rgba(243,209,130,0.4); background:rgba(243,209,130,0.04);">
-                <input type="radio" name="package_choice" value="RTO 8-Track &amp; City Mastery (₹7,500)" checked />
-                <div style="font-size:0.65rem; font-weight:800; color:var(--primary-gold); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.5rem;">⭐ Most Popular</div>
-                <div class="p-pkg-name">RTO 8-Track & City Mastery</div>
-                <div class="p-pkg-desc">Complete DL syllabus with automated sensor track, flyover & highway sessions.</div>
-                <div class="p-pkg-price">₹7,500</div>
-                <ul class="p-pkg-feats">
-                  <li>Full 20-Day DL Package (160 km)</li>
-                  <li>Automated 8-Track & H-Bay Mock</li>
-                  <li>Flyover Half-Clutch Hill Hold</li>
-                  <li>Highway & City Sessions</li>
+                  <li>20-Day Practical Training (8 km/day)</li>
+                  <li>Parivahan LLR Slot Booking</li>
+                  <li>RTO 8-Track & H-Bay Drill</li>
+                  <li>Licence Application Assistance</li>
                   <li>RTO Test Slot Booking</li>
                 </ul>
               </label>
-              <label class="p-pkg-option" id="pkg-ladies">
-                <input type="radio" name="package_choice" value="Ladies Special &amp; Doorstep Pickup (₹8,500)" />
-                <div class="p-pkg-name">Ladies Special</div>
-                <div class="p-pkg-desc">Dedicated senior lady instructor with doorstep car pickup & flexible batch timings.</div>
-                <div class="p-pkg-price">₹8,500</div>
+              <label class="p-pkg-option selected" id="pkg-with-licence" style="border-color:rgba(243,209,130,0.4); background:rgba(243,209,130,0.04);">
+                <input type="radio" name="package_choice" value="With Licence (₹7,000)" checked />
+                <div style="font-size:0.65rem; font-weight:800; color:var(--primary-gold); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.5rem;">⭐ Already Licensed</div>
+                <div class="p-pkg-name">With Licence</div>
+                <div class="p-pkg-desc">For students who already hold a valid driving licence and want to improve their skills with professional training.</div>
+                <div class="p-pkg-price">₹7,000</div>
                 <ul class="p-pkg-feats">
-                  <li>Senior Lady Mentor Assigned</li>
-                  <li>Doorstep Vehicle Pickup & Drop</li>
-                  <li>Flexible Morning/Evening Batches</li>
-                  <li>Full 20-Day DL Program</li>
+                  <li>20-Day Practical Training (8 km/day)</li>
+                  <li>City Traffic & Highway Sessions</li>
+                  <li>RTO 8-Track & H-Bay Practice</li>
+                  <li>Flyover Half-Clutch Mastery</li>
                 </ul>
               </label>
             </div>

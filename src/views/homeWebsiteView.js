@@ -66,7 +66,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
 
           <div class="mnc-cta-group" style="justify-content: center;">
             <button type="button" class="btn-mnc btn-mnc-primary" id="hero-btn-book" style="padding: 0.8rem 1.85rem; font-size: 0.95rem;">
-              Book a Course (From ₹5,500) →
+              Book a Course (From ₹7,000) →
             </button>
             <button type="button" class="btn-mnc btn-mnc-secondary" id="hero-btn-track-scroll" style="padding: 0.8rem 1.85rem; font-size: 0.95rem;">
               Explore RTO Track Guide ↓
@@ -156,95 +156,103 @@ export function renderHomeWebsiteView(container, onNavigate) {
           </div>
         </section>
 
-        <!-- SERVICES / COURSE ARCHITECTURE (3-COLUMN STRUCTURE IN ₹ INR) -->
+        <!-- SERVICES / COURSE ARCHITECTURE (2-COLUMN STRUCTURE IN ₹ INR) -->
         <section class="mnc-section-services" id="services-grid-section">
           <div class="mnc-section-container">
             <div class="mnc-section-header">
               <span class="mnc-section-tag">Curriculum Architecture</span>
               <h2 class="mnc-section-title">
-                Structured Driver Programs in Indian Rupees
+                Two Transparent Course Tracks
               </h2>
               <p class="mnc-section-desc">
-                Transparent all-inclusive fees with zero hidden charges. Dual-control Maruti Swift training with doorstep pickup options.
+                All-inclusive fees with zero hidden charges. Dual-control Maruti Swift training on real roads.
               </p>
             </div>
 
-            <div class="mnc-3col-grid">
-              <!-- COLUMN 1: BASIC COURSE -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2.5rem; max-width: 900px; margin-left: auto; margin-right: auto;">
+              <!-- COLUMN 1: WITHOUT LICENCE -->
               <div class="mnc-service-column">
                 <div>
                   <div class="col-header">
                     <span class="col-badge">
-                      Beginner Track
+                      No Licence Yet
                     </span>
-                    <h3 class="col-title">Beginner Driving Course</h3>
-                    <p class="col-desc">Foundational ground-up driver education for first-time motorists.</p>
+                    <h3 class="col-title">Without Licence</h3>
+                    <p class="col-desc">Complete package for first-time motorists — from LLR application to RTO test clearance.</p>
                   </div>
 
                   <div class="program-list">
                     <div class="program-item">
                       <div class="program-name">
-                        20-Day Program (8 km/day)
-                        <span style="color: var(--primary-cyan); font-weight: 800; font-family: var(--font-mono); font-size: 1.15rem;">₹5,500</span>
+                        20-Day Practical Training (8 km/day)
+                        <span style="color: var(--primary-cyan); font-weight: 800; font-family: var(--font-mono); font-size: 1.25rem;">₹11,000</span>
                       </div>
-                      <div class="program-detail">Accelerator-Brake-Clutch sensitivity, creeping, and progressive braking.</div>
+                      <div class="program-detail">Full road training — city, highway, flyover, and RTO 8-Track circuit (160 km total).</div>
                     </div>
 
                     <div class="program-item">
                       <div class="program-name">
-                        Ground Maneuvers & Turning
+                        Parivahan LLR Slot Booking
                         <span>Included</span>
                       </div>
-                      <div class="program-detail">Safe field coordination, 3-point turns, and obstacle slalom.</div>
+                      <div class="program-detail">Govt. learner licence online slot booking and test preparation assistance.</div>
                     </div>
 
                     <div class="program-item">
                       <div class="program-name">
-                        Parivahan LLR Guidance
+                        Licence Application Assistance
                         <span>Included</span>
                       </div>
-                      <div class="program-detail">Govt. learner licence slot booking and online test prep.</div>
+                      <div class="program-detail">End-to-end RTO documentation and DL application guidance.</div>
+                    </div>
+
+                    <div class="program-item">
+                      <div class="program-name">
+                        RTO Test Slot Booking
+                        <span>Included</span>
+                      </div>
+                      <div class="program-detail">Official Pulivendula RTO track test appointment scheduling.</div>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <button type="button" class="btn-mnc btn-mnc-secondary btn-action-program" data-tier="Beginner Driving Course (₹5,500)" style="width: 100%;">
-                    Enroll in Beginner Track →
+                  <button type="button" class="btn-mnc btn-mnc-secondary btn-action-program" data-tier="Without Licence (₹11,000)" style="width: 100%;">
+                    Enroll — Without Licence →
                   </button>
                 </div>
               </div>
 
-              <!-- COLUMN 2: RTO 8 & H TRACK + FLYOVER (MOST POPULAR) -->
+              <!-- COLUMN 2: WITH LICENCE (POPULAR) -->
               <div class="mnc-service-column popular-tier" style="position: relative;">
                 <div style="position: absolute; top: -14px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #f3d182 0%, #e0aa3e 100%); color: #08090c; font-size: 0.725rem; font-weight: 800; padding: 4px 14px; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.08em; box-shadow: 0 4px 14px rgba(243, 209, 130, 0.35);">
-                  Most Popular Choice
+                  Already Licensed
                 </div>
 
                 <div>
                   <div class="col-header" style="margin-top: 0.5rem;">
                     <span class="col-badge" style="background: rgba(243, 209, 130, 0.12); color: var(--primary-gold); border-color: rgba(243, 209, 130, 0.3);">
-                      Full Licensure
+                      Skill Upgrade
                     </span>
-                    <h3 class="col-title">RTO 8-Track & City Mastery</h3>
-                    <p class="col-desc">Complete licensing syllabus with automated test track and highway navigation.</p>
+                    <h3 class="col-title">With Licence</h3>
+                    <p class="col-desc">For licensed drivers who want to sharpen their skills with professional, structured road training.</p>
                   </div>
 
                   <div class="program-list">
                     <div class="program-item">
                       <div class="program-name">
-                        Full 20-Day DL Package
-                        <span style="color: var(--primary-gold); font-size: 1.25rem; font-weight: 800; font-family: var(--font-mono);">₹7,500</span>
+                        20-Day Practical Training (8 km/day)
+                        <span style="color: var(--primary-gold); font-size: 1.25rem; font-weight: 800; font-family: var(--font-mono);">₹7,000</span>
                       </div>
-                      <div class="program-detail">Daily 8 km on real highway and city road corridors (160 km total logged).</div>
+                      <div class="program-detail">City traffic, highway sessions, and RTO 8-Track drills (160 km total logged).</div>
                     </div>
 
                     <div class="program-item">
                       <div class="program-name">
-                        RTO '8' & 'H' Track Drills
+                        RTO 8-Track & H-Bay Practice
                         <span>Special</span>
                       </div>
-                      <div class="program-detail">Master the RTO sensor track with zero pole touching penalty.</div>
+                      <div class="program-detail">Master the RTO automated sensor track with zero pole-touching penalty.</div>
                     </div>
 
                     <div class="program-item">
@@ -254,57 +262,20 @@ export function renderHomeWebsiteView(container, onNavigate) {
                       </div>
                       <div class="program-detail">Half-clutch hold without rollback on steep flyovers and metro bridges.</div>
                     </div>
-                  </div>
-                </div>
-
-                <div>
-                  <button type="button" class="btn-mnc btn-mnc-primary btn-action-program" data-tier="RTO 8-Track & City Mastery (₹7,500)" style="width: 100%;">
-                    Enroll in RTO & City Track →
-                  </button>
-                </div>
-              </div>
-
-              <!-- COLUMN 3: LADIES SPECIAL & VIP DOORSTEP -->
-              <div class="mnc-service-column">
-                <div>
-                  <div class="col-header">
-                    <span class="col-badge" style="background: rgba(0, 245, 155, 0.12); color: var(--primary-green); border-color: rgba(0, 245, 155, 0.3);">
-                      Women Mentorship
-                    </span>
-                    <h3 class="col-title">Ladies Special & Doorstep Pickup</h3>
-                    <p class="col-desc">Empowering women drivers with senior female mentors and doorstep car dispatch.</p>
-                  </div>
-
-                  <div class="program-list">
-                    <div class="program-item">
-                      <div class="program-name">
-                        Senior Lady Instructor Package
-                        <span style="color: var(--primary-green); font-size: 1.15rem; font-weight: 800; font-family: var(--font-mono);">₹8,500</span>
-                      </div>
-                      <div class="program-detail">Patience-driven mentorship eliminating road nervousness.</div>
-                    </div>
 
                     <div class="program-item">
                       <div class="program-name">
-                        Doorstep Pickup & Drop
-                        <span>Free</span>
-                      </div>
-                      <div class="program-detail">Vehicle dispatched directly to your apartment / home gates.</div>
-                    </div>
-
-                    <div class="program-item">
-                      <div class="program-name">
-                        Flexible Hours
+                        Highway & City Sessions
                         <span>Included</span>
                       </div>
-                      <div class="program-detail">Tailored morning or evening batches for working professionals & homemakers.</div>
+                      <div class="program-detail">Real-world highway confidence and busy city intersection training.</div>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <button type="button" class="btn-mnc btn-mnc-secondary btn-action-program" data-tier="Ladies Special & Doorstep Pickup (₹8,500)" style="width: 100%;">
-                    Enroll in Ladies Special →
+                  <button type="button" class="btn-mnc btn-mnc-primary btn-action-program" data-tier="With Licence (₹7,000)" style="width: 100%;">
+                    Enroll — With Licence →
                   </button>
                 </div>
               </div>
@@ -313,6 +284,7 @@ export function renderHomeWebsiteView(container, onNavigate) {
         </section>
 
         <!-- FLEET SPOTLIGHT SECTION (AUTHENTIC TRAINING CARS) -->
+
         <section class="mnc-fleet-spotlight">
           <div class="mnc-section-container">
             <div class="fleet-banner">
