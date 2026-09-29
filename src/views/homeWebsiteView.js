@@ -161,145 +161,77 @@ export function renderHomeWebsiteView(container, onNavigate) {
           <div class="mnc-section-container">
             <div class="mnc-section-header">
               <span class="mnc-section-tag">Curriculum Architecture</span>
-              <h2 class="mnc-section-title">
-                Two Transparent Course Tracks
-              </h2>
-              <p class="mnc-section-desc">
-                All-inclusive fees with zero hidden charges. Dual-control Maruti Swift training on real roads. Choose the track that fits you.
-              </p>
+              <h2 class="mnc-section-title">Two Transparent Course Tracks</h2>
+              <p class="mnc-section-desc">All-inclusive fees with zero hidden charges. Dual-control Maruti Swift training on real roads. Choose the track that fits you.</p>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2.5rem; width: 100%; align-items: start;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.75rem; margin-top:2.5rem; width:100%; align-items:stretch;">
 
-              <!-- CARD 1: WITHOUT LICENCE — CYAN THEME -->
-              <div style="background: linear-gradient(180deg, rgba(0,229,255,0.06) 0%, rgba(13,16,23,0.97) 100%); border: 1.5px solid rgba(0,229,255,0.25); border-radius: var(--radius-card); padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem;">
-
-                <div>
-                  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
-                    <span style="font-size:0.65rem; font-weight:800; text-transform:uppercase; letter-spacing:0.12em; color:var(--primary-cyan); background:rgba(0,229,255,0.1); border:1px solid rgba(0,229,255,0.25); border-radius:var(--radius-pill); padding:3px 12px;">Basic Track</span>
-                    <span style="font-size:0.7rem; color:var(--slate-muted); font-weight:600;">Training Only</span>
+              <!-- CARD 1: WITHOUT LICENCE — CYAN -->
+              <div style="background:linear-gradient(160deg,rgba(0,229,255,0.06) 0%,rgba(13,16,23,0.98) 100%); border:1.5px solid rgba(0,229,255,0.22); border-radius:var(--radius-card); padding:1.75rem; display:flex; flex-direction:column; justify-content:space-between; gap:1.25rem;">
+                <div style="display:flex; flex-direction:column; gap:1.25rem;">
+                  <div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.6rem;">
+                      <span style="font-size:0.62rem; font-weight:800; text-transform:uppercase; letter-spacing:0.12em; color:var(--primary-cyan); background:rgba(0,229,255,0.1); border:1px solid rgba(0,229,255,0.22); border-radius:var(--radius-pill); padding:3px 10px;">Basic Track</span>
+                      <span style="font-size:0.7rem; color:var(--slate-muted); font-weight:600;">Training Only</span>
+                    </div>
+                    <h3 style="font-size:1.45rem; font-weight:800; color:#fff; margin:0 0 0.3rem;">Without Licence</h3>
+                    <p style="font-size:0.82rem; color:var(--slate-body); line-height:1.5; margin:0;">For students who already hold a licence and want professional road practice.</p>
                   </div>
-                  <h3 style="font-size:1.6rem; font-weight:800; color:#fff; margin:0 0 0.4rem;">Without Licence</h3>
-                  <p style="font-size:0.875rem; color:var(--slate-body); line-height:1.55; margin:0;">Just the driving training — for students who already hold a valid driving licence and want professional road practice.</p>
-                </div>
-
-                <div style="border-top:1px solid rgba(0,229,255,0.15); border-bottom:1px solid rgba(0,229,255,0.15); padding:1rem 0; display:flex; align-items:baseline; gap:0.5rem;">
-                  <span style="font-size:2.4rem; font-weight:900; font-family:var(--font-mono); color:var(--primary-cyan); letter-spacing:-0.02em;">&#8377;7,000</span>
-                  <span style="font-size:0.8rem; color:var(--slate-muted);">all-inclusive &middot; no hidden fees</span>
-                </div>
-
-                <div>
-                  <div style="font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--slate-muted); margin-bottom:0.85rem;">What&apos;s Included</div>
-                  <div style="display:flex; flex-direction:column; gap:0.6rem;">
-                    <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                      <span style="color:var(--primary-cyan); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                      <div><div style="font-size:0.85rem; font-weight:700; color:#fff;">20-Day Practical Training</div><div style="font-size:0.78rem; color:var(--slate-muted);">8 km/day &middot; 160 km total on real roads</div></div>
-                    </div>
-                    <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                      <span style="color:var(--primary-cyan); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                      <div><div style="font-size:0.85rem; font-weight:700; color:#fff;">City Traffic &amp; Highway Sessions</div><div style="font-size:0.78rem; color:var(--slate-muted);">Real intersections, flyovers, and national highway driving</div></div>
-                    </div>
-                    <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                      <span style="color:var(--primary-cyan); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                      <div><div style="font-size:0.85rem; font-weight:700; color:#fff;">RTO 8-Track &amp; H-Bay Practice</div><div style="font-size:0.78rem; color:var(--slate-muted);">Sensor track drills &mdash; zero pole-touching penalty training</div></div>
-                    </div>
-                    <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                      <span style="color:var(--primary-cyan); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                      <div><div style="font-size:0.85rem; font-weight:700; color:#fff;">Flyover Half-Clutch Mastery</div><div style="font-size:0.78rem; color:var(--slate-muted);">Hill-hold without rollback on steep bridges &amp; gradients</div></div>
-                    </div>
-                    <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                      <span style="color:var(--primary-cyan); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                      <div><div style="font-size:0.85rem; font-weight:700; color:#fff;">Dual-Control Safety Vehicle</div><div style="font-size:0.78rem; color:var(--slate-muted);">Maruti Swift with trainer co-pedals &mdash; 100% safety record</div></div>
-                    </div>
-                    <div style="margin-top:0.3rem; border-top:1px dashed rgba(255,255,255,0.07); padding-top:0.6rem; display:flex; flex-direction:column; gap:0.45rem;">
-                      <div style="display:flex; align-items:center; gap:0.75rem; opacity:0.4;">
-                        <span style="color:#ff6b6b; font-size:0.85rem; flex-shrink:0;">&#10007;</span>
-                        <div style="font-size:0.8rem; color:var(--slate-muted); text-decoration:line-through;">Parivahan LLR Slot Booking</div>
-                      </div>
-                      <div style="display:flex; align-items:center; gap:0.75rem; opacity:0.4;">
-                        <span style="color:#ff6b6b; font-size:0.85rem; flex-shrink:0;">&#10007;</span>
-                        <div style="font-size:0.8rem; color:var(--slate-muted); text-decoration:line-through;">Licence Application &amp; RTO Documentation</div>
-                      </div>
-                      <div style="display:flex; align-items:center; gap:0.75rem; opacity:0.4;">
-                        <span style="color:#ff6b6b; font-size:0.85rem; flex-shrink:0;">&#10007;</span>
-                        <div style="font-size:0.8rem; color:var(--slate-muted); text-decoration:line-through;">RTO Test Slot Booking</div>
-                      </div>
-                    </div>
+                  <div style="border-top:1px solid rgba(0,229,255,0.15); border-bottom:1px solid rgba(0,229,255,0.15); padding:0.75rem 0; display:flex; align-items:baseline; gap:0.5rem;">
+                    <span style="font-size:2.1rem; font-weight:900; font-family:var(--font-mono); color:var(--primary-cyan); letter-spacing:-0.02em;">&#8377;7,000</span>
+                    <span style="font-size:0.78rem; color:var(--slate-muted);">all-inclusive</span>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:0;">
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:var(--primary-cyan); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:600; color:#fff;">20-Day Practical Training (8 km/day)</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:var(--primary-cyan); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:600; color:#fff;">City Traffic &amp; Highway Sessions</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:var(--primary-cyan); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:600; color:#fff;">RTO 8-Track &amp; H-Bay Practice</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:var(--primary-cyan); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:600; color:#fff;">Flyover Half-Clutch Mastery</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:var(--primary-cyan); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:600; color:#fff;">Dual-Control Maruti Swift</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05); opacity:0.38;"><span style="color:#ff6b6b; font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10007;</span><span style="font-size:0.83rem; font-weight:600; color:var(--slate-muted); text-decoration:line-through;">Parivahan LLR Slot Booking</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05); opacity:0.38;"><span style="color:#ff6b6b; font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10007;</span><span style="font-size:0.83rem; font-weight:600; color:var(--slate-muted); text-decoration:line-through;">Licence Application &amp; RTO Docs</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; opacity:0.38;"><span style="color:#ff6b6b; font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10007;</span><span style="font-size:0.83rem; font-weight:600; color:var(--slate-muted); text-decoration:line-through;">RTO Driving Test Slot Booking</span></div>
+                  </div>
+                  <div style="background:rgba(0,229,255,0.05); border:1px solid rgba(0,229,255,0.14); border-radius:var(--radius-md); padding:0.65rem 0.9rem;">
+                    <span style="font-size:0.68rem; font-weight:800; color:var(--primary-cyan); text-transform:uppercase; letter-spacing:0.1em;">Best For: </span>
+                    <span style="font-size:0.8rem; color:var(--slate-body);">Students who already have a valid driving licence.</span>
                   </div>
                 </div>
-
-                <div style="background:rgba(0,229,255,0.05); border:1px solid rgba(0,229,255,0.15); border-radius:var(--radius-md); padding:0.85rem 1rem;">
-                  <div style="font-size:0.7rem; font-weight:800; color:var(--primary-cyan); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.3rem;">Best For</div>
-                  <div style="font-size:0.82rem; color:var(--slate-body);">Students who already have a driving licence and want to build real road confidence and skills.</div>
-                </div>
-
                 <button type="button" class="btn-mnc btn-mnc-secondary btn-action-program" data-tier="Without Licence (&#8377;7,000)" style="width:100%;">
                   Enroll &mdash; Without Licence &rarr;
                 </button>
               </div>
 
-              <!-- CARD 2: WITH LICENCE — GOLD THEME -->
-              <div style="background: linear-gradient(180deg, rgba(243,209,130,0.07) 0%, rgba(13,16,23,0.97) 100%); border: 1.5px solid rgba(243,209,130,0.35); border-radius: var(--radius-card); padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; box-shadow: 0 0 40px rgba(243,209,130,0.08);">
-
-                <div>
-                  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
-                    <span style="font-size:0.65rem; font-weight:800; text-transform:uppercase; letter-spacing:0.12em; color:var(--primary-gold); background:rgba(243,209,130,0.1); border:1px solid rgba(243,209,130,0.3); border-radius:var(--radius-pill); padding:3px 12px;">Full Package</span>
-                    <span style="font-size:0.7rem; color:var(--primary-gold); font-weight:700;">&#9733; Training + Licence</span>
+              <!-- CARD 2: WITH LICENCE — GOLD -->
+              <div style="background:linear-gradient(160deg,rgba(243,209,130,0.08) 0%,rgba(13,16,23,0.98) 100%); border:1.5px solid rgba(243,209,130,0.32); border-radius:var(--radius-card); padding:1.75rem; display:flex; flex-direction:column; justify-content:space-between; gap:1.25rem; box-shadow:0 0 40px rgba(243,209,130,0.07);">
+                <div style="display:flex; flex-direction:column; gap:1.25rem;">
+                  <div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.6rem;">
+                      <span style="font-size:0.62rem; font-weight:800; text-transform:uppercase; letter-spacing:0.12em; color:var(--primary-gold); background:rgba(243,209,130,0.1); border:1px solid rgba(243,209,130,0.28); border-radius:var(--radius-pill); padding:3px 10px;">Full Package</span>
+                      <span style="font-size:0.7rem; color:var(--primary-gold); font-weight:700;">&#9733; Training + Licence</span>
+                    </div>
+                    <h3 style="font-size:1.45rem; font-weight:800; color:#fff; margin:0 0 0.3rem;">With Licence</h3>
+                    <p style="font-size:0.82rem; color:var(--slate-body); line-height:1.5; margin:0;">Complete package &mdash; training AND full licence processing from LLR to DL test.</p>
                   </div>
-                  <h3 style="font-size:1.6rem; font-weight:800; color:#fff; margin:0 0 0.4rem;">With Licence</h3>
-                  <p style="font-size:0.875rem; color:var(--slate-body); line-height:1.55; margin:0;">Complete end-to-end package &mdash; driving training AND full licence processing from LLR to the final RTO driving test.</p>
-                </div>
-
-                <div style="border-top:1px solid rgba(243,209,130,0.2); border-bottom:1px solid rgba(243,209,130,0.2); padding:1rem 0; display:flex; align-items:baseline; gap:0.5rem;">
-                  <span style="font-size:2.4rem; font-weight:900; font-family:var(--font-mono); color:var(--primary-gold); letter-spacing:-0.02em;">&#8377;11,000</span>
-                  <span style="font-size:0.8rem; color:var(--slate-muted);">all-inclusive &middot; no hidden fees</span>
-                </div>
-
-                <div>
-                  <div style="font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--slate-muted); margin-bottom:0.85rem;">What&apos;s Included</div>
-                  <div style="display:flex; flex-direction:column; gap:0.6rem;">
-                    <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                      <span style="color:var(--primary-gold); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                      <div><div style="font-size:0.85rem; font-weight:700; color:#fff;">20-Day Practical Training</div><div style="font-size:0.78rem; color:var(--slate-muted);">8 km/day &middot; 160 km total on real roads</div></div>
-                    </div>
-                    <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                      <span style="color:var(--primary-gold); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                      <div><div style="font-size:0.85rem; font-weight:700; color:#fff;">City Traffic &amp; Highway Sessions</div><div style="font-size:0.78rem; color:var(--slate-muted);">Real intersections, flyovers, and national highway driving</div></div>
-                    </div>
-                    <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                      <span style="color:var(--primary-gold); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                      <div><div style="font-size:0.85rem; font-weight:700; color:#fff;">RTO 8-Track &amp; H-Bay Practice</div><div style="font-size:0.78rem; color:var(--slate-muted);">Sensor track drills &mdash; zero pole-touching penalty training</div></div>
-                    </div>
-                    <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                      <span style="color:var(--primary-gold); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                      <div><div style="font-size:0.85rem; font-weight:700; color:#fff;">Flyover Half-Clutch Mastery</div><div style="font-size:0.78rem; color:var(--slate-muted);">Hill-hold without rollback on steep bridges &amp; gradients</div></div>
-                    </div>
-                    <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                      <span style="color:var(--primary-gold); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                      <div><div style="font-size:0.85rem; font-weight:700; color:#fff;">Dual-Control Safety Vehicle</div><div style="font-size:0.78rem; color:var(--slate-muted);">Maruti Swift with trainer co-pedals &mdash; 100% safety record</div></div>
-                    </div>
-                    <div style="margin-top:0.3rem; border-top:1px dashed rgba(243,209,130,0.2); padding-top:0.6rem; display:flex; flex-direction:column; gap:0.5rem;">
-                      <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                        <span style="color:var(--primary-gold); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                        <div><div style="font-size:0.85rem; font-weight:700; color:var(--primary-gold);">Parivahan LLR Slot Booking</div><div style="font-size:0.78rem; color:var(--slate-muted);">Govt. learner licence online slot + online test prep</div></div>
-                      </div>
-                      <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                        <span style="color:var(--primary-gold); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                        <div><div style="font-size:0.85rem; font-weight:700; color:var(--primary-gold);">Licence Application &amp; RTO Documentation</div><div style="font-size:0.78rem; color:var(--slate-muted);">End-to-end form filling, DL application &amp; document guidance</div></div>
-                      </div>
-                      <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                        <span style="color:var(--primary-gold); font-size:0.9rem; flex-shrink:0; margin-top:1px;">&#10003;</span>
-                        <div><div style="font-size:0.85rem; font-weight:700; color:var(--primary-gold);">RTO Test Slot Booking</div><div style="font-size:0.78rem; color:var(--slate-muted);">Official Pulivendula RTO track test appointment scheduling</div></div>
-                      </div>
-                    </div>
+                  <div style="border-top:1px solid rgba(243,209,130,0.18); border-bottom:1px solid rgba(243,209,130,0.18); padding:0.75rem 0; display:flex; align-items:baseline; gap:0.5rem;">
+                    <span style="font-size:2.1rem; font-weight:900; font-family:var(--font-mono); color:var(--primary-gold); letter-spacing:-0.02em;">&#8377;11,000</span>
+                    <span style="font-size:0.78rem; color:var(--slate-muted);">all-inclusive</span>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:0;">
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:var(--primary-gold); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:600; color:#fff;">20-Day Practical Training (8 km/day)</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:var(--primary-gold); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:600; color:#fff;">City Traffic &amp; Highway Sessions</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:var(--primary-gold); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:600; color:#fff;">RTO 8-Track &amp; H-Bay Practice</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:var(--primary-gold); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:600; color:#fff;">Flyover Half-Clutch Mastery</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:var(--primary-gold); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:600; color:#fff;">Dual-Control Maruti Swift</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:var(--primary-gold); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:700; color:var(--primary-gold);">Parivahan LLR Slot Booking</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span style="color:var(--primary-gold); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:700; color:var(--primary-gold);">Licence Application &amp; RTO Docs</span></div>
+                    <div style="display:flex; align-items:center; gap:0.65rem; padding:0.45rem 0;"><span style="color:var(--primary-gold); font-size:0.85rem; flex-shrink:0; width:14px; text-align:center;">&#10003;</span><span style="font-size:0.83rem; font-weight:700; color:var(--primary-gold);">RTO Driving Test Slot Booking</span></div>
+                  </div>
+                  <div style="background:rgba(243,209,130,0.06); border:1px solid rgba(243,209,130,0.18); border-radius:var(--radius-md); padding:0.65rem 0.9rem;">
+                    <span style="font-size:0.68rem; font-weight:800; color:var(--primary-gold); text-transform:uppercase; letter-spacing:0.1em;">Best For: </span>
+                    <span style="font-size:0.8rem; color:var(--slate-body);">First-time drivers who need training + full licence.</span>
                   </div>
                 </div>
-
-                <div style="background:rgba(243,209,130,0.06); border:1px solid rgba(243,209,130,0.2); border-radius:var(--radius-md); padding:0.85rem 1rem;">
-                  <div style="font-size:0.7rem; font-weight:800; color:var(--primary-gold); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.3rem;">Best For</div>
-                  <div style="font-size:0.82rem; color:var(--slate-body);">First-time drivers who need everything &mdash; training, learner licence, and the final driving licence, all in one package.</div>
-                </div>
-
                 <button type="button" class="btn-mnc btn-mnc-primary btn-action-program" data-tier="With Licence (&#8377;11,000)" style="width:100%; background:linear-gradient(135deg,#f3d182,#e0aa3e); color:#08090c;">
                   Enroll &mdash; With Licence &rarr;
                 </button>
