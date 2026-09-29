@@ -9,6 +9,8 @@
 
 import { store } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
+import { renderStudentAvatar } from '../components/studentAvatar.js';
+import { triggerPhotoUpload } from '../components/photoCropModal.js';
 
 export function renderTraineeView(container, showToast, subService = 'curriculum', onNavigate) {
   let activeFilter = 'all';
@@ -39,9 +41,12 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
     if (currentSub === 'curriculum') {
       contentHtml = `
         <div class="portal-page-header">
-          <div>
-            <h1 class="portal-page-title">${trainee.name} — 20-Day Practical Driving Course</h1>
-            <p class="portal-page-sub">${trainee.package} · LLR Permit: ${trainee.permitNumber || 'AP004/LLR/2026/8941'} · Instructor: ${trainer.name}</p>
+          <div style="display:flex; align-items:center; gap:1.15rem;">
+            ${renderStudentAvatar(trainee, 54)}
+            <div>
+              <h1 class="portal-page-title">${trainee.name} — 20-Day Practical Driving Course</h1>
+              <p class="portal-page-sub">${trainee.package} · LLR Permit: ${trainee.permitNumber || 'AP004/LLR/2026/8941'} · Instructor: ${trainer.name}</p>
+            </div>
           </div>
           <div style="display:flex; gap:0.65rem; align-items:center;">
             <button type="button" class="btn-mnc btn-mnc-primary" id="btn-show-qr-voucher">Pay Course Fee (UPI QR) →</button>
@@ -161,9 +166,12 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
     if (currentSub === 'billing') {
       contentHtml = `
         <div class="portal-page-header">
-          <div>
-            <h1 class="portal-page-title">Course Fee Payment &amp; Receipts</h1>
-            <p class="portal-page-sub">Pay course fees conveniently using PhonePe, Google Pay, or Paytm UPI QR code.</p>
+          <div style="display:flex; align-items:center; gap:1.15rem;">
+            ${renderStudentAvatar(trainee, 54)}
+            <div>
+              <h1 class="portal-page-title">Course Fee Payment &amp; Receipts</h1>
+              <p class="portal-page-sub">Pay course fees conveniently using PhonePe, Google Pay, or Paytm UPI QR code.</p>
+            </div>
           </div>
           <button type="button" class="btn-mnc btn-mnc-primary" id="btn-show-qr-voucher-billing">Show UPI QR Code →</button>
         </div>
@@ -253,7 +261,32 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
         </div>
 
         <div class="portal-section">
-          <div class="portal-section-header">
+          <!-- Photo Hero Strip -->
+          <div style="display:flex; align-items:center; gap:1.5rem; padding:1.25rem 0 1.5rem; border-bottom:1px solid rgba(255,255,255,0.07); margin-bottom:1.25rem; flex-wrap:wrap;">
+            <div style="flex-shrink:0;">
+              ${trainee.profilePhotoData
+                ? `<div style="width:92px;height:92px;border-radius:50%;overflow:hidden;background:#ffffff;border:2px solid rgba(255,255,255,0.3);box-shadow:0 4px 16px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;"><img src="${trainee.profilePhotoData}" alt="${trainee.name}" style="width:100%;height:100%;object-fit:cover;display:block;" /></div>`
+                : `<div style="width:92px;height:92px;border-radius:50%;background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800;color:#ffffff;">${(trainee.avatar||trainee.name.substring(0,2)).toUpperCase()}</div>`
+              }
+            </div>
+            <div style="flex:1; min-width:240px;">
+              <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+                <div>
+                  <div style="font-size:1.35rem;font-weight:800;color:#ffffff;line-height:1.2;">${trainee.name}</div>
+                  ${trainee.gender ? `<div style="font-size:0.8rem;color:var(--slate-muted);margin-top:0.2rem;">${trainee.gender}</div>` : ''}
+                  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.55rem;">
+                    <span class="p-badge p-badge-gold" style="font-size:0.65rem;">${trainee.id}</span>
+                    <span class="p-badge p-badge-green" style="font-size:0.65rem;">Govt. Verified ✓</span>
+                    <span class="p-badge p-badge-dim" style="font-size:0.65rem;">${trainee.hasSmartphone === 'no' ? '📵 No Smartphone' : '📱 Has Smartphone'}</span>
+                  </div>
+                </div>
+                <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm" id="btn-trainee-change-photo" style="font-size:0.78rem; padding:0.45rem 0.95rem; border-color:rgba(255,255,255,0.25); color:#ffffff;">
+                  📷 ${trainee.profilePhotoData ? 'Change Photo / Logo' : 'Upload Photo / Logo'}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="portal-section-header" style="margin-top:0;">
             <span class="portal-section-title">Student Information &amp; Contact Details</span>
           </div>
           <div class="p-detail-grid">
@@ -262,11 +295,28 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
               <div class="p-detail-value">${trainee.name}</div>
               <div class="p-detail-sub">As registered with RTO Parivahan</div>
             </div>
+            ${trainee.surname ? `
+            <div class="p-detail-cell">
+              <div class="p-detail-key">Surname / Family Name</div>
+              <div class="p-detail-value">${trainee.surname}</div>
+              <div class="p-detail-sub">As on Aadhaar Card</div>
+            </div>` : ''}
             <div class="p-detail-cell">
               <div class="p-detail-key">Student Admission ID</div>
               <div class="p-detail-value" style="font-family:var(--font-mono);">${trainee.id}</div>
               <div class="p-detail-sub">School registration number</div>
             </div>
+            <div class="p-detail-cell">
+              <div class="p-detail-key">Date of Joining (Admission)</div>
+              <div class="p-detail-value" style="font-family:var(--font-mono);">${trainee.registeredDate || '2026-09-01'}</div>
+              <div class="p-detail-sub">Official course enrollment date</div>
+            </div>
+            ${trainee.gender ? `
+            <div class="p-detail-cell">
+              <div class="p-detail-key">Gender</div>
+              <div class="p-detail-value">${trainee.gender}</div>
+              <div class="p-detail-sub">As declared at admission</div>
+            </div>` : ''}
             <div class="p-detail-cell">
               <div class="p-detail-key">LLR Permit Number</div>
               <div class="p-detail-value" style="font-family:var(--font-mono); color:var(--primary-cyan);">${trainee.permitNumber || 'AP004/LLR/2026/8941'}</div>
@@ -277,6 +327,12 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
               <div class="p-detail-value">${trainee.phone || '+91 98480 22334'}</div>
               <div class="p-detail-sub">Primary WhatsApp Contact</div>
             </div>
+            ${trainee.alternatePhone ? `
+            <div class="p-detail-cell">
+              <div class="p-detail-key">Alternate Phone</div>
+              <div class="p-detail-value">${trainee.alternatePhone}</div>
+              <div class="p-detail-sub">Secondary / WhatsApp Alternate</div>
+            </div>` : ''}
             <div class="p-detail-cell">
               <div class="p-detail-key">Assigned Driving Instructor</div>
               <div class="p-detail-value">${trainer.name}</div>
@@ -286,6 +342,13 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
               <div class="p-detail-key">Emergency Contact</div>
               <div class="p-detail-value">${trainee.emergencyContact || 'Guardian / Family Contact'}</div>
               <div class="p-detail-sub">${trainee.emergencyPhone || '+91 98480 11222'}</div>
+            </div>
+            <div class="p-detail-cell">
+              <div class="p-detail-key">Smartphone Status</div>
+              <div class="p-detail-value" style="color:${trainee.hasSmartphone === 'no' ? 'var(--primary-gold)' : 'var(--neem-green)'};">
+                ${trainee.hasSmartphone === 'no' ? '📵 Without Smartphone' : '📱 Has Smartphone'}
+              </div>
+              <div class="p-detail-sub">Used for UPI, WhatsApp &amp; LLR notifications</div>
             </div>
           </div>
         </div>
@@ -340,6 +403,17 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
     attachQrBtn('#btn-show-qr-voucher');
     attachQrBtn('#btn-show-qr-voucher-billing');
     attachQrBtn('#btn-pay-now-action');
+
+    const btnChangePhoto = container.querySelector('#btn-trainee-change-photo');
+    if (btnChangePhoto) {
+      btnChangePhoto.addEventListener('click', () => {
+        triggerPhotoUpload((dataUrl) => {
+          store.updateTrainee(trainee.id, { profilePhotoData: dataUrl });
+          showToast('Profile photo / logo updated successfully!', 'success');
+          render();
+        });
+      });
+    }
   }
 
   function openQrVoucherModal(invoiceId, balance, student) {

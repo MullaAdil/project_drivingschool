@@ -9,6 +9,7 @@
 
 import { store } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
+import { renderStudentBoxAvatar, renderStudentAvatar } from '../components/studentAvatar.js';
 
 export function renderTrainerView(container, showToast, subService = 'schedule', onNavigate) {
   function render() {
@@ -107,9 +108,14 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
                         <div class="p-td-sub">${slot.duration || '60 min'}</div>
                       </td>
                       <td>
-                        <div class="p-td-name">${slot.studentName}</div>
-                        <div class="p-td-sub">${slot.traineeId}</div>
-                        <div class="p-td-sub">${trainee ? (trainee.phone || '') : ''}</div>
+                        <div style="display:flex; align-items:center; gap:0.65rem;">
+                          ${trainee ? renderStudentAvatar(trainee, 36) : ''}
+                          <div>
+                            <div class="p-td-name">${slot.studentName}</div>
+                            <div class="p-td-sub">${slot.traineeId}</div>
+                            <div class="p-td-sub">${trainee ? (trainee.phone || '') : ''}</div>
+                          </div>
+                        </div>
                       </td>
                       <td>
                         <div class="p-progress-wrap" style="margin-bottom:0.35rem;">
@@ -189,9 +195,7 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
                   <div>
                     <div class="student-box-header">
                       <div class="student-box-identity">
-                        <div class="student-box-avatar" style="background:#ffffff; border-color:#ffffff; color:#000000;">
-                          ${initials}
-                        </div>
+                        ${renderStudentBoxAvatar(t, 'background:#ffffff; border-color:#ffffff; color:#000000;')}
                         <div style="min-width:0;">
                           <div class="student-box-name">${t.name}</div>
                           <div class="student-box-meta-line">

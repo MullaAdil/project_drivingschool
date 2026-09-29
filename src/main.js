@@ -18,6 +18,7 @@ import { renderTrainerDetailView } from './views/trainerDetailView.js';
 import { renderTrainerView } from './views/trainerView.js';
 import { renderTraineeView } from './views/traineeView.js';
 import { renderBrandLogo } from './components/brandLogo.js';
+import { renderStudentAvatar } from './components/studentAvatar.js';
 
 const appRoot = document.getElementById('app');
 
@@ -707,6 +708,8 @@ function render() {
   if (service === 'trainee') {
     const activeSub = subService || 'curriculum';
 
+    const currentTrainee = store.getCurrentTrainee();
+
     appRoot.innerHTML = `
       <div class="admin-layout">
         <header class="admin-topnav">
@@ -725,6 +728,12 @@ function render() {
           </nav>
 
           <div class="admin-topnav-actions">
+            ${currentTrainee ? `
+              <div id="btn-topbar-student-profile" style="display:flex; align-items:center; gap:0.55rem; cursor:pointer; padding:0.2rem 0.55rem; border-radius:20px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15);" title="View My Profile">
+                ${renderStudentAvatar(currentTrainee, 26)}
+                <span style="font-size:0.75rem; font-weight:700; color:#ffffff;">${currentTrainee.name.split(' ')[0]}</span>
+              </div>
+            ` : ''}
             <span class="admin-topnav-badge"><span class="admin-topnav-dot"></span>Pulivendula · AP-04</span>
             <button type="button" class="admin-topnav-btn-subtle" id="btn-portal-home">← Website</button>
             <button type="button" class="admin-topnav-btn-signout" id="btn-portal-signout">Sign Out</button>
@@ -738,6 +747,7 @@ function render() {
     appRoot.querySelectorAll('[data-portal-nav]').forEach(btn => {
       btn.addEventListener('click', () => navigateTo('trainee', btn.dataset.portalNav));
     });
+    document.getElementById('btn-topbar-student-profile')?.addEventListener('click', () => navigateTo('trainee', 'profile'));
     document.getElementById('portal-brand-home')?.addEventListener('click', () => navigateTo('home'));
     document.getElementById('btn-portal-home')?.addEventListener('click', () => navigateTo('home'));
     document.getElementById('btn-portal-signout')?.addEventListener('click', () => navigateTo('login'));

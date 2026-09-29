@@ -10,6 +10,8 @@
 
 import { store } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
+import { renderStudentAvatar } from '../components/studentAvatar.js';
+import { triggerPhotoUpload } from '../components/photoCropModal.js';
 
 export function renderTraineeDetailView(container, traineeId, showToast, onNavigate, initialService = 'profile') {
   const trainee = store.trainees.find(t => t.id === traineeId) || store.trainees[0];
@@ -54,6 +56,9 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
               Edit Student Details
             </button>
+            <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm" id="btn-dossier-change-photo" style="border-color:rgba(255,255,255,0.25); color:#ffffff;" title="Upload or change student photo or logo">
+              📷 ${trainee.profilePhotoData ? 'Change Photo' : 'Upload Photo / Logo'}
+            </button>
             ${invoice.balance > 0 ? `
               <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm" id="btn-record-payment">
                 Receive Fee Payment
@@ -65,8 +70,11 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
         <!-- Student Identity Hero Card -->
         <div class="student-hero-card">
           <div class="student-hero-left">
-            <div class="student-avatar-badge">
-              ${trainee.avatar || trainee.name.substring(0, 2).toUpperCase()}
+            <div style="width:72px; height:72px; border-radius:50%; overflow:hidden; background:#ffffff; border:1.5px solid rgba(255,255,255,0.3); box-shadow:0 4px 16px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              ${trainee.profilePhotoData
+                ? `<img src="${trainee.profilePhotoData}" alt="${trainee.name}" style="width:100%; height:100%; object-fit:cover; display:block; border-radius:50%;" />`
+                : `<div style="width:100%; height:100%; background:rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:1.6rem; font-weight:800; color:#ffffff;">${(trainee.avatar || trainee.name.substring(0, 2)).toUpperCase()}</div>`
+              }
             </div>
             <div class="student-hero-name-block">
               <h1>${trainee.name}</h1>
@@ -682,6 +690,18 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
       });
     }
 
+    // Photo / Logo Upload Button in Dossier
+    const btnDossierPhoto = container.querySelector('#btn-dossier-change-photo');
+    if (btnDossierPhoto) {
+      btnDossierPhoto.addEventListener('click', () => {
+        triggerPhotoUpload((dataUrl) => {
+          store.updateTrainee(trainee.id, { profilePhotoData: dataUrl });
+          showToast(`Updated photo / logo for ${trainee.name}!`, 'success');
+          render();
+        });
+      });
+    }
+
     // Record Payment Buttons
     const btnPay = container.querySelector('#btn-record-payment');
     if (btnPay) {
@@ -769,25 +789,31 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
                 <input type="text" class="mnc-input" name="name" value="${trainee.name}" required style="width:100%;" />
               </div>
               <div>
-                <label class="p-label" style="margin-bottom:0.35rem; display:block;">Learner License (LLR) Number *</label>
-                <input type="text" class="mnc-input" name="permitNumber" value="${trainee.permitNumber || 'AP004/LLR/2026/8941'}" required style="width:100%;" />
+                <label class="p-label" style="margin-bottom:0.35rem; display:block;">Date of Joining (Admission Date) *</label>
+                <input type="date" class="mnc-input" name="registeredDate" value="${trainee.registeredDate || new Date().toISOString().split('T')[0]}" required style="width:100%;" />
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem;">
               <div>
+                <label class="p-label" style="margin-bottom:0.35rem; display:block;">Learner License (LLR) Number *</label>
+                <input type="text" class="mnc-input" name="permitNumber" value="${trainee.permitNumber || 'AP004/LLR/2026/8941'}" required style="width:100%;" />
+              </div>
+              <div>
                 <label class="p-label" style="margin-bottom:0.35rem; display:block;">Contact Mobile Number *</label>
                 <input type="tel" class="mnc-input" name="phone" value="${trainee.phone}" required style="width:100%;" />
               </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem;">
               <div>
                 <label class="p-label" style="margin-bottom:0.35rem; display:block;">Email Address</label>
                 <input type="email" class="mnc-input" name="email" value="${trainee.email}" required style="width:100%;" />
               </div>
-            </div>
-
-            <div style="margin-bottom: 1.25rem;">
-              <label class="p-label" style="margin-bottom:0.35rem; display:block;">Residential Address (Pulivendula / AP)</label>
-              <input type="text" class="mnc-input" name="address" value="${trainee.address || 'Pulivendula, Andhra Pradesh'}" style="width:100%;" />
+              <div>
+                <label class="p-label" style="margin-bottom:0.35rem; display:block;">Residential Address (Pulivendula / AP)</label>
+                <input type="text" class="mnc-input" name="address" value="${trainee.address || 'Pulivendula, Andhra Pradesh'}" style="width:100%;" />
+              </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.75rem;">
@@ -820,6 +846,7 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
       const formData = new FormData(form);
       const updated = {
         name: formData.get('name'),
+        registeredDate: formData.get('registeredDate'),
         email: formData.get('email'),
         phone: formData.get('phone'),
         permitNumber: formData.get('permitNumber'),

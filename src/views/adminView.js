@@ -6,6 +6,8 @@
 import { store } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
 import { getSupabaseCredentials, saveSupabaseCredentials, testSupabaseConnection } from '../supabase.js';
+import { renderStudentBoxAvatar, renderStudentAvatar } from '../components/studentAvatar.js';
+import { openPhotoCropModal } from '../components/photoCropModal.js';
 
 export function renderAdminView(container, showToast, subService = 'hub', onNavigate) {
   let searchQuery = '';
@@ -178,8 +180,16 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
                   <tr>
                     <td class="p-td-mono">${s.time}</td>
                     <td>
-                      <div class="p-td-name">${s.studentName}</div>
-                      <div class="p-td-sub">${s.traineeId}</div>
+                      <div style="display:flex; align-items:center; gap:0.65rem;">
+                        ${(() => {
+                          const tr = trainees.find(t => t.id === s.traineeId);
+                          return tr ? renderStudentAvatar(tr, 32) : '';
+                        })()}
+                        <div>
+                          <div class="p-td-name">${s.studentName}</div>
+                          <div class="p-td-sub">${s.traineeId}</div>
+                        </div>
+                      </div>
                     </td>
                     <td class="p-td-muted">${s.topic}</td>
                     <td class="p-td-muted">${s.car}</td>
@@ -305,7 +315,7 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
                     <div>
                       <div class="student-box-header">
                         <div class="student-box-identity">
-                          <div class="student-box-avatar">${initials}</div>
+                        ${renderStudentBoxAvatar(t)}
                           <div style="min-width:0;">
                             <div class="student-box-name btn-open-dossier" data-trainee-id="${t.id}" title="Click to view full student file">${t.name}</div>
                             <div class="student-box-meta-line">
@@ -415,29 +425,89 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
           <!-- Section 1: Personal Details -->
           <div class="portal-section">
             <div class="portal-section-header">
-              <span class="portal-section-title">Section 1 — Candidate Profile & Contact Information</span>
+              <span class="portal-section-title">Section 1 — Candidate Profile &amp; Contact Information</span>
             </div>
+
+            <!-- Profile Photo / Logo Upload -->
+            <div style="display:flex; align-items:flex-start; gap:1.75rem; margin-bottom:1.5rem; padding:1.25rem; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-md);">
+              <div style="position:relative; flex-shrink:0;">
+                <div id="photo-preview-wrap" style="position:relative; width:96px; height:96px; border-radius:50%; overflow:hidden; border:2px dashed rgba(255,255,255,0.3); background:rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,0.4);">
+                  <!-- Native file input layered directly on top = 100% genuine user click on Mac/Safari/Chrome -->
+                  <input type="file" id="inp-profile-photo" name="profilePhoto" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                    style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:25;" title="Click to upload student photo or logo" />
+                  <img id="photo-preview-img" src="" alt="Profile Photo" style="width:100%; height:100%; object-fit:cover; display:none; position:relative; z-index:5;" />
+                  <div id="photo-preview-placeholder" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none; z-index:2;">
+                    <div style="font-size:1.6rem; margin-bottom:0.2rem;">📷</div>
+                    <div style="font-size:0.6rem; color:var(--slate-muted); font-weight:700; line-height:1.2;">CLICK TO<br>UPLOAD</div>
+                  </div>
+                </div>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:0.9rem; font-weight:800; color:#ffffff; margin-bottom:0.3rem;">Profile Photo or Logo</div>
+                <div style="font-size:0.78rem; color:var(--slate-muted); margin-bottom:0.8rem;">Upload a student portrait or organization logo. Click the circle or browse button — preview appears instantly with zero yellow lines.</div>
+                <div style="position:relative; display:inline-block;">
+                  <button type="button" class="p-ghost-btn" style="font-size:0.78rem; padding:0.4rem 0.9rem; cursor:pointer; color:#ffffff; border-color:rgba(255,255,255,0.25);">📁 Browse &amp; Upload Photo / Logo</button>
+                  <input type="file" id="inp-profile-photo-btn" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                    style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;" title="Browse file" />
+                </div>
+              </div>
+            </div>
+
             <div class="p-form-grid">
+              <!-- Surname + First Name split -->
               <div class="p-form-row">
-                <label class="p-label">Full Name (as on Aadhaar) *</label>
-                <input type="text" class="mnc-input p-input" name="name" required placeholder="e.g. Divya Bharathi" />
+                <label class="p-label">Surname (Family Name) *</label>
+                <input type="text" class="mnc-input p-input" name="surname" required placeholder="e.g. Reddy / Khan / Sharma" />
               </div>
               <div class="p-form-row">
-                <label class="p-label">Mobile Number (+91) *</label>
-                <input type="tel" class="mnc-input p-input" name="phone" required placeholder="+91 98480 00000" />
+                <label class="p-label">First &amp; Middle Name *</label>
+                <input type="text" class="mnc-input p-input" name="firstName" required placeholder="e.g. Divya Bharathi" />
               </div>
+
+              <!-- Gender -->
               <div class="p-form-row">
-                <label class="p-label">Email Address</label>
-                <input type="email" class="mnc-input p-input" name="email" placeholder="candidate@gmail.com" />
+                <label class="p-label">Gender *</label>
+                <select class="mnc-select p-input" name="gender" required>
+                  <option value="" disabled selected>— Select Gender —</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other / Prefer not to say</option>
+                </select>
               </div>
+
               <div class="p-form-row">
                 <label class="p-label">Date of Birth</label>
                 <input type="date" class="mnc-input p-input" name="dob" />
               </div>
+
+              <!-- Date of Joining -->
+              <div class="p-form-row">
+                <label class="p-label">Date of Joining (Admission Date) *</label>
+                <input type="date" class="mnc-input p-input" name="registeredDate" required value="${new Date().toISOString().split('T')[0]}" />
+              </div>
+
+              <!-- Primary Mobile -->
+              <div class="p-form-row">
+                <label class="p-label">Mobile Number (+91) *</label>
+                <input type="tel" class="mnc-input p-input" name="phone" required placeholder="+91 98480 00000" />
+              </div>
+
+              <!-- Alternate Mobile -->
+              <div class="p-form-row">
+                <label class="p-label">Alternate / WhatsApp Number</label>
+                <input type="tel" class="mnc-input p-input" name="alternatePhone" placeholder="+91 98490 00000 (optional)" />
+              </div>
+
+              <div class="p-form-row">
+                <label class="p-label">Email Address</label>
+                <input type="email" class="mnc-input p-input" name="email" placeholder="candidate@gmail.com" />
+              </div>
+
               <div class="p-form-row" style="grid-column:1/-1;">
                 <label class="p-label">Residential Address</label>
                 <input type="text" class="mnc-input p-input" name="address" placeholder="Flat No., Street, Colony, Landmark, City" />
               </div>
+
               <div class="p-form-row">
                 <label class="p-label">Govt. LLR Permit Number</label>
                 <input type="text" class="mnc-input p-input" name="permitNumber" value="TS009/LLR/2026/${Math.floor(1000+Math.random()*9000)}" />
@@ -452,6 +522,23 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
                   <option value="Kadapa RTO Ground">Kadapa — District RTO Ground</option>
                 </select>
               </div>
+
+              <!-- Smartphone toggle — full width -->
+              <div class="p-form-row" style="grid-column:1/-1;">
+                <label class="p-label">Does the Student Have a Smartphone? *</label>
+                <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.4rem;">
+                  <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; padding:0.55rem 1.1rem; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.04); transition:all 0.15s; font-size:0.85rem; font-weight:700; color:#ffffff;" id="lbl-smartphone-yes">
+                    <input type="radio" name="hasSmartphone" value="yes" style="accent-color:var(--primary-gold);" />
+                    📱 Yes — Has Smartphone
+                  </label>
+                  <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; padding:0.55rem 1.1rem; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.04); transition:all 0.15s; font-size:0.85rem; font-weight:700; color:#ffffff;" id="lbl-smartphone-no">
+                    <input type="radio" name="hasSmartphone" value="no" style="accent-color:var(--primary-gold);" />
+                    📵 No — Without Smartphone
+                  </label>
+                </div>
+                <div style="font-size:0.73rem; color:var(--slate-muted); margin-top:0.4rem;">Used for WhatsApp class reminders, UPI payment links, and digital LLR slot notifications.</div>
+              </div>
+
             </div>
           </div>
 
@@ -641,8 +728,16 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
                   <tr>
                     <td class="p-td-mono">${p.id}</td>
                     <td>
-                      <div class="p-td-name">${p.traineeName}</div>
-                      <div class="p-td-sub">${p.traineeId}</div>
+                      <div style="display:flex; align-items:center; gap:0.65rem;">
+                        ${(() => {
+                          const tr = trainees.find(t => t.id === p.traineeId);
+                          return tr ? renderStudentAvatar(tr, 32) : '';
+                        })()}
+                        <div>
+                          <div class="p-td-name">${p.traineeName}</div>
+                          <div class="p-td-sub">${p.traineeId}</div>
+                        </div>
+                      </div>
                     </td>
                     <td class="p-td-muted">${p.package}</td>
                     <td style="font-weight:700; color:#fff; font-family:var(--font-mono);">₹${p.amount.toLocaleString('en-IN')}</td>
@@ -949,8 +1044,13 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
                   return `
                     <tr>
                       <td>
-                        <div class="p-td-name">${t.name}</div>
-                        <div class="p-td-sub">${t.id} · ${t.phone || ''}</div>
+                        <div style="display:flex; align-items:center; gap:0.65rem;">
+                          ${renderStudentAvatar(t, 32)}
+                          <div>
+                            <div class="p-td-name">${t.name}</div>
+                            <div class="p-td-sub">${t.id} · ${t.phone || ''}</div>
+                          </div>
+                        </div>
                       </td>
                       <td class="p-td-mono" style="color:var(--primary-cyan); font-weight:700;">
                         ${t.permitNumber || 'AP004/LLR/2026/8941'}
@@ -1094,9 +1194,17 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
       formNewStudent.addEventListener('submit', e => {
         e.preventDefault();
         const f = formNewStudent.elements;
+        const surname   = f['surname']?.value.trim() || '';
+        const firstName = f['firstName']?.value.trim() || '';
+        const fullName  = surname && firstName ? `${firstName} ${surname}` : (f['name']?.value?.trim() || firstName || surname);
         const newStudent = store.addTrainee({
-          name: f['name'].value.trim(),
+          name: fullName,
+          surname: surname,
+          firstName: firstName,
+          gender: f['gender']?.value || '',
+          registeredDate: f['registeredDate']?.value || new Date().toISOString().split('T')[0],
           phone: f['phone'].value.trim(),
+          alternatePhone: f['alternatePhone']?.value.trim() || '',
           email: f['email'].value.trim(),
           address: f['address'].value.trim() || f['branch'].value,
           package: f['package_choice'].value,
@@ -1105,10 +1213,57 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
           emergencyContact: f['emergencyContact'].value.trim() || 'Parent / Guardian',
           emergencyPhone: f['emergencyPhone'].value.trim() || f['phone'].value.trim(),
           paymentStatus: f['paymentStatus'].value,
+          hasSmartphone: f['hasSmartphone']?.value || 'yes',
+          profilePhotoData: window._studentPhotoDataUrl || '',
         });
+        window._studentPhotoDataUrl = '';
         showToast(`Student registered! Login Code: ${newStudent.studentCode || newStudent.id}`, 'success');
         showStudentRegistrationSuccessModal(newStudent, () => {
           onNavigate('trainees');
+        });
+      });
+
+      // Profile photo — open crop modal on file select
+      // Profile photo / logo — wire up file inputs
+      function wirePhotoInput(input) {
+        if (!input) return;
+        input.addEventListener('change', () => {
+          const file = input.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            openPhotoCropModal(ev.target.result, (croppedDataUrl) => {
+              window._studentPhotoDataUrl = croppedDataUrl;
+              const previewImg  = container.querySelector('#photo-preview-img');
+              const placeholder = container.querySelector('#photo-preview-placeholder');
+              const wrap = container.querySelector('#photo-preview-wrap');
+              if (previewImg) {
+                previewImg.src = croppedDataUrl;
+                previewImg.style.display = 'block';
+              }
+              if (placeholder) placeholder.style.display = 'none';
+              if (wrap) {
+                wrap.style.border = '2px solid rgba(255, 255, 255, 0.4)';
+                wrap.style.background = '#ffffff';
+              }
+            });
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+      wirePhotoInput(container.querySelector('#inp-profile-photo'));
+      wirePhotoInput(container.querySelector('#inp-profile-photo-btn'));
+
+      // Smartphone radio pill highlight
+      container.querySelectorAll('[name="hasSmartphone"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+          container.querySelectorAll('[name="hasSmartphone"]').forEach(r => {
+            const lbl = r.closest('label');
+            if (lbl) {
+              lbl.style.borderColor = r.checked ? 'rgba(243,209,130,0.5)' : 'rgba(255,255,255,0.15)';
+              lbl.style.background  = r.checked ? 'rgba(243,209,130,0.07)' : 'rgba(255,255,255,0.04)';
+            }
+          });
         });
       });
     }
@@ -1372,6 +1527,10 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
             </div>
 
             <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:0.85rem; font-size:0.8rem; color:#a1a1aa; text-align:left; margin-bottom:1.75rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; padding-bottom:0.5rem; border-bottom:1px solid rgba(255,255,255,0.08);">
+                <span style="color:var(--slate-muted);">Date of Joining:</span>
+                <strong style="color:#ffffff; font-family:var(--font-mono);">${student.registeredDate || new Date().toISOString().split('T')[0]}</strong>
+              </div>
               <div style="font-weight:700; color:#ffffff; margin-bottom:0.25rem;">Candidate Access Instructions:</div>
               The student can now use this unique code <strong style="color:#ffffff;">${studentCode}</strong> to sign in to the Student Portal from any mobile device or browser.
             </div>
