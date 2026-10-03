@@ -12,26 +12,36 @@ import { store } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
 import { renderStudentAvatar } from '../components/studentAvatar.js';
 import { triggerPhotoUpload } from '../components/photoCropModal.js';
+import { renderProgressiveCalendar } from '../components/progressiveCalendar.js';
+import { openRouteMapModal } from '../components/drivingRouteMap.js';
+import { formatDateDisplay } from '../utils/academyCalendar.js';
+import { getStageForDay } from '../utils/trainingCurriculum.js';
 
 export function renderTraineeDetailView(container, traineeId, showToast, onNavigate, initialService = 'profile') {
-  const trainee = store.trainees.find(t => t.id === traineeId) || store.trainees[0];
+  const trainee = store.trainees.find(t => t.id === traineeId || t.studentCode === traineeId) || store.trainees[0];
   const trainers = store.trainers;
   let activeService = initialService || 'profile';
 
   function render() {
     const assignedTrainer = trainers.find(tr => tr.id === trainee.assignedTrainerId) || trainers[0];
-    const invoice = store.payments.find(p => p.traineeId === trainee.id) || {
+    const invoice = store.payments.find(p => p.traineeId === trainee.id || p.traineeId === trainee.studentCode) || {
       id: 'INV-4011', amount: 7500, paid: 7000, balance: 500, dueDate: '2026-09-30', status: 'partial'
     };
     const curriculum = store.getCurriculum();
-    const progressPercent = Math.min(100, Math.round((trainee.currentDay / 20) * 100));
-    const kmDriven = trainee.currentDay * 8;
-    const kmRemaining = Math.max(0, (20 - trainee.currentDay) * 8);
+    const sched = store.getStudentSchedule(trainee.id);
+    const isCompleted = trainee.isActive === false || trainee.currentDay >= 20 || trainee.status === 'Completed';
+    const progressPercent = isCompleted ? 100 : Math.min(100, Math.round((trainee.currentDay / 20) * 100));
+    const kmDriven = isCompleted ? 160 : (trainee.currentDay * 8);
+    const kmRemaining = isCompleted ? 0 : Math.max(0, (20 - trainee.currentDay) * 8);
 
-    let stageName = trainee.currentDay <= 2 ? 'Stage 1 · LLR Intake' :
-                    trainee.currentDay <= 7 ? 'Stage 2 · Ground Practice' :
-                    trainee.currentDay <= 15 ? 'Stage 3 · Town Driving' :
-                    trainee.currentDay <= 19 ? 'Stage 4 · RTO 8-Track' : 'Stage 5 · Test Ready';
+    const startDateDisplay = sched?.startDate ? formatDateDisplay(sched.startDate) : (trainee.registeredDate || 'Oct 2, 2026');
+    const expCompDateDisplay = sched?.completionDate ? formatDateDisplay(sched.completionDate) : 'Oct 28, 2026';
+    const actualCompDateDisplay = trainee.actualCompletionDate ? formatDateDisplay(trainee.actualCompletionDate) : expCompDateDisplay;
+
+    let stageName = isCompleted ? 'Stage 3 · Course Completed ✓' :
+                    trainee.currentDay <= 10 ? 'Stage 1 · Basic Driving (Days 1–10)' :
+                    trainee.currentDay <= 15 ? 'Stage 2 · Intermediate Driving (Days 11–15)' :
+                    'Stage 3 · Final Assessment & Parking (Days 16–20)';
 
     const template = `
       <div class="student-details-container">
@@ -44,24 +54,30 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
           </button>
 
           <div class="student-actions-row">
-            <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm" id="btn-quick-step-day" title="Mark 1 day (+8 km practice logged)">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              + 1 Day (+8 km)
-            </button>
+            ${isCompleted ? `
+              <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-open-completion-certificate" id="btn-print-dossier" style="border-color:#22c55e; color:#22c55e;">
+                ✓ Form 5 DL Certificate
+              </button>
+            ` : `
+              <div style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.35rem 0.75rem; border-radius:6px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); font-size:0.75rem; color:#94a3b8;">
+                <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#38bdf8;"></span>
+                Rides logged by Trainer only
+              </div>
+            `}
             <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm" id="btn-print-dossier">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-              Print Driving Record (PDF)
+              Print Record (PDF)
             </button>
             <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm" id="btn-edit-student">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-              Edit Student Details
+              Edit Details
             </button>
-            <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm" id="btn-dossier-change-photo" style="border-color:rgba(255,255,255,0.25); color:#ffffff;" title="Upload or change student photo or logo">
-              📷 ${trainee.profilePhotoData ? 'Change Photo' : 'Upload Photo / Logo'}
+            <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm" id="btn-dossier-change-photo" style="border-color:rgba(255,255,255,0.25); color:#ffffff;" title="Upload or change student photo">
+              📷 ${trainee.profilePhotoData ? 'Change Photo' : 'Upload Photo'}
             </button>
             ${invoice.balance > 0 ? `
               <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm" id="btn-record-payment">
-                Receive Fee Payment
+                Receive Fee
               </button>
             ` : ''}
           </div>
@@ -77,9 +93,18 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
               }
             </div>
             <div class="student-hero-name-block">
-              <h1>${trainee.name}</h1>
-              <div class="student-hero-badges">
-                <span class="p-badge p-badge-gold" style="font-size:0.7rem;">${trainee.id}</span>
+              <div style="display:flex; align-items:center; gap:0.65rem; flex-wrap:wrap;">
+                <h1 style="margin:0;">${trainee.name}</h1>
+                ${isCompleted ? `
+                  <span class="p-badge p-badge-green" style="font-size:0.75rem;">Course: Completed 🏁</span>
+                  <span class="p-badge p-badge-gold" style="font-size:0.75rem;">Passed RTO DL Test 🟢</span>
+                ` : `
+                  <span class="p-badge p-badge-green" style="font-size:0.75rem;">Active Student · Day ${trainee.currentDay} / 20</span>
+                `}
+              </div>
+
+              <div class="student-hero-badges" style="margin-top:0.35rem;">
+                <span class="p-badge p-badge-gold" style="font-size:0.7rem;">${trainee.studentCode || trainee.id}</span>
                 <span class="p-badge ${invoice.balance === 0 ? 'p-badge-green' : 'p-badge-gold'}">
                   ${invoice.balance === 0 ? 'Fee Fully Paid ✓' : `₹${invoice.balance.toLocaleString('en-IN')} Due`}
                 </span>
@@ -87,12 +112,15 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
                   ${stageName}
                 </span>
               </div>
-              <div class="student-hero-meta">
+
+              <div class="student-hero-meta" style="margin-top:0.45rem;">
                 <span>Package: <strong>${trainee.package}</strong></span>
                 <span>•</span>
-                <span>LLR Permit: <strong style="color:var(--primary-cyan); font-family:var(--font-mono);">${trainee.permitNumber || 'AP004/LLR/2026/8941'}</strong></span>
+                <span>Start: <strong>${startDateDisplay}</strong></span>
                 <span>•</span>
-                <span>Enrolled: <strong>${trainee.registeredDate}</strong></span>
+                <span>${isCompleted ? 'Completed' : 'Expected'}: <strong style="color:${isCompleted ? '#22c55e' : 'var(--primary-gold)'};">${isCompleted ? actualCompDateDisplay : expCompDateDisplay}</strong></span>
+                <span>•</span>
+                <span>Instructor: <strong>👨‍🏫 ${assignedTrainer.name}</strong></span>
               </div>
             </div>
           </div>
@@ -100,12 +128,16 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
           <div class="student-hero-progress">
             <div style="display:flex; align-items:baseline; gap:0.4rem;">
               <span style="font-size:1.6rem; font-weight:900; color:#ffffff; font-family:var(--font-mono);">${progressPercent}%</span>
-              <span style="font-size:0.8rem; color:var(--slate-muted); text-transform:uppercase; font-weight:700;">Completed</span>
+              <span style="font-size:0.8rem; color:var(--slate-muted); text-transform:uppercase; font-weight:700;">
+                ${isCompleted ? 'Graduated' : 'Completed'}
+              </span>
             </div>
             <div style="width:180px; height:8px; background:rgba(255,255,255,0.08); border-radius:var(--radius-pill); overflow:hidden; border:1px solid rgba(255,255,255,0.06);">
               <div style="width:${progressPercent}%; height:100%; background:var(--neem-green); border-radius:var(--radius-pill); transition:width 0.3s ease;"></div>
             </div>
-            <span style="font-size:0.75rem; color:var(--slate-muted);">Day ${trainee.currentDay} of 20 practical lessons (${kmDriven} km)</span>
+            <span style="font-size:0.75rem; color:var(--slate-muted);">
+              ${isCompleted ? 'All 20 practical lessons completed (160 km)' : `Day ${trainee.currentDay} of 20 lessons (${kmDriven} km)`}
+            </span>
           </div>
         </div>
 
@@ -116,20 +148,24 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
             <span>1. Student Profile &amp; KYC</span>
           </button>
           <button type="button" class="student-service-tab ${activeService === 'course' ? 'active' : ''}" data-service-tab="course">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-            <span>2. 20-Day Driving Course (${trainee.currentDay}/20)</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>2. 20-Day Driving Course &amp; Calendar</span>
+          </button>
+          <button type="button" class="student-service-tab ${activeService === 'history' ? 'active' : ''}" data-service-tab="history">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+            <span>3. Training History &amp; GPS Routes (20 Days)</span>
           </button>
           <button type="button" class="student-service-tab ${activeService === 'fees' ? 'active' : ''}" data-service-tab="fees">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
-            <span>3. Fees &amp; Receipts (${invoice.balance > 0 ? '₹' + invoice.balance.toLocaleString('en-IN') + ' Due' : 'Paid ✓'})</span>
+            <span>4. Fees &amp; Receipts (${invoice.balance > 0 ? '₹' + invoice.balance.toLocaleString('en-IN') + ' Due' : 'Paid ✓'})</span>
           </button>
           <button type="button" class="student-service-tab ${activeService === 'instructor' ? 'active' : ''}" data-service-tab="instructor">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg>
-            <span>4. Instructor &amp; Dual-Control Car</span>
+            <span>5. Instructor &amp; Dual-Control Car</span>
           </button>
           <button type="button" class="student-service-tab ${activeService === 'rto' ? 'active' : ''}" data-service-tab="rto">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
-            <span>5. Govt DL Test (RTO)</span>
+            <span>6. Govt DL Test (RTO)</span>
           </button>
         </div>
 
@@ -265,6 +301,18 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
                   <div style="margin-top:1.5rem; padding:0.85rem; border-radius:var(--radius-sm); background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.14); font-size:0.8rem; color:#ffffff;">
                     ✓ Parivahan Sarathi clearance complete. Candidate authorized for dual-control road classes.
                   </div>
+
+                  <!-- 7. DANGER ZONE: PERMANENTLY DELETE STUDENT -->
+                  <div class="student-danger-zone">
+                    <div>
+                      <h4>Permanently Delete Student Record</h4>
+                      <p>This will permanently remove this student’s profile, course data, training history, and associated records. This action cannot be undone.</p>
+                    </div>
+                    <button type="button" class="btn-danger-outline" id="btn-trigger-delete-student">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                      Delete Student Record 🗑
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -273,88 +321,182 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
         ` : ''}
 
         <!-- ============================================================ -->
-        <!-- SERVICE 2: 20-DAY PRACTICAL DRIVING COURSE SUB-PAGE -->
+        <!-- SERVICE 2: 20-DAY PRACTICAL DRIVING COURSE & CALENDAR        -->
         <!-- ============================================================ -->
         ${activeService === 'course' ? `
           <div class="student-service-page">
-            <div class="student-card">
-              <div class="student-card-header">
-                <div>
-                  <span class="student-card-title">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary-cyan)" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-                    20-Day Practical Driving Course (8 km / Day · 160 km Total)
-                  </span>
-                  <div style="font-size:0.775rem; color:var(--slate-muted); margin-top:0.25rem;">
-                    Standard Government Driving Syllabus · Pulivendula Daily Road Classes
-                  </div>
-                </div>
+            <div id="progressive-calendar-mount-detail"></div>
+          </div>
+        ` : ''}
 
-                <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm" id="btn-advance-curriculum" style="white-space:nowrap;">
-                  + Mark Next Day (+8 km)
-                </button>
+        <!-- ============================================================ -->
+        <!-- SERVICE 3: 20-DAY TRAINING HISTORY & GPS ROUTES              -->
+        <!-- ============================================================ -->
+        ${activeService === 'history' ? `
+          <div class="student-service-page">
+            <!-- Training History Strip -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1.25rem; margin-bottom:1.5rem;">
+              <div class="student-kpi-card">
+                <span class="student-kpi-val">${trainee.currentDay >= 20 ? 20 : trainee.currentDay}<span style="font-size:1rem; color:var(--slate-muted);"> / 20</span></span>
+                <span class="student-kpi-label">Completed Driving Sessions</span>
+              </div>
+              <div class="student-kpi-card">
+                <span class="student-kpi-val" style="color:var(--primary-cyan);">${kmDriven}<span style="font-size:1rem; color:var(--slate-muted);"> km</span></span>
+                <span class="student-kpi-label">Distance Driven</span>
+              </div>
+              <div class="student-kpi-card">
+                <span class="student-kpi-val" style="color:var(--neem-green);">100%</span>
+                <span class="student-kpi-label">Attendance</span>
+              </div>
+              <div class="student-kpi-card">
+                <span class="student-kpi-val" style="color:${isCompleted ? 'var(--neem-green)' : 'var(--primary-gold)'}; font-size:1.35rem;">
+                  ${isCompleted ? 'Passed ✓' : 'In Progress'}
+                </span>
+                <span class="student-kpi-label">Course Status</span>
+              </div>
+            </div>
+
+            <!-- Route Day Quick Selector Bar -->
+            <div style="
+              background: #141720;
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              border-radius: 12px;
+              padding: 1rem 1.5rem;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              flex-wrap: wrap;
+              gap: 1rem;
+              margin-bottom: 1.5rem;
+            ">
+              <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+                <span style="font-size:0.875rem; font-weight:800; color:#ffffff;">Select Practical Route:</span>
+                <select id="select-history-day-route" class="mnc-select" style="font-size:0.85rem; padding:0.45rem 1.8rem 0.45rem 0.85rem; font-weight:700;">
+                  ${sched ? sched.sessions.map(s => `
+                    <option value="${s.dayNumber}">
+                      Day ${s.dayNumber} — ${s.objective} (8.0 km · ${s.status === 'completed' ? 'Completed 🟢' : 'Scheduled'})
+                    </option>
+                  `).join('') : ''}
+                </select>
               </div>
 
-              <div class="student-card-body">
+              <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm" id="btn-open-selected-day-route" style="display:flex; align-items:center; gap:0.4rem;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+                Open Route Map 🗺️
+              </button>
+            </div>
 
-                <!-- Phase indicators -->
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:0.85rem; margin-bottom:1.5rem;">
-                  <div style="padding:0.85rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-light); background:${trainee.currentDay >= 7 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)'};">
-                    <div style="font-size:0.68rem; font-weight:800; color:var(--slate-muted); text-transform:uppercase;">Phase 1 · Days 1–7</div>
-                    <div style="font-size:0.95rem; font-weight:800; color:#ffffff; margin-top:0.2rem;">Ground Practice &amp; ABC</div>
-                    <div style="font-size:0.75rem; color:${trainee.currentDay >= 7 ? '#ffffff' : 'var(--slate-muted)'}; font-weight:700; margin-top:0.25rem;">
-                      ${trainee.currentDay >= 7 ? '✓ Completed' : 'In Progress'}
-                    </div>
-                  </div>
+            <!-- Chronological List of All 20 Sessions -->
+            <div style="display:flex; flex-direction:column; gap:1rem;">
+              ${sched ? sched.sessions.map(s => {
+                const isSessCompleted = s.status === 'completed';
+                const isSessToday = s.status === 'today';
+                const stg = getStageForDay(s.dayNumber);
+                const routeDist = s.route?.distanceKm || 8.0;
+                const routeDur = s.route?.durationMins || 60;
 
-                  <div style="padding:0.85rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-light); background:${trainee.currentDay >= 15 ? 'rgba(255,255,255,0.06)' : trainee.currentDay >= 8 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)'};">
-                    <div style="font-size:0.68rem; font-weight:800; color:var(--slate-muted); text-transform:uppercase;">Phase 2 · Days 8–15</div>
-                    <div style="font-size:0.95rem; font-weight:800; color:#ffffff; margin-top:0.2rem;">Town Driving &amp; Flyover</div>
-                    <div style="font-size:0.75rem; color:${trainee.currentDay >= 15 ? '#ffffff' : trainee.currentDay >= 8 ? '#ffffff' : 'var(--slate-muted)'}; font-weight:700; margin-top:0.25rem;">
-                      ${trainee.currentDay >= 15 ? '✓ Completed' : trainee.currentDay >= 8 ? '● Active Lessons' : 'Upcoming'}
-                    </div>
-                  </div>
-
-                  <div style="padding:0.85rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-light); background:${trainee.currentDay >= 20 ? 'rgba(255,255,255,0.06)' : trainee.currentDay >= 16 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)'};">
-                    <div style="font-size:0.68rem; font-weight:800; color:var(--slate-muted); text-transform:uppercase;">Phase 3 · Days 16–20</div>
-                    <div style="font-size:0.95rem; font-weight:800; color:#ffffff; margin-top:0.2rem;">RTO 8-Track &amp; Test Mock</div>
-                    <div style="font-size:0.75rem; color:${trainee.currentDay >= 20 ? '#ffffff' : trainee.currentDay >= 16 ? '#ffffff' : 'var(--slate-muted)'}; font-weight:700; margin-top:0.25rem;">
-                      ${trainee.currentDay >= 20 ? '✓ Ready for DL' : trainee.currentDay >= 16 ? '● Active Track' : 'Upcoming'}
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 20-Day Milestones Grid -->
-                <div class="inspect-milestone-grid">
-                  ${curriculum.map(c => {
-                    const isCleared = c.day < trainee.currentDay;
-                    const isToday = c.day === trainee.currentDay;
-                    const statusClass = isCleared ? 'cleared' : isToday ? 'active-today' : 'upcoming';
-                    const statusText = isCleared ? '✓ Completed' : isToday ? '● Today’s Lesson' : '○ Upcoming';
-                    const statusColor = isCleared ? 'var(--neem-green)' : isToday ? 'var(--primary-gold)' : 'var(--slate-muted)';
-
-                    return `
-                      <div class="inspect-milestone-item ${statusClass}">
-                        <div class="inspect-day-head">
-                          <span class="inspect-day-num" style="color:${statusColor};">Day ${c.day}</span>
-                          <span style="font-size:0.7rem; font-weight:800; color:${statusColor};">${statusText}</span>
-                        </div>
-                        <div class="inspect-day-title">${c.topic}</div>
-                        <div class="inspect-day-footer">
-                          <span>8 km practical driving</span>
-                          <span style="font-family:var(--font-mono);">${c.day * 8} km cumulative</span>
+                return `
+                  <div style="
+                    background: #11141c;
+                    border: 1px solid ${isSessCompleted ? 'rgba(34, 197, 94, 0.35)' : isSessToday ? 'rgba(56, 189, 248, 0.4)' : 'rgba(255, 255, 255, 0.08)'};
+                    border-radius: 12px;
+                    padding: 1.25rem 1.5rem;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                    transition: border-color 0.2s ease;
+                  ">
+                    <!-- Session Header -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+                      <div style="display:flex; align-items:center; gap:0.75rem;">
+                        <span style="
+                          width: 32px;
+                          height: 32px;
+                          border-radius: 50%;
+                          background: ${isSessCompleted ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)'};
+                          border: 1px solid ${isSessCompleted ? 'rgba(34, 197, 94, 0.4)' : 'rgba(255, 255, 255, 0.15)'};
+                          color: ${isSessCompleted ? '#22c55e' : '#ffffff'};
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          font-weight: 800;
+                          font-size: 0.85rem;
+                        ">${s.dayNumber}</span>
+                        <div>
+                          <h4 style="margin:0; font-size:1rem; font-weight:800; color:#ffffff;">
+                            Day ${s.dayNumber} — ${s.objective}
+                          </h4>
+                          <span style="font-size:0.75rem; color:#94a3b8; margin-top:0.15rem; display:block;">
+                            ${stg.name} · Practical Driving Lesson (8.0 km)
+                          </span>
                         </div>
                       </div>
-                    `;
-                  }).join('')}
-                </div>
 
-              </div>
+                      <div style="display:flex; align-items:center; gap:0.6rem;">
+                        <span style="font-size:0.85rem; font-weight:700; color:#e2e8f0;">
+                          ${formatDateDisplay(s.date)}
+                        </span>
+                        ${isSessCompleted ? `
+                          <span class="p-badge p-badge-green" style="font-size:0.72rem;">Completed 🟢</span>
+                        ` : isSessToday ? `
+                          <span class="p-badge p-badge-dim" style="font-size:0.72rem; color:#38bdf8; border-color:rgba(56,189,248,0.4);">Today 📍</span>
+                        ` : `
+                          <span class="p-badge p-badge-dim" style="font-size:0.72rem; color:#94a3b8;">Scheduled ⏳</span>
+                        `}
+                      </div>
+                    </div>
+
+                    <!-- Skills Practiced -->
+                    <div style="font-size:0.8rem; color:#cbd5e1; line-height:1.4;">
+                      <strong style="color:#94a3b8;">Curriculum Skills:</strong> ${s.skills ? s.skills.join(' · ') : 'Vehicle control · Road safety'}
+                    </div>
+
+                    <!-- Postponement History Notice if Applicable -->
+                    ${s.postponementHistory && s.postponementHistory.length > 0 ? `
+                      <div style="background:rgba(234, 179, 8, 0.1); border:1px solid rgba(234, 179, 8, 0.3); border-radius:8px; padding:0.65rem 0.85rem; font-size:0.775rem; color:#fef08a;">
+                        ⚠️ <strong>Rescheduled Session:</strong> Originally scheduled on ${s.postponementHistory[0].originalDate}. Reason: <em>${s.postponementHistory[0].reason || 'Academy adjustment'}</em>. Rescheduled to ${s.date}.
+                      </div>
+                    ` : ''}
+
+                    <!-- Instructor Notes & Driving Route Action Strip -->
+                    <div style="
+                      background: rgba(255, 255, 255, 0.025);
+                      border: 1px solid rgba(255, 255, 255, 0.06);
+                      border-radius: 8px;
+                      padding: 0.75rem 1rem;
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      flex-wrap: wrap;
+                      gap: 0.75rem;
+                    ">
+                      <div style="flex:1; min-width:240px;">
+                        <span style="font-size:0.72rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Instructor Remarks:</span>
+                        <div style="font-size:0.8rem; color:#e2e8f0; margin-top:0.15rem; font-style:italic;">
+                          "${s.instructorNotes || (isSessCompleted ? 'Session completed with good steering control, mirror routine, and braking.' : 'Scheduled practical training session.')}"
+                        </div>
+                      </div>
+
+                      <div style="display:flex; align-items:center; gap:0.75rem;">
+                        <div style="text-align:right; font-size:0.75rem; color:#94a3b8;">
+                          <div>Duration: <strong style="color:#ffffff;">${routeDur} mins</strong></div>
+                          <div>Distance: <strong style="color:#38bdf8;">${routeDist} km</strong></div>
+                        </div>
+                        <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-view-session-route" data-day="${s.dayNumber}" style="white-space:nowrap; font-size:0.78rem;">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+                          View Route Map 🗺️
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('') : ''}
             </div>
           </div>
         ` : ''}
 
         <!-- ============================================================ -->
-        <!-- SERVICE 3: FEES & PAYMENT RECEIPTS SUB-PAGE -->
+        <!-- SERVICE 4: FEES & PAYMENT RECEIPTS SUB-PAGE                  -->
         <!-- ============================================================ -->
         ${activeService === 'fees' ? `
           <div class="student-service-page">
@@ -633,6 +775,16 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
     `;
 
     container.innerHTML = template;
+
+    const calMount = container.querySelector('#progressive-calendar-mount-detail');
+    if (calMount) {
+      renderProgressiveCalendar(calMount, trainee.id, {
+        showToast,
+        canEdit: true,
+        onUpdate: () => render()
+      });
+    }
+
     attachEvents();
   }
 
@@ -642,29 +794,6 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
     if (btnBack) {
       btnBack.addEventListener('click', () => {
         onNavigate('trainees');
-      });
-    }
-
-    // Advance 1 Day (+8 km)
-    const btnQuickStep = container.querySelector('#btn-quick-step-day');
-    if (btnQuickStep) {
-      btnQuickStep.addEventListener('click', () => {
-        const nextDay = Math.min(20, trainee.currentDay + 1);
-        store.setTraineeTestDay(nextDay);
-        store.updateTrainee(trainee.id, { currentDay: nextDay });
-        showToast(`Advanced ${trainee.name} to Day ${nextDay} (+8 km road training logged)`, 'success');
-        render();
-      });
-    }
-
-    const btnAdvanceCurriculum = container.querySelector('#btn-advance-curriculum');
-    if (btnAdvanceCurriculum) {
-      btnAdvanceCurriculum.addEventListener('click', () => {
-        const nextDay = Math.min(20, trainee.currentDay + 1);
-        store.setTraineeTestDay(nextDay);
-        store.updateTrainee(trainee.id, { currentDay: nextDay });
-        showToast(`Advanced ${trainee.name} to Day ${nextDay} (+8 km road training logged)`, 'success');
-        render();
       });
     }
 
@@ -763,6 +892,166 @@ export function renderTraineeDetailView(container, traineeId, showToast, onNavig
         openPrintModal();
       });
     }
+
+    // Delete Student trigger
+    const btnDelete = container.querySelector('#btn-trigger-delete-student');
+    if (btnDelete) {
+      btnDelete.addEventListener('click', () => {
+        openDeleteConfirmModal();
+      });
+    }
+
+    // Quick inspect day route from dropdown
+    const btnOpenSelectedRoute = container.querySelector('#btn-open-selected-day-route');
+    if (btnOpenSelectedRoute) {
+      btnOpenSelectedRoute.addEventListener('click', () => {
+        const selDay = parseInt(container.querySelector('#select-history-day-route')?.value || '1', 10);
+        const sched = store.getStudentSchedule(trainee.id);
+        const sess = sched?.sessions.find(s => s.dayNumber === selDay) || {
+          dayNumber: selDay,
+          objective: 'Driving Session',
+          route: { distanceKm: 8, durationMins: 55 }
+        };
+        const tr = store.trainers.find(t => t.id === trainee.assignedTrainerId);
+        openRouteMapModal({
+          session: sess,
+          studentName: trainee.name,
+          carInfo: tr?.car || 'Dual-Control Maruti Swift'
+        });
+      });
+    }
+
+    // View route map button on each session card
+    container.querySelectorAll('.btn-view-session-route').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dayNum = parseInt(btn.dataset.day || '1', 10);
+        const sched = store.getStudentSchedule(trainee.id);
+        const sess = sched?.sessions.find(s => s.dayNumber === dayNum) || {
+          dayNumber: dayNum,
+          objective: 'Driving Session',
+          route: { distanceKm: 8, durationMins: 55 }
+        };
+        const tr = store.trainers.find(t => t.id === trainee.assignedTrainerId);
+        openRouteMapModal({
+          session: sess,
+          studentName: trainee.name,
+          carInfo: tr?.car || 'Dual-Control Maruti Swift'
+        });
+      });
+    });
+  }
+
+  // ====================================================
+  // MODAL: CONFIRM PERMANENT DELETE (Requirement 7)
+  // ====================================================
+  function openDeleteConfirmModal() {
+    const modalRoot = document.getElementById('modal-root');
+    const targetName = trainee.name.trim();
+
+    modalRoot.innerHTML = `
+      <div class="mnc-modal-overlay">
+        <div class="mnc-modal" style="max-width: 520px; border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 25px 60px rgba(239, 68, 68, 0.25);">
+          <!-- Modal Header -->
+          <div style="padding: 1.25rem 1.75rem; border-bottom: 1px solid rgba(239, 68, 68, 0.2); display: flex; justify-content: space-between; align-items: center; background: rgba(239, 68, 68, 0.08);">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); display: flex; align-items: center; justify-content: center; color: #ef4444;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </div>
+              <div>
+                <h3 style="font-size: 1.15rem; font-weight: 800; color: #ffffff; margin: 0;">Delete Student?</h3>
+                <span style="font-size: 0.775rem; color: #fca5a5;">Permanent deletion warning</span>
+              </div>
+            </div>
+            <button type="button" id="btn-close-delete-modal" style="background: transparent; border: none; font-size: 1.25rem; cursor: pointer; color: var(--slate-muted);">✕</button>
+          </div>
+
+          <!-- Modal Body -->
+          <div style="padding: 1.75rem; background: var(--cred-surface);">
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; font-size: 0.85rem; color: #fecaca; line-height: 1.5;">
+              <strong>⚠️ Critical Warning:</strong> This will permanently remove this student’s profile, course data, training history, and associated records. This action cannot be undone.
+            </div>
+
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1.5rem;">
+              <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Target Student Profile:</div>
+              <div style="font-size: 1rem; font-weight: 800; color: #ffffff; margin-top: 0.25rem;">${trainee.name}</div>
+              <div style="font-size: 0.78rem; color: #cbd5e1; margin-top: 0.2rem;">ID: ${trainee.id} · Course: ${trainee.package || 'Comprehensive (20 Days)'}</div>
+            </div>
+
+            <div>
+              <label for="input-confirm-delete-name" style="display: block; font-size: 0.825rem; font-weight: 700; color: #ffffff; margin-bottom: 0.5rem;">
+                To confirm permanent deletion, type the student's full name <strong style="color: #ef4444; user-select: all;">"${targetName}"</strong> below:
+              </label>
+              <input
+                type="text"
+                id="input-confirm-delete-name"
+                class="mnc-input"
+                style="width: 100%; border-color: rgba(239, 68, 68, 0.4); font-weight: 700;"
+                placeholder="Type ${targetName} to confirm"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+
+          <!-- Modal Footer -->
+          <div style="padding: 1.25rem 1.75rem; border-top: 1px solid var(--border-light); display: flex; justify-content: flex-end; gap: 0.75rem; background: var(--cred-surface);">
+            <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-cancel-delete-modal">Cancel</button>
+            <button
+              type="button"
+              class="btn-mnc"
+              id="btn-confirm-delete-action"
+              disabled
+              style="background: rgba(239, 68, 68, 0.3); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.5); cursor: not-allowed; opacity: 0.6; transition: all 0.2s ease;"
+            >
+              Permanently Delete Student 🗑
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const close = () => { modalRoot.innerHTML = ''; };
+    modalRoot.querySelector('#btn-close-delete-modal').addEventListener('click', close);
+    modalRoot.querySelector('#btn-cancel-delete-modal').addEventListener('click', close);
+
+    const inputName = modalRoot.querySelector('#input-confirm-delete-name');
+    const btnConfirm = modalRoot.querySelector('#btn-confirm-delete-action');
+
+    inputName.addEventListener('input', () => {
+      const typed = inputName.value.trim();
+      if (typed.toLowerCase() === targetName.toLowerCase()) {
+        btnConfirm.disabled = false;
+        btnConfirm.style.background = '#dc2626';
+        btnConfirm.style.color = '#ffffff';
+        btnConfirm.style.border = '1px solid #ef4444';
+        btnConfirm.style.cursor = 'pointer';
+        btnConfirm.style.opacity = '1';
+        btnConfirm.style.boxShadow = '0 0 16px rgba(239, 68, 68, 0.4)';
+      } else {
+        btnConfirm.disabled = true;
+        btnConfirm.style.background = 'rgba(239, 68, 68, 0.3)';
+        btnConfirm.style.color = '#fca5a5';
+        btnConfirm.style.border = '1px solid rgba(239, 68, 68, 0.5)';
+        btnConfirm.style.cursor = 'not-allowed';
+        btnConfirm.style.opacity = '0.6';
+        btnConfirm.style.boxShadow = 'none';
+      }
+    });
+
+    btnConfirm.addEventListener('click', () => {
+      if (btnConfirm.disabled) return;
+      const ok = store.deleteTrainee(trainee.id);
+      close();
+      if (ok) {
+        showToast(`Student record for ${trainee.name} permanently deleted from school system.`, 'info');
+        if (typeof onNavigate === 'function') {
+          onNavigate('trainees');
+        }
+      } else {
+        showToast('Error deleting student record.', 'error');
+      }
+    });
+
+    setTimeout(() => inputName.focus(), 50);
   }
 
   // ====================================================

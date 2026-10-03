@@ -23,8 +23,8 @@ export function getSupabaseCredentials() {
   const envUrl = import.meta.env?.VITE_SUPABASE_URL || '';
   const envKey = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
 
-  const localUrl = (typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_URL_KEY) : '') || '';
-  const localKey = (typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_ANON_KEY) : '') || '';
+  const localUrl = typeof localStorage !== 'undefined' ? (localStorage.getItem(STORAGE_URL_KEY) || '') : '';
+  const localKey = typeof localStorage !== 'undefined' ? (localStorage.getItem(STORAGE_ANON_KEY) || '') : '';
 
   const rawUrl = (localUrl || envUrl).trim();
   const url = sanitizeSupabaseUrl(rawUrl);

@@ -11,6 +11,8 @@ import { store, formatReadableDate, getLocalTodayDate } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
 import { renderStudentAvatar } from '../components/studentAvatar.js';
 import { triggerPhotoUpload } from '../components/photoCropModal.js';
+import { renderProgressiveCalendar } from '../components/progressiveCalendar.js';
+import { openLiveRideMapModal } from '../components/liveRideTrackingModal.js';
 
 export function renderTraineeView(container, showToast, subService = 'curriculum', onNavigate) {
   let activeFilter = 'all';
@@ -38,18 +40,21 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
     const kmDriven = currentDay * 8;
     const kmRemaining = Math.max(0, (20 - currentDay) * 8);
 
-    const currentSub = subService || 'curriculum';
+    const sched = store.getStudentSchedule(trainee.id);
+    const todaySession = sched?.sessions?.find(s => s.dayNumber === currentDay) || {
+      dayNumber: currentDay,
+      objective: 'Practical Road Driving Lesson (8.0 km)',
+      stage: currentDay <= 10 ? 'Stage 1 · Basic Driving' : currentDay <= 15 ? 'Stage 2 · Intermediate Driving' : 'Stage 3 · Advanced Road Skills'
+    };
 
-    const filteredCurriculum = curriculum.filter(item =>
-      activeFilter === 'all' ? true : item.category === activeFilter
-    );
+    const currentSub = subService || 'curriculum';
 
     const topbar = '';
 
     let contentHtml = '';
 
     // =========================================================
-    // SERVICE 01: 20-DAY CURRICULUM ROADMAP (8 KM/DAY)
+    // SERVICE 01: 20-DAY CURRICULUM ROADMAP (CALENDAR ENGINE)
     // =========================================================
     if (currentSub === 'curriculum') {
       contentHtml = `
@@ -62,115 +67,81 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
             </div>
           </div>
           <div style="display:flex; gap:0.65rem; align-items:center; flex-wrap:wrap;">
-            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-go-to-book-slot">Book Driving Slot →</button>
+            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-student-start-gps-ride" style="background:#22c55e; border-color:#22c55e; color:#000000; font-weight:900; box-shadow:0 4px 18px rgba(34,197,94,0.45); display:flex; align-items:center; gap:0.45rem;">
+              <span>🚀</span> <span>Start Ride (Live GPS)</span>
+            </button>
+            <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-go-to-book-slot">Book Driving Slot →</button>
             <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-show-qr-voucher">Pay Course Fee (UPI QR)</button>
           </div>
         </div>
 
-        <!-- STATS STRIP -->
-        <div class="portal-stats-strip">
-          <div class="portal-stat">
-            <span class="portal-stat-value">${currentDay}<span style="font-size:1rem; color:var(--slate-muted);"> / 20</span></span>
-            <span class="portal-stat-label">Days Completed</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value" style="color:var(--primary-cyan);">${kmDriven} km</span>
-            <span class="portal-stat-label">Distance Driven</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value">${kmRemaining} km</span>
-            <span class="portal-stat-label">Remaining</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value">${progressPercent}%</span>
-            <span class="portal-stat-label">Course Progress</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value" style="color:${invoice.balance > 0 ? 'var(--primary-gold)' : 'var(--neem-green)'};">
-              ${invoice.balance > 0 ? '₹' + invoice.balance.toLocaleString('en-IN') : 'Cleared ✓'}
-            </span>
-            <span class="portal-stat-label">Fee Balance</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value" style="color:var(--neem-green);">${trainee.attendanceRate || '96%'}</span>
-            <span class="portal-stat-label">Attendance Rate</span>
-          </div>
-        </div>
-
-        <!-- PROGRESS BAR -->
-        <div class="portal-progress-bar-wrap">
-          <div class="portal-progress-bar" style="width:${progressPercent}%;"></div>
-        </div>
-
-        <!-- CURRICULUM TABLE -->
-        <div class="portal-section">
-          <div class="portal-section-header">
-            <span class="portal-section-title">20-Day Practical Driving Lessons (8 km per day)</span>
-            <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-              <span style="font-size:0.75rem; color:var(--slate-muted);">Check day status:</span>
-              <button type="button" class="p-chip-btn ${currentDay === 7  ? 'p-chip-active':''}" data-test-day="7">Day 7</button>
-              <button type="button" class="p-chip-btn ${currentDay === 14 ? 'p-chip-active':''}" data-test-day="14">Day 14</button>
-              <button type="button" class="p-chip-btn ${currentDay === 20 ? 'p-chip-active':''}" data-test-day="20">Day 20 (RTO)</button>
+        <!-- TODAY'S PRACTICAL RIDE & LIVE GPS TRACKER HERO CARD -->
+        <div class="today-ride-hero-card" style="
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.14) 0%, rgba(15, 23, 42, 0.85) 100%);
+          border: 1.5px solid rgba(34, 197, 94, 0.45);
+          border-radius: 14px;
+          padding: 1.25rem 1.6rem;
+          margin-bottom: 1.75rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1.25rem;
+          flex-wrap: wrap;
+          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+        ">
+          <div style="display:flex; align-items:center; gap:1.15rem;">
+            <div style="
+              width: 54px;
+              height: 54px;
+              border-radius: 14px;
+              background: #22c55e;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 1.75rem;
+              box-shadow: 0 4px 20px rgba(34, 197, 94, 0.45);
+            ">🚗</div>
+            <div>
+              <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.25rem; flex-wrap:wrap;">
+                <span class="p-badge p-badge-green" style="font-size:0.72rem; font-weight:900; letter-spacing:0.04em;">
+                  DAY ${currentDay} PRACTICAL RIDE
+                </span>
+                <span style="font-size:0.8rem; color:#a1a1aa; font-weight:700;">
+                  Target: 8.00 km (16 Checkpoints @ 500m Intervals)
+                </span>
+              </div>
+              <h3 style="font-size:1.2rem; font-weight:900; color:#ffffff; margin:0 0 0.25rem 0;">
+                ${todaySession.objective || 'Practical Road Driving Lesson'}
+              </h3>
+              <p style="font-size:0.825rem; color:#94a3b8; margin:0;">
+                Instructor: <strong style="color:#ffffff;">${trainer.name}</strong> · Fleet Rig: <strong style="color:#ffffff;">${trainer.car}</strong> (Dual-Brake) · Sector: <strong style="color:#ffffff;">Pulivendula</strong>
+              </p>
             </div>
           </div>
 
-          <!-- Category filter buttons -->
-          <div class="portal-filter-bar">
-            <button type="button" class="p-filter-btn ${activeFilter==='all'     ?'p-filter-active':''}" data-cat="all">All 20 Days</button>
-            <button type="button" class="p-filter-btn ${activeFilter==='street'  ?'p-filter-active':''}" data-cat="street">Ground &amp; Town (Days 1–10)</button>
-            <button type="button" class="p-filter-btn ${activeFilter==='highway' ?'p-filter-active':''}" data-cat="highway">Highway &amp; Flyover (Days 11–19)</button>
-            <button type="button" class="p-filter-btn ${activeFilter==='test'    ?'p-filter-active':''}" data-cat="test">RTO 8-Track Test (Day 20)</button>
-          </div>
-
-          <div class="p-table-wrap">
-            <table class="p-table">
-              <thead>
-                <tr>
-                  <th>Course Day</th>
-                  <th>Practical Driving Lesson</th>
-                  <th>Stage</th>
-                  <th>Daily Distance</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${filteredCurriculum.map(item => {
-                  const isDone  = item.day < currentDay;
-                  const isToday = item.day === currentDay;
-                  return `
-                    <tr class="${isDone?'p-row-done':isToday?'p-row-today':''}">
-                      <td class="p-td-mono" style="font-size:0.875rem; font-weight:800; color:${isDone?'var(--neem-green)':isToday?'var(--primary-gold)':'#ffffff'};">
-                        Day ${item.day}
-                      </td>
-                      <td>
-                        <div class="p-td-name" style="${isDone?'opacity:0.75;':''}">
-                          ${isDone?'<span style="color:var(--neem-green); margin-right:0.35rem;">✓</span>':isToday?'<span style="color:var(--primary-gold); margin-right:0.35rem;">●</span>':''}${item.topic}
-                        </div>
-                        <div class="p-td-sub">${item.details || 'Standard RTO Practical Syllabus'}</div>
-                      </td>
-                      <td>
-                        <span class="p-badge p-badge-dim" style="font-size:0.62rem;">${item.category.toUpperCase()}</span>
-                      </td>
-                      <td class="p-td-muted">
-                        ${item.distance || '8 km'}
-                      </td>
-                      <td>
-                        <span class="${isDone?'p-status-done':isToday?'p-status-today':'p-status-upcoming'}">
-                          ${isDone ? '✓ Completed' : isToday ? '● Today’s Lesson' : 'Upcoming'}
-                        </span>
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
+          <div style="display:flex; align-items:center; gap:0.85rem; flex-wrap:wrap;">
+            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-hero-start-gps-ride" style="
+              background: #22c55e;
+              border-color: #22c55e;
+              color: #000000;
+              font-weight: 900;
+              padding: 0.85rem 1.85rem;
+              font-size: 0.95rem;
+              border-radius: 10px;
+              box-shadow: 0 6px 24px rgba(34, 197, 94, 0.5);
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+            ">
+              <span>🚀</span>
+              <span>Start Live GPS Ride (500m Tracking) →</span>
+            </button>
           </div>
         </div>
+
+        <!-- PROGRESSIVE CALENDAR MOUNT -->
+        <div id="progressive-calendar-mount"></div>
       `;
     }
 
@@ -840,6 +811,43 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
         ${contentHtml}
       </div>
     `;
+
+    // Mount 20-Day Progressive Driving Training Calendar
+    const calendarMount = container.querySelector('#progressive-calendar-mount');
+    if (calendarMount) {
+      renderProgressiveCalendar(calendarMount, trainee.id, {
+        showToast,
+        canEdit: false,
+        isTrainer: false,
+        onUpdate: () => render()
+      });
+    }
+
+    // Launch Live GPS Ride Tracker for Candidate
+    const launchStudentRide = () => {
+      const dayToRide = trainee.currentDay || 1;
+      const sched = store.getStudentSchedule(trainee.id);
+      const session = sched?.sessions?.find(s => s.dayNumber === dayToRide) || {
+        dayNumber: dayToRide,
+        objective: 'Practical Road Driving Lesson (8.0 km)',
+        stage: dayToRide <= 10 ? 'Stage 1 · Basic Driving' : dayToRide <= 15 ? 'Stage 2 · Intermediate Driving' : 'Stage 3 · Advanced Road Skills',
+        date: new Date().toISOString().split('T')[0]
+      };
+
+      openLiveRideMapModal({
+        session,
+        student: trainee,
+        trainer,
+        canTrainerComplete: false,
+        onRideCompleted: () => {
+          showToast(`Day ${dayToRide} 8.0 km ride recorded successfully! 16 Checkpoints cleared ✓`, 'success');
+          render();
+        }
+      });
+    };
+
+    container.querySelector('#btn-student-start-gps-ride')?.addEventListener('click', launchStudentRide);
+    container.querySelector('#btn-hero-start-gps-ride')?.addEventListener('click', launchStudentRide);
 
     // Service Navigation Events
     container.querySelectorAll('[data-trainee-nav]').forEach(btn => {

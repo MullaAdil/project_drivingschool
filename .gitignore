@@ -29,3 +29,8 @@ dist-ssr/
 *.sln
 *.sw?
 .env
+
+# Android / Gradle cache
+.gradle/
+android/.gradle/
+

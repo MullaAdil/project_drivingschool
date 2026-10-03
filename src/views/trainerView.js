@@ -10,6 +10,8 @@
 import { store, formatReadableDate, getLocalTodayDate } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
 import { renderStudentBoxAvatar, renderStudentAvatar } from '../components/studentAvatar.js';
+import { openRouteMapModal } from '../components/drivingRouteMap.js';
+import { openLiveRideMapModal } from '../components/liveRideTrackingModal.js';
 
 export function renderTrainerView(container, showToast, subService = 'schedule', onNavigate) {
   let selectedDate = store.getTodayDateStr();
@@ -118,12 +120,90 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
         </div>
 
         <!-- PERMISSIONS ADVISORY -->
-        <div style="padding:0.75rem 2rem; background:rgba(255,255,255,0.02); border-bottom:1px solid var(--border-light); font-size:0.75rem; color:var(--slate-muted); display:flex; align-items:center; justify-content:space-between;">
+        <div style="padding:0.75rem 2rem; background:rgba(255,255,255,0.02); border-bottom:1px solid var(--border-light); font-size:0.75rem; color:var(--slate-muted); display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem;">
           <span>🔒 Instructor Access: You see only your assigned training slots. Maximum 2 candidates per slot. Master scheduling &amp; allocations are managed by Administration.</span>
           <span class="p-badge p-badge-dim" style="font-size:0.65rem;">Date: ${formatReadableDate(selectedDate)}</span>
         </div>
+        <!-- INSTRUCTOR ACTIVE GPS RIDE DISPATCH COMMAND CARD -->
+        <div class="trainer-gps-command-card" style="
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.14) 0%, rgba(15, 23, 42, 0.85) 100%);
+          border: 1.5px solid rgba(34, 197, 94, 0.45);
+          border-radius: 14px;
+          padding: 1.25rem 1.6rem;
+          margin-bottom: 1.75rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1.25rem;
+          flex-wrap: wrap;
+          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+        ">
+          <div style="display:flex; align-items:center; gap:1.15rem;">
+            <div style="
+              width: 52px;
+              height: 52px;
+              border-radius: 14px;
+              background: #22c55e;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 1.75rem;
+              box-shadow: 0 4px 20px rgba(34, 197, 94, 0.45);
+            ">🛰️</div>
+            <div>
+              <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.25rem; flex-wrap:wrap;">
+                <span class="p-badge p-badge-green" style="font-size:0.72rem; font-weight:900; letter-spacing:0.04em;">
+                  INSTRUCTOR GPS TELEMETRY COCKPIT
+                </span>
+                <span style="font-size:0.8rem; color:#a1a1aa; font-weight:700;">
+                  Dual-Control Sensor · 500m Checkpoint Verification
+                </span>
+              </div>
+              <h3 style="font-size:1.2rem; font-weight:900; color:#ffffff; margin:0 0 0.25rem 0;">
+                Live Practical Ride &amp; Distance Tracking (8.0 km)
+              </h3>
+              <p style="font-size:0.825rem; color:#94a3b8; margin:0;">
+                Select an active student candidate to launch live GPS tracking with 500m milestone logs and automatic curriculum sync.
+              </p>
+            </div>
+          </div>
 
-        <!-- ASSIGNED SLOTS LIST -->
+          <div style="display:flex; align-items:center; gap:0.85rem; flex-wrap:wrap;">
+            <select id="trainer-quick-select-student" style="
+              background: rgba(13, 16, 23, 0.95);
+              border: 1px solid rgba(255, 255, 255, 0.25);
+              color: #ffffff;
+              padding: 0.75rem 1rem;
+              border-radius: 8px;
+              font-size: 0.85rem;
+              font-weight: 700;
+              cursor: pointer;
+            ">
+              ${myTrainees.filter(t => t.isActive).map(t => `
+                <option value="${t.id}">${t.name} (Day ${t.currentDay || 1}/20 · 8km)</option>
+              `).join('')}
+            </select>
+
+            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-trainer-quick-start-gps" style="
+              background: #22c55e;
+              border-color: #22c55e;
+              color: #000000;
+              font-weight: 900;
+              padding: 0.85rem 1.75rem;
+              font-size: 0.95rem;
+              border-radius: 10px;
+              box-shadow: 0 6px 24px rgba(34, 197, 94, 0.5);
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+            ">
+              <span>🚀</span>
+              <span>Start Ride (Live GPS) →</span>
+            </button>
+          </div>
+        </div>
+
         <div class="portal-section">
           <div class="portal-section-header">
             <span class="portal-section-title">My Assigned Road Sessions (${formatReadableDate(selectedDate)})</span>
@@ -245,10 +325,9 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
             ${myTrainees.map(t => {
               const pct = Math.min(100, Math.round((t.currentDay / 20) * 100));
               const initials = t.avatar || t.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-              let stageName = t.currentDay <= 2 ? 'Stage 1 · LLR Intake' :
-                              t.currentDay <= 7 ? 'Stage 2 · Ground Practice' :
-                              t.currentDay <= 15 ? 'Stage 3 · Town Driving' :
-                              t.currentDay <= 19 ? 'Stage 4 · RTO 8-Track' : 'Stage 5 · Test Ready';
+              let stageName = t.currentDay <= 10 ? 'Stage 1 · Basic Driving' :
+                              t.currentDay <= 15 ? 'Stage 2 · Intermediate Driving' :
+                              'Stage 3 · Final Assessment & Parking';
               return `
                 <div class="student-box-card">
                   <div>
@@ -305,9 +384,15 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
                     </div>
                   </div>
 
-                  <div class="student-box-footer">
-                    <span style="font-size:0.72rem; color:var(--slate-muted);">Assigned Car: <strong>${trainer.car}</strong></span>
-                    <span class="p-badge p-badge-green" style="font-size:0.62rem;">Dual-Control OK</span>
+                  <div class="student-box-footer" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                    <span style="font-size:0.72rem; color:var(--slate-muted);">Car: <strong>${trainer.car}</strong></span>
+                    ${t.isActive && t.currentDay <= 20 ? `
+                      <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm btn-trainer-log-ride" data-trainee-id="${t.id}" style="background:#22c55e; border-color:#22c55e; color:#000000; font-weight:800; padding:0.35rem 0.75rem; font-size:0.75rem;">
+                        🚀 Start Day ${t.currentDay} Ride (8 km Live Map)
+                      </button>
+                    ` : `
+                      <span class="p-badge p-badge-green" style="font-size:0.65rem;">Course Completed 🏁</span>
+                    `}
                   </div>
                 </div>
               `;
@@ -335,50 +420,50 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
         <div class="portal-stats-strip">
           <div class="portal-stat">
             <span class="portal-stat-value" style="color:var(--neem-green);">PASSED</span>
-            <span class="portal-stat-label">Dual-Brake Status</span>
+            <span class="portal-stat-label">Dual-Brake Check</span>
           </div>
           <div class="portal-stat-div"></div>
           <div class="portal-stat">
-            <span class="portal-stat-value">${totalKm.toLocaleString('en-IN')} km</span>
-            <span class="portal-stat-label">Total Distance Logged</span>
+            <span class="portal-stat-value">8.0 km</span>
+            <span class="portal-stat-label">Daily Lesson Distance</span>
           </div>
           <div class="portal-stat-div"></div>
           <div class="portal-stat">
-            <span class="portal-stat-value" style="color:var(--primary-cyan);">45.2 PSI</span>
-            <span class="portal-stat-label">Brake Master Pressure</span>
+            <span class="portal-stat-value" style="color:var(--neem-green);">CHECKED</span>
+            <span class="portal-stat-label">Tire &amp; Mirror Check</span>
           </div>
           <div class="portal-stat-div"></div>
           <div class="portal-stat">
-            <span class="portal-stat-value" style="color:var(--neem-green);">100%</span>
-            <span class="portal-stat-label">Speed Governor Active</span>
+            <span class="portal-stat-value" style="color:var(--neem-green);">READY</span>
+            <span class="portal-stat-label">Vehicle Readiness</span>
           </div>
         </div>
 
         <div class="portal-section">
           <div class="portal-section-header">
-            <span class="portal-section-title">Car Safety Specifications &amp; Inspection Checklist</span>
+            <span class="portal-section-title">Car Specifications &amp; Daily Checklist</span>
             <span class="portal-section-meta">${trainer.car}</span>
           </div>
           <div class="p-detail-grid">
             <div class="p-detail-cell">
               <div class="p-detail-key">Assigned Training Car</div>
               <div class="p-detail-value">${trainer.car}</div>
-              <div class="p-detail-sub">Pulivendula Academy Training Fleet</div>
+              <div class="p-detail-sub">Pulivendula Academy Training Car</div>
             </div>
             <div class="p-detail-cell">
               <div class="p-detail-key">Dual Controls</div>
-              <div class="p-detail-value" style="color:var(--neem-green);">Dual-Pedal Hydraulic Override</div>
+              <div class="p-detail-value" style="color:var(--neem-green);">Dual-Brake Pedal Installed</div>
               <div class="p-detail-sub">Instructor emergency brake pedal active</div>
             </div>
             <div class="p-detail-cell">
-              <div class="p-detail-key">RTO Inspection Compliance</div>
-              <div class="p-detail-value">AP RTO Verified (Valid 2027)</div>
-              <div class="p-detail-sub">Safety inspection passed Sept 2026</div>
+              <div class="p-detail-key">Inspection Compliance</div>
+              <div class="p-detail-value">AP RTO Verified</div>
+              <div class="p-detail-sub">Safety inspection passed</div>
             </div>
             <div class="p-detail-cell">
               <div class="p-detail-key">Safety Equipment</div>
-              <div class="p-detail-value">Speed Governor (40 km/h)</div>
-              <div class="p-detail-sub">Instructor dual control &amp; first aid kit</div>
+              <div class="p-detail-value">First Aid Kit &amp; Dual Mirrors</div>
+              <div class="p-detail-sub">Instructor dual control verification</div>
             </div>
           </div>
         </div>
@@ -446,6 +531,83 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
           store.updateAttendance(slotId, status);
           showToast(`${slot.studentName} marked ${status.toUpperCase()}`, 'success');
           render();
+        }
+      });
+    });
+
+    // Instructor Quick Start GPS Ride from Command Card
+    const btnQuickStartGps = container.querySelector('#btn-trainer-quick-start-gps');
+    if (btnQuickStartGps) {
+      btnQuickStartGps.addEventListener('click', () => {
+        const select = container.querySelector('#trainer-quick-select-student');
+        const selectedId = select ? select.value : (myTrainees[0]?.id);
+        const trainee = allTrainees.find(t => t.id === selectedId) || myTrainees[0];
+        if (!trainee) {
+          showToast('No active student candidate found to start ride', 'warning');
+          return;
+        }
+        const dayToComplete = trainee.currentDay || 1;
+        const sched = store.getStudentSchedule(trainee.id);
+        const session = sched?.sessions?.find(s => s.dayNumber === dayToComplete) || {
+          dayNumber: dayToComplete,
+          objective: 'Practical Road Driving Lesson (8.0 km)',
+          date: new Date().toISOString().split('T')[0]
+        };
+
+        openLiveRideMapModal({
+          session,
+          student: trainee,
+          trainer,
+          canTrainerComplete: true,
+          onRideCompleted: () => {
+            showToast(`Day ${dayToComplete} 8.0 km ride completed for ${trainee.name} ✓`, 'success');
+            render();
+          }
+        });
+      });
+    }
+
+    // Trainer Start / Log Ride (Opens Live 8km Map from Table Rows)
+    container.querySelectorAll('.btn-trainer-log-ride').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const traineeId = btn.dataset.traineeId;
+        const trainee = allTrainees.find(t => t.id === traineeId);
+        if (!trainee) return;
+        const dayToComplete = trainee.currentDay;
+        const sched = store.getStudentSchedule(traineeId);
+        const session = sched?.sessions?.find(s => s.dayNumber === dayToComplete) || {
+          dayNumber: dayToComplete,
+          objective: 'Practical Road Driving',
+          date: '2026-10-01'
+        };
+
+        openLiveRideMapModal({
+          session,
+          student: trainee,
+          trainer,
+          canTrainerComplete: true,
+          onRideCompleted: () => {
+            showToast(`Day ${dayToComplete} 8.0 km ride completed for ${trainee.name} ✓`, 'success');
+            render();
+          }
+        });
+      });
+    });
+
+    // Route map buttons
+    container.querySelectorAll('.btn-trainer-view-route').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const traineeId = btn.dataset.traineeId;
+        const trainee = allTrainees.find(t => t.id === traineeId);
+        const sched = store.getStudentSchedule(traineeId);
+        const dayNum = trainee?.currentDay || 1;
+        const session = sched?.sessions?.find(s => s.dayNumber === dayNum) || sched?.sessions?.[0];
+        if (session) {
+          openRouteMapModal({
+            session,
+            studentName: trainee ? trainee.name : 'Student',
+            carInfo: trainer.car
+          });
         }
       });
     });
