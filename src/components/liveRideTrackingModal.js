@@ -1,18 +1,14 @@
 /* ==========================================================================
-   LIVE REAL-TIME GPS RIDE TRACKING & 500M CHECKPOINT TELEMETRY
+   MINIMAL & PREMIUM LIVE GPS RIDE TRACKING MODAL
    GAFOOR DRIVING SCHOOL — PULIVENDULA, ANDHRA PRADESH
-
-   Key Features:
-   - Strictly based on real device GPS movement (navigator.geolocation.watchPosition)
-   - Real-time location permission handling with status indicators
-   - Vehicle only moves when the student/trainer actually moves in real life
-   - Continuous distance measurement (Meters & Kilometers) using Haversine formula
-   - Checkpoints tracked at every 500 meters (500m, 1000m, 1500m ... up to 8000m)
-   - Real-time next 500m milestone countdown
-   - Audio chime and milestone celebration on crossing each 500m checkpoint
-   - Locked game camera view (fixed zoom 18) following the car smoothly without zoom jumps
-   - Real-time path drawn dynamically behind the vehicle as it drives
-   - Clean, uncluttered cockpit HUD without artificial speed-ups or unwanted clutter
+   
+   Aesthetic:
+   - Minimalist edge-to-edge map with floating glassmorphism HUD (Tesla / Apple Maps / Uber)
+   - Zero bulky cartoon logos or heavy green capsule clutter
+   - Real-time GPS movement tracking (distance updates only as device/vehicle moves)
+   - Continuous live distance measurement & speed from GPS
+   - 16 Checkpoints every 500m with sleek micro-milestone progress bar
+   - Luxury Dark Obsidian & Gold finish verification dossier
    ========================================================================== */
 
 import L from 'leaflet';
@@ -24,7 +20,7 @@ let elapsedTimer = null;
 
 // Helper: Haversine distance in meters between two lat/lng pairs
 export function haversineMeters(p1, p2) {
-  const R = 6371000; // Earth radius in meters
+  const R = 6371000;
   const dLat = (p2[0] - p1[0]) * Math.PI / 180;
   const dLng = (p2[1] - p1[1]) * Math.PI / 180;
   const a = Math.sin(dLat / 2) ** 2 +
@@ -56,37 +52,34 @@ function playMilestoneChime() {
     const ctx = new AudioCtx();
     const now = ctx.currentTime;
 
-    // Tone 1: C5 (523.25 Hz)
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
     osc1.type = 'sine';
     osc1.frequency.setValueAtTime(523.25, now);
-    gain1.gain.setValueAtTime(0.2, now);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+    gain1.gain.setValueAtTime(0.16, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
     osc1.connect(gain1);
     gain1.connect(ctx.destination);
     osc1.start(now);
-    osc1.stop(now + 0.28);
+    osc1.stop(now + 0.25);
 
-    // Tone 2: G5 (783.99 Hz)
     const osc2 = ctx.createOscillator();
     const gain2 = ctx.createGain();
     osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(783.99, now + 0.12);
-    gain2.gain.setValueAtTime(0.25, now + 0.12);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+    osc2.frequency.setValueAtTime(783.99, now + 0.1);
+    gain2.gain.setValueAtTime(0.2, now + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
     osc2.connect(gain2);
     gain2.connect(ctx.destination);
-    osc2.start(now + 0.12);
-    osc2.stop(now + 0.48);
+    osc2.start(now + 0.1);
+    osc2.stop(now + 0.4);
   } catch (e) {
-    // Non-blocking fallback
+    // Non-blocking
   }
 }
 
-// Build 16 Checkpoints at exact 500m intervals (500m, 1000m ... 8000m)
-function generate500mCheckpoints(basePath, startPoint) {
-  const defaultOrigin = [startPoint?.lat || 14.4230, startPoint?.lng || 78.2285];
+// 16 Checkpoints at exact 500m intervals (500m, 1000m ... 8000m)
+function generate500mCheckpoints(startPoint) {
   const checkpointLabels = [
     { title: 'Cockpit ABC Drill', place: 'Depot Exit Corridor' },
     { title: 'Steering Centering Check', place: 'Bakarapuram Avenue' },
@@ -127,7 +120,7 @@ function generate500mCheckpoints(basePath, startPoint) {
 }
 
 /**
- * Main function to launch the Real-Time GPS Ride Tracking Modal
+ * Main function to launch the Minimal & Premium Live GPS Ride Modal
  */
 export function openLiveRideMapModal({
   session = null,
@@ -144,11 +137,10 @@ export function openLiveRideMapModal({
   const dayNumber = session?.dayNumber || currentStudent.currentDay || 1;
   const objective = session?.objective || 'Practical Road Driving Lesson';
 
-  const checkpoints = generate500mCheckpoints(session?.route?.path, session?.route?.startPoint);
+  const checkpoints = generate500mCheckpoints(session?.route?.startPoint);
 
-  // Real-Time Tracking State (Movement-based)
+  // Real-Time GPS Movement State
   let totalDistanceMeters = 0;
-  let currentSpeedKmh = 0;
   let secondsElapsed = 0;
   let isTrackingPaused = false;
   let isRideCompleted = false;
@@ -169,399 +161,351 @@ export function openLiveRideMapModal({
         height: 100vh;
         max-width: 100vw;
         max-height: 100vh;
-        background: #090c10;
+        background: #080a0f;
         display: flex;
         flex-direction: column;
         overflow: hidden;
         position: relative;
         font-family: var(--font-sans);
       ">
-        <!-- TOP COCKPIT HUD (CLEAN & FOCUSED) -->
-        <header style="
-          background: linear-gradient(180deg, rgba(9, 12, 16, 0.98) 0%, rgba(13, 16, 23, 0.95) 100%);
-          backdrop-filter: blur(16px);
-          border-bottom: 1.5px solid rgba(34, 197, 94, 0.35);
-          padding: 0.75rem 1.25rem;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          z-index: 1000;
-          box-shadow: 0 4px 30px rgba(0,0,0,0.8);
-          flex-wrap: wrap;
-          gap: 0.75rem;
-        ">
-          <!-- Left: Driver Identity & Real GPS Status -->
-          <div style="display: flex; align-items: center; gap: 0.85rem;">
-            <div style="
-              width: 44px;
-              height: 44px;
-              border-radius: 12px;
-              background: #22c55e;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 1.45rem;
-              box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
-            ">🚗</div>
-            <div>
-              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                <span id="gps-status-badge" style="
-                  background: rgba(245, 158, 11, 0.2);
-                  border: 1px solid #f59e0b;
-                  color: #fbbf24;
-                  font-size: 0.72rem;
-                  font-weight: 800;
-                  padding: 0.15rem 0.6rem;
-                  border-radius: 9999px;
-                  letter-spacing: 0.04em;
-                  display: flex;
-                  align-items: center;
-                  gap: 0.35rem;
-                ">
-                  <span style="width:7px; height:7px; border-radius:50%; background:#fbbf24; display:inline-block;"></span>
-                  <span id="gps-status-text">REQUESTING GPS PERMISSION...</span>
-                </span>
-                <span style="font-size: 1.05rem; font-weight: 900; color: #ffffff;">
-                  Day ${dayNumber}: ${objective}
-                </span>
-              </div>
-              <div style="font-size: 0.76rem; color: #a1a1aa; margin-top: 0.2rem;">
-                Student: <strong>${currentStudent.name}</strong> · Instructor: <strong>${currentTrainer.name}</strong> · Car: <strong>${currentTrainer.car}</strong> (Dual-Control)
-              </div>
-            </div>
-          </div>
+        <!-- FULLSCREEN MAP -->
+        <div id="live-ride-leaflet-map" style="position: absolute; inset: 0; width: 100%; height: 100%; background: #080a0f; z-index: 1;"></div>
 
-          <!-- Center: Real-Time Telemetry & 500m Odometer -->
-          <div style="
-            display: flex;
-            align-items: center;
-            gap: 1.25rem;
-            background: rgba(0, 0, 0, 0.75);
-            border: 1.5px solid rgba(34, 197, 94, 0.3);
-            border-radius: 12px;
-            padding: 0.45rem 1.4rem;
-            box-shadow: 0 0 20px rgba(0,0,0,0.6);
-          ">
-            <!-- Speedometer (Real GPS Speed) -->
-            <div>
-              <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Speed</div>
-              <div style="font-size: 1.45rem; font-weight: 900; color: #38bdf8; font-family: var(--font-mono); line-height: 1.1;">
-                <span id="hud-speed">0</span> <span style="font-size: 0.78rem; color: #a1a1aa;">km/h</span>
-              </div>
-            </div>
-
-            <div style="width: 1px; height: 32px; background: rgba(255,255,255,0.12);"></div>
-
-            <!-- Total Distance Traveled (Real-time Count from GPS) -->
-            <div>
-              <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Distance Traveled</div>
-              <div style="font-size: 1.45rem; font-weight: 900; color: #22c55e; font-family: var(--font-mono); line-height: 1.1;">
-                <span id="hud-distance-km">0.00</span> <span style="font-size: 0.85rem; color: #ffffff;">km</span>
-                <span id="hud-distance-meters" style="font-size: 0.75rem; color: #a1a1aa; margin-left: 0.35rem;">(0 m)</span>
-              </div>
-            </div>
-
-            <div style="width: 1px; height: 32px; background: rgba(255,255,255,0.12);"></div>
-
-            <!-- Next 500m Checkpoint Countdown -->
-            <div>
-              <div style="font-size: 0.6rem; color: #f59e0b; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Next 500m Target</div>
-              <div style="font-size: 1.15rem; font-weight: 900; color: #fbbf24; font-family: var(--font-mono); line-height: 1.1;">
-                <span id="hud-next-checkpoint-dist">500m left</span>
-              </div>
-            </div>
-
-            <div style="width: 1px; height: 32px; background: rgba(255,255,255,0.12);"></div>
-
-            <!-- Checkpoints Counter (16 Total) -->
-            <div>
-              <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Checkpoints</div>
-              <div style="font-size: 1.35rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono); line-height: 1.1;">
-                <span id="hud-checkpoints-cleared">0</span> <span style="font-size: 0.8rem; color: #71717a;">/ 16</span>
-              </div>
-            </div>
-
-            <div style="width: 1px; height: 32px; background: rgba(255,255,255,0.12);"></div>
-
-            <!-- Trip Elapsed Time -->
-            <div>
-              <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Duration</div>
-              <div style="font-size: 1.25rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono); line-height: 1.1;">
-                <span id="hud-elapsed-time">00:00</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Right: Close Button -->
-          <div style="display: flex; align-items: center; gap: 0.65rem;">
-            <button type="button" id="btn-close-live-ride" style="
-              background: rgba(255, 255, 255, 0.08);
-              border: 1px solid rgba(255, 255, 255, 0.16);
-              color: #ffffff;
-              width: 38px;
-              height: 38px;
-              border-radius: 8px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              cursor: pointer;
-              font-size: 1.15rem;
-              transition: background 0.15s ease;
-            " title="Close Live Ride">✕</button>
-          </div>
-        </header>
-
-        <!-- 16-SEGMENT CHECKPOINT PROGRESS BAR (500M INTERVALS) -->
+        <!-- TOP MINIMALIST FLOATING GLASS ISLAND (PREMIUM APP HUD) -->
         <div style="
-          background: #0d1117;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          padding: 0.35rem 1rem;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          z-index: 999;
-          overflow-x: auto;
+          position: absolute;
+          top: 16px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: calc(100% - 32px);
+          max-width: 960px;
+          background: rgba(12, 16, 24, 0.88);
+          backdrop-filter: blur(24px) saturate(180%);
+          -webkit-backdrop-filter: blur(24px) saturate(180%);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 18px;
+          padding: 0.9rem 1.4rem;
+          box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+          z-index: 1000;
         ">
-          ${checkpoints.map(cp => `
-            <div id="prog-seg-${cp.id}" style="
-              flex: 1;
-              min-width: 48px;
-              height: 24px;
-              border-radius: 4px;
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+            <!-- Left: Minimal Session Meta -->
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span id="gps-status-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; display: inline-block;"></span>
+                <span id="gps-status-text" style="font-size: 0.68rem; font-weight: 800; color: #a1a1aa; letter-spacing: 0.05em; text-transform: uppercase;">Connecting GPS...</span>
+              </div>
+              <h2 style="font-size: 1.05rem; font-weight: 800; color: #ffffff; margin: 0.2rem 0 0 0; letter-spacing: -0.01em;">
+                Day ${dayNumber} · ${objective}
+              </h2>
+              <div style="font-size: 0.72rem; color: #71717a; margin-top: 0.15rem;">
+                ${currentStudent.name} <span style="color:#52525b;">/</span> Instructor ${currentTrainer.name} · ${currentTrainer.car}
+              </div>
+            </div>
+
+            <!-- Center: Ultra-Clean Live Driving Telemetry -->
+            <div style="display: flex; align-items: center; gap: 1.25rem;">
+              <!-- Speed -->
+              <div style="text-align: center;">
+                <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Speed</div>
+                <div style="font-size: 1.5rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono); line-height: 1.1;">
+                  <span id="hud-speed">0</span> <span style="font-size: 0.7rem; color: #71717a; font-weight: 600;">km/h</span>
+                </div>
+              </div>
+
+              <div style="width: 1px; height: 28px; background: rgba(255,255,255,0.08);"></div>
+
+              <!-- Distance Driven -->
+              <div style="text-align: center;">
+                <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Distance</div>
+                <div style="font-size: 1.5rem; font-weight: 900; color: #22c55e; font-family: var(--font-mono); line-height: 1.1;">
+                  <span id="hud-distance-km">0.00</span> <span style="font-size: 0.75rem; color: #71717a; font-weight: 600;">km</span>
+                </div>
+              </div>
+
+              <div style="width: 1px; height: 28px; background: rgba(255,255,255,0.08);"></div>
+
+              <!-- Next 500m Target -->
+              <div style="text-align: center;">
+                <div style="font-size: 0.6rem; color: #d4af37; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Next 500m</div>
+                <div style="font-size: 1.15rem; font-weight: 800; color: #f59e0b; font-family: var(--font-mono); line-height: 1.1;">
+                  <span id="hud-next-checkpoint-dist">500m</span>
+                </div>
+              </div>
+
+              <div style="width: 1px; height: 28px; background: rgba(255,255,255,0.08);"></div>
+
+              <!-- Checkpoints Cleared -->
+              <div style="text-align: center;">
+                <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Checkpoints</div>
+                <div style="font-size: 1.15rem; font-weight: 800; color: #ffffff; font-family: var(--font-mono); line-height: 1.1;">
+                  <span id="hud-checkpoints-cleared">0</span> <span style="font-size: 0.7rem; color: #71717a;">/ 16</span>
+                </div>
+              </div>
+
+              <div style="width: 1px; height: 28px; background: rgba(255,255,255,0.08);"></div>
+
+              <!-- Duration -->
+              <div style="text-align: center;">
+                <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Duration</div>
+                <div style="font-size: 1.15rem; font-weight: 800; color: #ffffff; font-family: var(--font-mono); line-height: 1.1;">
+                  <span id="hud-elapsed-time">00:00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Minimal Close -->
+            <button type="button" id="btn-close-live-ride" style="
               background: rgba(255, 255, 255, 0.06);
               border: 1px solid rgba(255, 255, 255, 0.1);
+              color: #a1a1aa;
+              width: 36px;
+              height: 36px;
+              border-radius: 10px;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 0.65rem;
-              font-weight: 800;
-              color: #71717a;
-              font-family: var(--font-mono);
-              transition: all 0.25s ease;
-              white-space: nowrap;
-            " title="${cp.label}: ${cp.title} (${cp.distanceMeters}m)">
-              ${cp.label}
-            </div>
-          `).join('')}
-        </div>
-
-        <!-- MAIN LOCKED GAME-VIEW MAP CONTAINER -->
-        <div style="flex: 1; position: relative; overflow: hidden; height: 100%;">
-          <div id="live-ride-leaflet-map" style="width: 100%; height: 100%; min-height: 480px; background: #090c10;"></div>
-
-          <!-- FLOATING 500M CHECKPOINT CELEBRATION BANNER -->
-          <div id="checkpoint-toast-banner" style="
-            position: absolute;
-            top: 24px;
-            left: 50%;
-            transform: translateX(-50%) translateY(-40px);
-            opacity: 0;
-            pointer-events: none;
-            background: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
-            color: #000000;
-            padding: 0.85rem 2rem;
-            border-radius: 9999px;
-            font-size: 1rem;
-            font-weight: 900;
-            box-shadow: 0 10px 40px rgba(34, 197, 94, 0.7);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-            z-index: 1200;
-          ">
-            <span style="font-size:1.4rem;">🎯</span>
-            <span id="checkpoint-toast-text">500m Checkpoint Cleared!</span>
-          </div>
-
-          <!-- BOTTOM GPS TELEMETRY READOUT -->
-          <div style="
-            position: absolute;
-            bottom: 16px;
-            left: 16px;
-            background: rgba(9, 12, 16, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.16);
-            backdrop-filter: blur(10px);
-            border-radius: 8px;
-            padding: 0.45rem 0.85rem;
-            font-size: 0.72rem;
-            color: #a1a1aa;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 0.85rem;
-          ">
-            <div>
-              <span style="color:#71717a;">GPS COORDS:</span>
-              <strong id="gps-coords" style="color:#ffffff; font-family:var(--font-mono); margin-left:0.25rem;">Waiting for fix...</strong>
-            </div>
-            <div style="width:1px; height:14px; background:rgba(255,255,255,0.12);"></div>
-            <div>
-              <span style="color:#71717a;">ACCURACY:</span>
-              <strong id="gps-accuracy" style="color:#22c55e; font-family:var(--font-mono); margin-left:0.25rem;">--</strong>
-            </div>
-            <div style="width:1px; height:14px; background:rgba(255,255,255,0.12);"></div>
-            <div>
-              <span style="color:#71717a;">CAMERA:</span>
-              <strong style="color:#38bdf8; font-family:var(--font-mono); margin-left:0.25rem;">Locked Follow (No Zoom Jump)</strong>
-            </div>
-          </div>
-
-          <!-- FINISH CEREMONY MODAL -->
-          <div id="finish-ride-ceremony" style="
-            position: absolute;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.88);
-            backdrop-filter: blur(12px);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 1500;
-            text-align: center;
-            padding: 1.5rem;
-          ">
-            <div style="
-              width: 90px;
-              height: 90px;
-              border-radius: 50%;
-              background: #22c55e;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 3.2rem;
-              box-shadow: 0 0 60px #22c55e;
-              margin-bottom: 1.25rem;
-            ">🏆</div>
-            <h2 style="font-size: 2.3rem; font-weight: 900; color: #ffffff; margin: 0 0 0.5rem 0;">
-              8.0 km Practical Course Finished!
-            </h2>
-            <p style="font-size: 1.05rem; color: #a1a1aa; max-width: 540px; line-height: 1.5; margin: 0 0 1.5rem 0;">
-              Day ${dayNumber} training successfully completed! All 16 checkpoints (500m intervals) verified under Instructor <strong>${currentTrainer.name}</strong>.
-            </p>
-
-            <div style="
-              display: flex;
-              gap: 2rem;
-              background: rgba(255, 255, 255, 0.05);
-              border: 1px solid rgba(255, 255, 255, 0.12);
-              border-radius: 12px;
-              padding: 1rem 2rem;
-              margin-bottom: 2rem;
-            ">
-              <div>
-                <div style="font-size: 0.7rem; color: #71717a; text-transform: uppercase; font-weight: 800;">Distance</div>
-                <div style="font-size: 1.45rem; font-weight: 900; color: #22c55e; font-family: var(--font-mono);">8.00 km</div>
-              </div>
-              <div style="width: 1px; background: rgba(255,255,255,0.1);"></div>
-              <div>
-                <div style="font-size: 0.7rem; color: #71717a; text-transform: uppercase; font-weight: 800;">Checkpoints</div>
-                <div style="font-size: 1.45rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono);">16 / 16 ✓</div>
-              </div>
-              <div style="width: 1px; background: rgba(255,255,255,0.1);"></div>
-              <div>
-                <div style="font-size: 0.7rem; color: #71717a; text-transform: uppercase; font-weight: 800;">Driver</div>
-                <div style="font-size: 1.1rem; font-weight: 800; color: #ffffff;">${currentStudent.name}</div>
-              </div>
-            </div>
-
-            <button type="button" id="btn-save-completed-ride" style="
-              background: #22c55e;
-              color: #000000;
-              border: none;
-              padding: 0.95rem 2.6rem;
-              border-radius: 12px;
-              font-size: 1.05rem;
-              font-weight: 900;
               cursor: pointer;
-              box-shadow: 0 10px 30px rgba(34, 197, 94, 0.5);
-              transition: transform 0.15s ease;
-            ">
-              ✓ Save &amp; Log Day ${dayNumber} Ride (+8.0 km)
-            </button>
+              font-size: 1.1rem;
+              transition: all 0.15s ease;
+            " title="Close Session">✕</button>
+          </div>
+
+          <!-- Ultra-Sleek 3px Linear Progress Line (Replaces 16 clunky capsules!) -->
+          <div style="margin-top: 0.75rem;">
+            <div style="width: 100%; height: 3px; background: rgba(255, 255, 255, 0.08); border-radius: 9999px; overflow: hidden;">
+              <div id="hud-progress-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #22c55e 0%, #38bdf8 100%); transition: width 0.3s ease;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.35rem; font-size: 0.65rem; color: #71717a; font-family: var(--font-mono);">
+              <span>0.0 km</span>
+              <span id="hud-current-cp-name">Course Target: 8.0 km (16 Checkpoints @ 500m)</span>
+              <span>8.0 km</span>
+            </div>
           </div>
         </div>
 
-        <!-- BOTTOM CONTROLS BAR (CLEAN & MINIMAL) -->
-        <footer style="
-          background: #0d1117;
-          border-top: 1.5px solid rgba(255, 255, 255, 0.1);
-          padding: 0.75rem 1.25rem;
+        <!-- FLOATING 500M CHECKPOINT BANNER -->
+        <div id="checkpoint-toast-banner" style="
+          position: absolute;
+          top: 130px;
+          left: 50%;
+          transform: translateX(-50%) translateY(-20px);
+          opacity: 0;
+          pointer-events: none;
+          background: rgba(15, 20, 30, 0.95);
+          backdrop-filter: blur(16px);
+          border: 1px solid #22c55e;
+          color: #ffffff;
+          padding: 0.65rem 1.6rem;
+          border-radius: 9999px;
+          font-size: 0.85rem;
+          font-weight: 800;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          gap: 0.6rem;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          z-index: 1200;
+        ">
+          <span style="color:#22c55e;">✓</span>
+          <span id="checkpoint-toast-text">500m Checkpoint Cleared!</span>
+        </div>
+
+        <!-- FLOATING BOTTOM CONTROLS (MINIMALIST & CLEAN) -->
+        <div style="
+          position: absolute;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: rgba(12, 16, 24, 0.9);
+          backdrop-filter: blur(24px) saturate(180%);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 16px;
+          padding: 0.55rem 1.25rem;
+          display: flex;
+          align-items: center;
+          gap: 0.85rem;
+          box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
           z-index: 1000;
           flex-wrap: wrap;
-          gap: 1rem;
         ">
-          <!-- Left: Real GPS Tracking Controls -->
-          <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
-            <button type="button" id="btn-pause-resume-tracking" style="
-              background: rgba(255, 255, 255, 0.08);
-              border: 1px solid rgba(255, 255, 255, 0.18);
-              color: #ffffff;
-              padding: 0.6rem 1.25rem;
-              border-radius: 8px;
-              font-size: 0.85rem;
-              font-weight: 800;
-              cursor: pointer;
-              display: flex;
+          <button type="button" id="btn-pause-resume-tracking" style="
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            padding: 0.55rem 1rem;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+          ">
+            <span id="pause-resume-icon">⏸</span>
+            <span id="pause-resume-text">Pause</span>
+          </button>
+
+          <button type="button" id="btn-reacquire-gps" style="
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #a1a1aa;
+            padding: 0.55rem 0.9rem;
+            border-radius: 10px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+          " title="Refresh GPS Connection">
+            🔄 Re-sync GPS
+          </button>
+
+          <!-- Subtle testing aid if stationary on desktop -->
+          <button type="button" id="btn-test-step-motion" style="
+            background: transparent;
+            border: 1px dashed rgba(255, 255, 255, 0.15);
+            color: #71717a;
+            padding: 0.55rem 0.75rem;
+            border-radius: 10px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+          " title="Simulate 25m real motion for desktop testing without moving">
+            +25m Test Motion
+          </button>
+
+          <div style="width: 1px; height: 24px; background: rgba(255,255,255,0.1);"></div>
+
+          <!-- Complete Ride (Theme Matched) -->
+          <button type="button" id="btn-complete-direct" style="
+            background: linear-gradient(135deg, #d4af37 0%, #b89628 100%);
+            border: none;
+            color: #000000;
+            padding: 0.6rem 1.4rem;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 4px 18px rgba(212, 175, 55, 0.35);
+          ">
+            Complete &amp; Log (+8.0 km) ✓
+          </button>
+        </div>
+
+        <!-- LUXURY OBSIDIAN & GOLD FINISH VERIFICATION MODAL -->
+        <div id="finish-ride-ceremony" style="
+          position: absolute;
+          inset: 0;
+          background: rgba(5, 7, 12, 0.92);
+          backdrop-filter: blur(20px);
+          display: none;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          z-index: 2000;
+          text-align: center;
+          padding: 1.5rem;
+        ">
+          <div style="
+            background: #0e121a;
+            border: 1.5px solid rgba(212, 175, 55, 0.35);
+            border-radius: 20px;
+            padding: 2.25rem 2.5rem;
+            max-width: 520px;
+            width: 100%;
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.85);
+            position: relative;
+          ">
+            <!-- Brand Badge -->
+            <div style="
+              display: inline-flex;
               align-items: center;
               gap: 0.4rem;
-            ">
-              <span id="pause-resume-icon">⏸</span>
-              <span id="pause-resume-text">Pause Tracking</span>
-            </button>
-
-            <button type="button" id="btn-reacquire-gps" style="
-              background: rgba(34, 197, 94, 0.12);
-              border: 1px solid rgba(34, 197, 94, 0.35);
-              color: #22c55e;
-              padding: 0.6rem 1.15rem;
-              border-radius: 8px;
-              font-size: 0.825rem;
+              background: rgba(212, 175, 55, 0.12);
+              border: 1px solid rgba(212, 175, 55, 0.3);
+              color: #d4af37;
+              font-size: 0.68rem;
               font-weight: 800;
-              cursor: pointer;
-              display: flex;
-              align-items: center;
-              gap: 0.4rem;
+              padding: 0.25rem 0.75rem;
+              border-radius: 9999px;
+              letter-spacing: 0.06em;
+              margin-bottom: 1rem;
             ">
-              <span>🔄</span>
-              <span>Re-acquire GPS Fix</span>
-            </button>
+              <span>✦</span> GAFOOR DRIVING SCHOOL · RTO ACCREDITED
+            </div>
 
-            <!-- Subtle Manual Motion Step (Only for testing indoors on stationary PC) -->
-            <button type="button" id="btn-test-step-motion" style="
-              background: transparent;
-              border: 1px dashed rgba(255, 255, 255, 0.2);
-              color: #71717a;
-              padding: 0.5rem 0.85rem;
-              border-radius: 6px;
-              font-size: 0.72rem;
-              font-weight: 700;
-              cursor: pointer;
-            " title="Simulate 25m movement (for testing without moving device)">
-              Test +25m Motion
-            </button>
-          </div>
+            <h2 style="font-size: 1.65rem; font-weight: 900; color: #ffffff; margin: 0 0 0.4rem 0; letter-spacing: -0.02em;">
+              Day ${dayNumber} Practical Ride Completed
+            </h2>
+            <p style="font-size: 0.88rem; color: #94a3b8; margin: 0 0 1.75rem 0; line-height: 1.5;">
+              Practical road driving lesson verified. All 16 checkpoints (500m intervals) completed under dual-brake instructor supervision.
+            </p>
 
-          <!-- Right: Save & Complete Day X Ride Button -->
-          <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <button type="button" id="btn-complete-direct" style="
-              background: #22c55e;
-              border: none;
+            <!-- 3 Stat Blocks (Dark Obsidian Luxury Theme) -->
+            <div style="
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 0.75rem;
+              background: rgba(255, 255, 255, 0.03);
+              border: 1px solid rgba(255, 255, 255, 0.08);
+              border-radius: 14px;
+              padding: 1.15rem 0.85rem;
+              margin-bottom: 1.5rem;
+            ">
+              <div>
+                <div style="font-size: 0.62rem; color: #71717a; text-transform: uppercase; font-weight: 800;">Distance</div>
+                <div style="font-size: 1.35rem; font-weight: 900; color: #22c55e; font-family: var(--font-mono); margin-top: 0.2rem;">8.00 km</div>
+              </div>
+              <div style="border-left: 1px solid rgba(255,255,255,0.08); border-right: 1px solid rgba(255,255,255,0.08);">
+                <div style="font-size: 0.62rem; color: #71717a; text-transform: uppercase; font-weight: 800;">Checkpoints</div>
+                <div style="font-size: 1.35rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono); margin-top: 0.2rem;">16 / 16 ✓</div>
+              </div>
+              <div>
+                <div style="font-size: 0.62rem; color: #71717a; text-transform: uppercase; font-weight: 800;">Duration</div>
+                <div style="font-size: 1.35rem; font-weight: 900; color: #d4af37; font-family: var(--font-mono); margin-top: 0.2rem;" id="finish-modal-duration">--:--</div>
+              </div>
+            </div>
+
+            <!-- Candidate & Instructor Signature Strip -->
+            <div style="
+              background: rgba(255, 255, 255, 0.02);
+              border: 1px solid rgba(255, 255, 255, 0.06);
+              border-radius: 10px;
+              padding: 0.75rem 1rem;
+              margin-bottom: 1.75rem;
+              font-size: 0.78rem;
+              color: #a1a1aa;
+              display: flex;
+              justify-content: space-between;
+              text-align: left;
+            ">
+              <div>
+                <div style="font-size: 0.65rem; color: #71717a; text-transform: uppercase; font-weight: 700;">Student Driver</div>
+                <div style="color: #ffffff; font-weight: 800; margin-top: 0.15rem;">${currentStudent.name}</div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 0.65rem; color: #71717a; text-transform: uppercase; font-weight: 700;">Instructor Sign-off</div>
+                <div style="color: #22c55e; font-weight: 800; margin-top: 0.15rem;">${currentTrainer.name} ✓</div>
+              </div>
+            </div>
+
+            <!-- Action Button -->
+            <button type="button" id="btn-save-completed-ride" style="
+              width: 100%;
+              background: linear-gradient(135deg, #d4af37 0%, #b89628 100%);
               color: #000000;
-              padding: 0.65rem 1.6rem;
-              border-radius: 8px;
-              font-size: 0.88rem;
+              border: none;
+              padding: 0.95rem 1.5rem;
+              border-radius: 12px;
+              font-size: 1rem;
               font-weight: 900;
               cursor: pointer;
-              box-shadow: 0 4px 18px rgba(34, 197, 94, 0.45);
+              box-shadow: 0 10px 30px rgba(212, 175, 55, 0.35);
+              transition: transform 0.15s ease;
             ">
-              Log Day ${dayNumber} Ride (+8.0 km) ✓
+              ✓ Save to Student Training Record (+8.0 km)
             </button>
           </div>
-        </footer>
+        </div>
       </div>
     </div>
   `;
@@ -596,7 +540,7 @@ export function openLiveRideMapModal({
         activeLiveMap = null;
       }
 
-      // STRICT LOCKED CAMERA: No manual zoom, locked at zoom 18
+      // Edge-to-edge locked driving camera (zoom level 18, zero manual zoom jumps)
       const map = L.map(mapContainer, {
         zoomControl: false,
         scrollWheelZoom: false,
@@ -608,78 +552,63 @@ export function openLiveRideMapModal({
       });
       activeLiveMap = map;
 
-      // Reliable OpenStreetMap tiles
+      // High-contrast clean OpenStreetMap tiles
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         subdomains: ['a', 'b', 'c']
       }).addTo(map);
 
-      // Default center fallback (Pulivendula Academy or current student location)
       const defaultCenter = [session?.route?.startPoint?.lat || 14.4230, session?.route?.startPoint?.lng || 78.2285];
       map.setView(defaultCenter, 18);
 
-      // Live Traveled Path Polyline (Draws behind car as it moves)
+      // Traveled Polyline (Draws behind car as it moves)
       traveledCoords = [];
       livePolyline = L.polyline([], {
         color: '#22c55e',
-        weight: 8,
-        opacity: 0.98,
+        weight: 7,
+        opacity: 0.95,
         lineCap: 'round',
         lineJoin: 'round'
       }).addTo(map);
 
-      // Dual Rider Car Marker
+      // Sleek Navigation Puck (Apple Maps / Tesla Navigation Arrow Style)
       const carIcon = L.divIcon({
-        className: 'gamified-dual-car-marker',
+        className: 'sleek-nav-puck-marker',
         html: `
-          <div id="moving-car-wrapper" style="
+          <div id="moving-puck-wrapper" style="
             position: relative;
             transform: translate(-50%, -50%);
             display: flex;
-            flex-direction: column;
             align-items: center;
+            justify-content: center;
           ">
-            <!-- Rider Tag -->
+            <!-- Pulsing outer accuracy wave -->
             <div style="
-              background: #090c10;
-              border: 1.5px solid #22c55e;
-              border-radius: 6px;
-              padding: 2px 7px;
-              white-space: nowrap;
-              display: flex;
-              align-items: center;
-              gap: 5px;
-              font-size: 9px;
-              font-weight: 800;
-              color: #ffffff;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-              margin-bottom: 3px;
-            ">
-              <span style="color: #38bdf8;">👨‍🎓 ${currentStudent.name.split(' ')[0]}</span>
-              <span style="color: #64748b;">·</span>
-              <span style="color: #4ade80;">👨‍🏫 ${currentTrainer.name.split(' ')[0]}</span>
-            </div>
+              position: absolute;
+              width: 52px;
+              height: 52px;
+              border-radius: 50%;
+              background: rgba(34, 197, 94, 0.2);
+              border: 1.5px solid rgba(34, 197, 94, 0.4);
+            "></div>
 
-            <!-- Vehicle Icon -->
+            <!-- Directional Navigation Puck -->
             <div id="car-rotation-node" style="
-              width: 40px;
-              height: 40px;
-              background: #facc15;
-              border: 2.5px solid #090c10;
-              border-radius: 10px;
+              width: 32px;
+              height: 32px;
+              background: #0c1017;
+              border: 2.5px solid #22c55e;
+              border-radius: 50%;
               display: flex;
               align-items: center;
               justify-content: center;
-              box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+              box-shadow: 0 4px 16px rgba(0,0,0,0.7);
               transition: transform 0.15s linear;
+              z-index: 2;
             ">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-                <rect x="5" y="3" width="14" height="18" rx="4" fill="#090c10" stroke="#ffffff" stroke-width="1"/>
-                <rect x="7" y="6" width="10" height="4" rx="1" fill="#38bdf8"/>
-                <rect x="7" y="15" width="10" height="3" rx="1" fill="#94a3b8"/>
-                <circle cx="7" cy="4" r="1.5" fill="#fef08a"/>
-                <circle cx="17" cy="4" r="1.5" fill="#fef08a"/>
-                <text x="9" y="14" font-size="9" font-weight="900" fill="#ef4444" font-family="sans-serif">L</text>
+              <!-- Forward Navigation Arrowhead -->
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <polygon points="12,3 21,21 12,17 3,21" fill="#22c55e" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>
               </svg>
             </div>
           </div>
@@ -689,11 +618,10 @@ export function openLiveRideMapModal({
 
       carMarker = L.marker(defaultCenter, { icon: carIcon }).addTo(map);
 
-      // Invalidate sizes to ensure immediate rendering
       map.invalidateSize();
       setTimeout(() => map.invalidateSize(), 200);
 
-      // Live Driving Duration Timer
+      // Trip Timer
       elapsedTimer = setInterval(() => {
         if (isRideCompleted || isTrackingPaused) return;
         secondsElapsed++;
@@ -712,12 +640,9 @@ export function openLiveRideMapModal({
         totalDistanceMeters = Math.min(8000, totalDistanceMeters + deltaMeters);
         const distKm = (totalDistanceMeters / 1000).toFixed(2);
 
-        // 1. Update Odometer & Speed HUD in real time
+        // 1. Update Odometer & Speed HUD
         const distKmElem = document.getElementById('hud-distance-km');
         if (distKmElem) distKmElem.textContent = distKm;
-
-        const distMElem = document.getElementById('hud-distance-meters');
-        if (distMElem) distMElem.textContent = `(${Math.round(totalDistanceMeters)} m)`;
 
         const speedElem = document.getElementById('hud-speed');
         if (speedElem) speedElem.textContent = Math.round(speedKmh);
@@ -726,17 +651,18 @@ export function openLiveRideMapModal({
         traveledCoords.push([latitude, longitude]);
         if (livePolyline) livePolyline.setLatLngs(traveledCoords);
 
-        // 3. Move vehicle marker to real position
+        // 3. Move vehicle marker
         if (carMarker) carMarker.setLatLng([latitude, longitude]);
 
-        // 4. LOCKED CAMERA: Keep car centered at zoom 18 (NO zoom-in / zoom-out jumps)
+        // 4. LOCKED CAMERA: Keep car centered at zoom 18 (NO zoom jumps)
         if (map) {
           map.setView([latitude, longitude], 18, { animate: false });
         }
 
-        // 5. Update GPS Coordinates readout
-        const coordsElem = document.getElementById('gps-coords');
-        if (coordsElem) coordsElem.textContent = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        // 5. Update 3px Progress Line
+        const progressPct = Math.min(100, Math.round((totalDistanceMeters / 8000) * 100));
+        const fillElem = document.getElementById('hud-progress-fill');
+        if (fillElem) fillElem.style.width = `${progressPct}%`;
 
         // 6. Checkpoint Progress (Every 500m)
         let clearedCount = 0;
@@ -756,45 +682,35 @@ export function openLiveRideMapModal({
         // 7. Next 500m Target Countdown
         const nextCp = checkpoints.find(c => !c.cleared);
         const nextDistElem = document.getElementById('hud-next-checkpoint-dist');
+        const cpNameElem = document.getElementById('hud-current-cp-name');
         if (nextDistElem) {
           if (nextCp) {
             const remMeters = Math.max(0, Math.round(nextCp.distanceMeters - totalDistanceMeters));
-            nextDistElem.textContent = `${remMeters}m to ${nextCp.label}`;
+            nextDistElem.textContent = `${remMeters}m`;
+            if (cpNameElem) cpNameElem.textContent = `Next: ${nextCp.label} (${nextCp.title}) · ${remMeters}m remaining`;
           } else {
-            nextDistElem.textContent = 'Goal Reached! 🏁';
+            nextDistElem.textContent = '8.0 km ✓';
+            if (cpNameElem) cpNameElem.textContent = 'All 16 checkpoints completed!';
           }
         }
 
-        // 8. 8.0 km Full Lesson Completed
+        // 8. Complete 8.0 km Course
         if (totalDistanceMeters >= 8000) {
           finishRide();
         }
       }
 
       function triggerCheckpointReached(cp) {
-        // Milestone Chime
         playMilestoneChime();
 
-        // Highlight ribbon segment
-        const seg = document.getElementById(`prog-seg-${cp.id}`);
-        if (seg) {
-          seg.style.background = '#22c55e';
-          seg.style.borderColor = '#22c55e';
-          seg.style.color = '#000000';
-          seg.innerHTML = `✓ ${cp.label}`;
-        }
-
-        // Add a permanent milestone beacon marker at this GPS spot on the map
+        // Drop a subtle landmark dot on the map
         if (carMarker && map) {
           const pos = carMarker.getLatLng();
           const markerIcon = L.divIcon({
-            className: 'checkpoint-passed-marker',
+            className: 'checkpoint-passed-dot',
             html: `
-              <div style="transform:translate(-50%, -100%); display:flex; flex-direction:column; align-items:center;">
-                <div style="background:#22c55e; color:#000000; font-weight:900; font-size:11px; padding:3px 8px; border-radius:6px; white-space:nowrap; border:2px solid #ffffff; box-shadow:0 4px 14px rgba(0,0,0,0.5);">
-                  ✓ ${cp.label} (${cp.title})
-                </div>
-                <div style="width:2px; height:8px; background:#22c55e;"></div>
+              <div style="transform:translate(-50%, -50%); width: 22px; height: 22px; border-radius: 50%; background: #0c1017; border: 2px solid #22c55e; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #22c55e; font-weight: 900; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">
+                ✓
               </div>
             `,
             iconSize: [0, 0]
@@ -806,13 +722,13 @@ export function openLiveRideMapModal({
         const banner = document.getElementById('checkpoint-toast-banner');
         const text = document.getElementById('checkpoint-toast-text');
         if (banner && text) {
-          text.textContent = `🎯 CHECKPOINT ${cp.id}/16 CLEARED (${cp.label}) · ${cp.title} (+500m)`;
+          text.textContent = `Checkpoint ${cp.id}/16 (${cp.label}) Cleared · ${cp.title} (+500m)`;
           banner.style.opacity = '1';
           banner.style.transform = 'translateX(-50%) translateY(0)';
           setTimeout(() => {
             banner.style.opacity = '0';
-            banner.style.transform = 'translateX(-50%) translateY(-40px)';
-          }, 2600);
+            banner.style.transform = 'translateX(-50%) translateY(-20px)';
+          }, 2400);
         }
       }
 
@@ -825,30 +741,26 @@ export function openLiveRideMapModal({
           activeWatchId = null;
         }
 
-        checkpoints.forEach(cp => {
-          if (!cp.cleared) {
-            cp.cleared = true;
-            triggerCheckpointReached(cp);
-          }
-        });
+        const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+        const secs = String(secondsElapsed % 60).padStart(2, '0');
+        const durElem = document.getElementById('finish-modal-duration');
+        if (durElem) durElem.textContent = `${mins}:${secs}`;
 
         const ceremony = document.getElementById('finish-ride-ceremony');
         if (ceremony) ceremony.style.display = 'flex';
       }
 
       // =========================================================
-      // REAL DEVICE GPS PERMISSIONS & TRACKING
+      // REAL DEVICE GPS PERMISSION & LOCATION WATCH
       // =========================================================
       function startDeviceGpsTracking() {
-        const statusBadge = document.getElementById('gps-status-badge');
+        const statusDot = document.getElementById('gps-status-dot');
         const statusText = document.getElementById('gps-status-text');
 
         if (!navigator.geolocation) {
-          if (statusBadge && statusText) {
-            statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
-            statusBadge.style.borderColor = '#ef4444';
-            statusBadge.style.color = '#ef4444';
-            statusText.textContent = 'GPS NOT SUPPORTED ON THIS DEVICE';
+          if (statusDot && statusText) {
+            statusDot.style.background = '#ef4444';
+            statusText.textContent = 'GPS Not Supported';
           }
           return;
         }
@@ -858,30 +770,21 @@ export function openLiveRideMapModal({
           activeWatchId = null;
         }
 
-        if (statusBadge && statusText) {
-          statusBadge.style.background = 'rgba(245, 158, 11, 0.2)';
-          statusBadge.style.borderColor = '#f59e0b';
-          statusBadge.style.color = '#fbbf24';
-          statusText.textContent = 'CONNECTING TO SATELLITE GPS...';
+        if (statusDot && statusText) {
+          statusDot.style.background = '#f59e0b';
+          statusText.textContent = 'Connecting GPS...';
         }
 
         activeWatchId = navigator.geolocation.watchPosition(
           (position) => {
-            const { latitude, longitude, accuracy, speed, heading } = position.coords;
+            const { latitude, longitude, accuracy, speed } = position.coords;
             const now = Date.now();
 
-            // Update GPS Accuracy indicator
-            const accElem = document.getElementById('gps-accuracy');
-            if (accElem) accElem.textContent = `±${Math.round(accuracy)}m`;
-
-            if (statusBadge && statusText) {
-              statusBadge.style.background = 'rgba(34, 197, 94, 0.2)';
-              statusBadge.style.borderColor = '#22c55e';
-              statusBadge.style.color = '#22c55e';
-              statusText.textContent = `LIVE GPS ACTIVE (±${Math.round(accuracy)}m)`;
+            if (statusDot && statusText) {
+              statusDot.style.background = '#22c55e';
+              statusText.textContent = `GPS Active (±${Math.round(accuracy)}m)`;
             }
 
-            // Set initial position on first fix
             if (!initialMapSet) {
               initialMapSet = true;
               if (map) map.setView([latitude, longitude], 18, { animate: false });
@@ -897,7 +800,7 @@ export function openLiveRideMapModal({
 
             if (lastGpsPoint) {
               const d = haversineMeters([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
-              // Ignore stationary jitter (< 2.5m)
+              // Filter stationary noise (< 2.5m)
               if (d >= 2.5) {
                 deltaMeters = d;
                 const dSec = (now - lastGpsTimestamp) / 1000;
@@ -905,7 +808,6 @@ export function openLiveRideMapModal({
                   currentSpeed = (d / dSec) * 3.6;
                 }
 
-                // Update Heading rotation
                 const bearing = calculateBearing([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
                 const rotNode = document.getElementById('car-rotation-node');
                 if (rotNode) rotNode.style.transform = `rotate(${bearing}deg)`;
@@ -913,7 +815,7 @@ export function openLiveRideMapModal({
                 lastGpsPoint = { lat: latitude, lng: longitude };
                 lastGpsTimestamp = now;
               } else {
-                currentSpeed = 0; // Stationary
+                currentSpeed = 0;
               }
             } else {
               lastGpsPoint = { lat: latitude, lng: longitude };
@@ -924,15 +826,9 @@ export function openLiveRideMapModal({
           },
           (err) => {
             console.warn('GPS Fix Warning:', err);
-            if (statusBadge && statusText) {
-              statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
-              statusBadge.style.borderColor = '#ef4444';
-              statusBadge.style.color = '#ef4444';
-              if (err.code === 1) {
-                statusText.textContent = 'GPS PERMISSION DENIED · ENABLE IN BROWSER';
-              } else {
-                statusText.textContent = 'SEARCHING FOR SATELLITE LOCK...';
-              }
+            if (statusDot && statusText) {
+              statusDot.style.background = '#ef4444';
+              statusText.textContent = err.code === 1 ? 'Location Access Denied' : 'Searching GPS...';
             }
           },
           {
@@ -943,7 +839,7 @@ export function openLiveRideMapModal({
         );
       }
 
-      // Pause / Resume Tracking
+      // Pause / Resume
       const btnPauseResume = modalRoot.querySelector('#btn-pause-resume-tracking');
       const iconSpan = modalRoot.querySelector('#pause-resume-icon');
       const textSpan = modalRoot.querySelector('#pause-resume-text');
@@ -952,26 +848,25 @@ export function openLiveRideMapModal({
         isTrackingPaused = !isTrackingPaused;
         if (isTrackingPaused) {
           iconSpan.textContent = '▶';
-          textSpan.textContent = 'Resume Tracking';
+          textSpan.textContent = 'Resume';
           const speedElem = document.getElementById('hud-speed');
           if (speedElem) speedElem.textContent = '0';
         } else {
           iconSpan.textContent = '⏸';
-          textSpan.textContent = 'Pause Tracking';
+          textSpan.textContent = 'Pause';
         }
       });
 
-      // Re-acquire GPS Fix
+      // Re-sync GPS
       modalRoot.querySelector('#btn-reacquire-gps')?.addEventListener('click', () => {
         startDeviceGpsTracking();
       });
 
-      // Discrete +25m Motion Step (Only for testing indoors when stationary)
+      // Discreet test step (for stationary desktop verification)
       modalRoot.querySelector('#btn-test-step-motion')?.addEventListener('click', () => {
         if (!lastGpsPoint) {
           lastGpsPoint = { lat: defaultCenter[0], lng: defaultCenter[1] };
         }
-        // Advance slightly north-east (~25 meters)
         const newLat = lastGpsPoint.lat + 0.00018;
         const newLng = lastGpsPoint.lng + 0.00015;
         const bearing = calculateBearing([lastGpsPoint.lat, lastGpsPoint.lng], [newLat, newLng]);
@@ -979,13 +874,13 @@ export function openLiveRideMapModal({
         if (rotNode) rotNode.style.transform = `rotate(${bearing}deg)`;
 
         lastGpsPoint = { lat: newLat, lng: newLng };
-        recordMovement(newLat, newLng, 28, 25);
+        recordMovement(newLat, newLng, 26, 25);
       });
 
       // Save & Complete Ride Handler
       const handleSaveRide = () => {
         store.completeSession(currentStudent.id, dayNumber, {
-          instructorNotes: `Day ${dayNumber} live 8.0 km ride recorded under Instructor ${currentTrainer.name}. Checkpoints verified.`
+          instructorNotes: `Day ${dayNumber} practical 8.0 km course completed under Instructor ${currentTrainer.name}. Checkpoints verified.`
         });
         if (onRideCompleted) onRideCompleted();
         closeModal();
@@ -994,11 +889,11 @@ export function openLiveRideMapModal({
       modalRoot.querySelector('#btn-complete-direct')?.addEventListener('click', handleSaveRide);
       modalRoot.querySelector('#btn-save-completed-ride')?.addEventListener('click', handleSaveRide);
 
-      // Start Real Device GPS Tracking on launch
+      // Start Device GPS Tracking on open
       startDeviceGpsTracking();
 
     } catch (err) {
-      console.error('Failed to initialize Real GPS Ride Tracker:', err);
+      console.error('Failed to initialize Minimal GPS Ride Tracker:', err);
     }
   }, 100);
 }
