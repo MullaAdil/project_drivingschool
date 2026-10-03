@@ -10,6 +10,7 @@
    ========================================================================== */
 
 import { store } from './store.js';
+import 'leaflet/dist/leaflet.css';
 import { renderHomeWebsiteView } from './views/homeWebsiteView.js';
 import { renderLoginView } from './views/loginView.js';
 import { renderAdminView } from './views/adminView.js';
@@ -25,7 +26,7 @@ const appRoot = document.getElementById('app');
 // State Route Definition
 let currentRoute = {
   service: 'home', // 'home' | 'admin' | 'trainee-profile' | 'trainer-profile' | 'trainer' | 'trainee' | 'login'
-  subService: 'hub', // for admin: 'hub' | 'trainees' | 'new-student' | 'billing' | 'trainers' | 'fleet' | 'rto-scheduler'
+  subService: 'hub', // for admin: 'hub' | 'trainees' | 'new-student' | 'billing' | 'trainers' | 'calendar' | 'rto-scheduler'
   traineeId: 'APX-9021',
   trainerId: 'TRN-1'
 };
@@ -197,15 +198,17 @@ function renderSidebar(role, currentSub) {
               <span>Driving Instructors</span>
             </button>
 
-            <button type="button" class="console-sidebar-item ${currentSub === 'fleet' ? 'active' : ''}" data-console-nav="fleet" title="Training Cars (Dual-Ctrl)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-              <span>Training Cars (Dual-Ctrl)</span>
+            <button type="button" class="console-sidebar-item ${currentSub === 'calendar' || currentSub === 'calendar-manager' ? 'active' : ''}" data-console-nav="calendar" title="Academy Calendar & Course">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              <span>Academy Calendar</span>
             </button>
 
             <button type="button" class="console-sidebar-item ${currentSub === 'rto-scheduler' ? 'active' : ''}" data-console-nav="rto-scheduler" title="Driving Tests (RTO)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
               <span>Driving Tests (RTO)</span>
             </button>
+
+
           </nav>
         </div>
 
@@ -361,7 +364,7 @@ function getSubTitle(service, subService) {
       'new-student': 'Register New Student',
       'billing': 'Course Fee Payments & Receipts',
       'trainers': 'Driving Instructors Roster',
-      'fleet': 'Training Cars (Dual-Control)',
+      'calendar': 'Academy Calendar & Course Management',
       'rto-scheduler': 'Government Driving License (DL) Tests'
     },
     'trainer': {
@@ -518,7 +521,7 @@ function render() {
             <button type="button" class="admin-nav-btn item-highlight ${activeSub === 'new-student' ? 'active' : ''}" data-console-nav="new-student">+ Register</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'billing' ? 'active' : ''}" data-console-nav="billing">Payments</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'trainers' ? 'active' : ''}" data-console-nav="trainers">Instructors</button>
-            <button type="button" class="admin-nav-btn ${activeSub === 'fleet' ? 'active' : ''}" data-console-nav="fleet">Fleet</button>
+            <button type="button" class="admin-nav-btn ${activeSub === 'calendar' || activeSub === 'calendar-manager' ? 'active' : ''}" data-console-nav="calendar">Calendar</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'rto-scheduler' ? 'active' : ''}" data-console-nav="rto-scheduler">RTO Tests</button>
           </nav>
 
@@ -575,7 +578,7 @@ function render() {
             <button type="button" class="admin-nav-btn item-highlight" data-console-nav-admin="new-student">+ Register</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="billing">Payments</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="trainers">Instructors</button>
-            <button type="button" class="admin-nav-btn" data-console-nav-admin="fleet">Fleet</button>
+            <button type="button" class="admin-nav-btn" data-console-nav-admin="calendar">Calendar</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="rto-scheduler">RTO Tests</button>
           </nav>
 
@@ -625,7 +628,7 @@ function render() {
             <button type="button" class="admin-nav-btn item-highlight" data-console-nav-admin="new-student">+ Register</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="billing">Payments</button>
             <button type="button" class="admin-nav-btn active" data-console-nav-admin="trainers">Instructors</button>
-            <button type="button" class="admin-nav-btn" data-console-nav-admin="fleet">Fleet</button>
+            <button type="button" class="admin-nav-btn" data-console-nav-admin="calendar">Calendar</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="rto-scheduler">RTO Tests</button>
           </nav>
 

@@ -8,40 +8,45 @@ import { renderBrandLogo } from '../components/brandLogo.js';
 import { getSupabaseCredentials, saveSupabaseCredentials, testSupabaseConnection } from '../supabase.js';
 import { renderStudentBoxAvatar, renderStudentAvatar } from '../components/studentAvatar.js';
 import { openPhotoCropModal } from '../components/photoCropModal.js';
+import { renderProgressiveCalendar } from '../components/progressiveCalendar.js';
+import { openAdminHolidayModal } from '../components/adminHolidayModal.js';
+import { formatDateDisplay } from '../utils/academyCalendar.js';
+import { openRouteMapModal } from '../components/drivingRouteMap.js';
 
 export function renderAdminView(container, showToast, subService = 'hub', onNavigate) {
   let searchQuery = '';
   let activePackageFilter = 'all';
   let activePayFilter = 'all';
   let activeStageFilter = 'all';
+  let activeInstructorFilter = 'all';
+  let studentCategoryTab = 'active'; // 'active' | 'inactive'
+  let studentViewMode = 'table'; // 'table' | 'cards'
   let lastPulsedTraineeId = null;
 
   function render() {
     const trainees = store.trainees;
     const trainers  = store.trainers;
     const payments  = store.payments;
+    const activeTraineesAll = trainees.filter(t => t.isActive !== false && t.currentDay < 20 && t.status !== 'Completed');
+    const inactiveTraineesAll = trainees.filter(t => t.isActive === false || t.currentDay >= 20 || t.status === 'Completed');
 
     const totalInvoiced    = payments.reduce((a, p) => a + p.amount, 0);
     const totalCollected   = payments.reduce((a, p) => a + p.paid, 0);
     const totalOutstanding = payments.reduce((a, p) => a + p.balance, 0);
     const collectionRate   = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 100;
 
-    const intakeCount = trainees.filter(t => t.currentDay <= 2).length;
-    const groundCount = trainees.filter(t => t.currentDay >= 3 && t.currentDay <= 7).length;
-    const cityCount   = trainees.filter(t => t.currentDay >= 8 && t.currentDay <= 15).length;
-    const trackCount  = trainees.filter(t => t.currentDay >= 16 && t.currentDay <= 19).length;
-    const examCount   = trainees.filter(t => t.currentDay >= 20).length;
+    const stage1Count = trainees.filter(t => t.currentDay <= 10).length;
+    const stage2Count = trainees.filter(t => t.currentDay >= 11 && t.currentDay <= 15).length;
+    const stage3Count = trainees.filter(t => t.currentDay >= 16).length;
 
     const topbar = '';
 
     const stageNav = `
       <div class="portal-stage-nav" style="padding:1.25rem 2rem; border-bottom:1px solid var(--border-light); background:rgba(255,255,255,0.01); gap:0.5rem;">
         <button type="button" class="p-stage-btn ${activeStageFilter==='all'    ? 'p-stage-active':''}" data-stage-target="all">All Students (${trainees.length})</button>
-        <button type="button" class="p-stage-btn ${activeStageFilter==='intake' ? 'p-stage-active':''}" data-stage-target="intake">Stage 1 · LLR Issued (${intakeCount})</button>
-        <button type="button" class="p-stage-btn ${activeStageFilter==='ground' ? 'p-stage-active':''}" data-stage-target="ground">Stage 2 · Ground Practice (${groundCount})</button>
-        <button type="button" class="p-stage-btn ${activeStageFilter==='city'   ? 'p-stage-active':''}" data-stage-target="city">Stage 3 · Town Driving (${cityCount})</button>
-        <button type="button" class="p-stage-btn ${activeStageFilter==='track'  ? 'p-stage-active':''}" data-stage-target="track">Stage 4 · RTO 8-Track (${trackCount})</button>
-        <button type="button" class="p-stage-btn ${activeStageFilter==='exam'   ? 'p-stage-active':''}" data-stage-target="exam">Stage 5 · Test Ready (${examCount})</button>
+        <button type="button" class="p-stage-btn ${activeStageFilter==='stage1' ? 'p-stage-active':''}" data-stage-target="stage1">Stage 1 · Basic Driving (${stage1Count})</button>
+        <button type="button" class="p-stage-btn ${activeStageFilter==='stage2' ? 'p-stage-active':''}" data-stage-target="stage2">Stage 2 · Intermediate (${stage2Count})</button>
+        <button type="button" class="p-stage-btn ${activeStageFilter==='stage3' ? 'p-stage-active':''}" data-stage-target="stage3">Stage 3 · Final Assessment (${stage3Count})</button>
       </div>
     `;
 
@@ -141,11 +146,11 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
             </div>
             <div class="p-nav-item">
               <div style="flex:1;">
-                <div class="p-nav-number">Service 05 · Training Cars</div>
-                <div class="p-nav-title">Dual-Control Training Cars &amp; Safety Checks</div>
-                <div class="p-nav-sub">Vehicle safety — 4 dual-brake Maruti Swift, Hyundai, and Tata training cars with instructor dual pedals and Government fitness certificates.</div>
+                <div class="p-nav-number">Service 05 · Academy Calendar</div>
+                <div class="p-nav-title">20-Day Course &amp; Academy Calendar Service</div>
+                <div class="p-nav-sub">Master academy calendar — mark holidays, auto-skip Sundays, and view every student's 20-day progressive training timeline.</div>
               </div>
-              <button type="button" class="btn-mnc btn-mnc-secondary btn-launch-sub" data-target="fleet" style="white-space:nowrap;">Inspect Training Cars →</button>
+              <button type="button" class="btn-mnc btn-mnc-secondary btn-launch-sub" data-target="calendar" style="white-space:nowrap;">Open Academy Calendar →</button>
             </div>
             <div class="p-nav-item">
               <div style="flex:1;">
@@ -206,33 +211,23 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
         <!-- Stage Summary -->
         <div class="portal-section">
           <div class="portal-section-header">
-            <span class="portal-section-title">Curriculum Stage Distribution</span>
+            <span class="portal-section-title">20-Day Course Progression (3 Stages)</span>
           </div>
           <div class="p-detail-grid">
             <div class="p-detail-cell">
-              <div class="p-detail-key">Stage 1 · LLR Intake</div>
-              <div class="p-detail-value">${intakeCount} Candidates</div>
-              <div class="p-detail-sub">Day 1–2 · Document verification & Parivahan LLR setup</div>
+              <div class="p-detail-key">Stage 1 · Basic Driving</div>
+              <div class="p-detail-value">${stage1Count} Candidates</div>
+              <div class="p-detail-sub">Days 1–10 · Vehicle orientation, clutch control & simple driving</div>
             </div>
             <div class="p-detail-cell">
-              <div class="p-detail-key">Stage 2 · Ground & ABC</div>
-              <div class="p-detail-value">${groundCount} Candidates</div>
-              <div class="p-detail-sub">Day 3–7 · Clutch bite-point, ABC pedals, gear synchronization</div>
+              <div class="p-detail-key">Stage 2 · Intermediate Driving</div>
+              <div class="p-detail-value">${stage2Count} Candidates</div>
+              <div class="p-detail-sub">Days 11–15 · Town traffic, gear shifting & road navigation</div>
             </div>
             <div class="p-detail-cell">
-              <div class="p-detail-key">Stage 3 · City & Flyover</div>
-              <div class="p-detail-value">${cityCount} Candidates</div>
-              <div class="p-detail-sub">Day 8–15 · City traffic, flyover hill-hold, highway driving</div>
-            </div>
-            <div class="p-detail-cell">
-              <div class="p-detail-key">Stage 4 · RTO 8-Track</div>
-              <div class="p-detail-value">${trackCount} Candidates</div>
-              <div class="p-detail-sub">Day 16–19 · Automated sensor track, H-bay reverse, mock test</div>
-            </div>
-            <div class="p-detail-cell">
-              <div class="p-detail-key">Stage 5 · DL Exam Ready</div>
-              <div class="p-detail-value">${examCount} Candidates</div>
-              <div class="p-detail-sub">Day 20 · RTO driving test cleared, DL certificate issued</div>
+              <div class="p-detail-key">Stage 3 · Final Assessment & Parking</div>
+              <div class="p-detail-value">${stage3Count} Candidates</div>
+              <div class="p-detail-sub">Days 16–20 · RTO track manoeuvres, complex parking & final assessment</div>
             </div>
             <div class="p-detail-cell">
               <div class="p-detail-key">Total Distance Logged</div>
@@ -245,32 +240,51 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
     }
 
     // =====================================================
-    // STUDENTS DIRECTORY
+    // STUDENTS DIRECTORY & MANAGEMENT (ACTIVE / INACTIVE)
     // =====================================================
     if (subService === 'trainees') {
-      const filteredTrainees = trainees.filter(t => {
-        const q = searchQuery.toLowerCase();
-        const matchSearch = t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q) || (t.permitNumber||'').toLowerCase().includes(q) || (t.phone||'').includes(q);
-        const matchPkg = activePackageFilter==='all' ||
-          (activePackageFilter==='without-licence' && t.package.includes('Without Licence')) ||
-          (activePackageFilter==='with-licence' && t.package.includes('With Licence'));
+      const q = searchQuery.toLowerCase().trim();
+
+      const filteredActive = activeTraineesAll.filter(t => {
+        const matchSearch = !q || t.name.toLowerCase().includes(q) || (t.studentCode || t.id).toLowerCase().includes(q) || (t.permitNumber||'').toLowerCase().includes(q) || (t.phone||'').includes(q);
+        const matchPkg = activePackageFilter === 'all' ||
+          (activePackageFilter === 'without-licence' && (t.package || '').includes('Without Licence')) ||
+          (activePackageFilter === 'with-licence' && (t.package || '').includes('With Licence'));
         let matchStage = true;
-        if (activeStageFilter==='intake') matchStage = t.currentDay<=2;
-        else if (activeStageFilter==='ground') matchStage = t.currentDay>=3&&t.currentDay<=7;
-        else if (activeStageFilter==='city')  matchStage = t.currentDay>=8&&t.currentDay<=15;
-        else if (activeStageFilter==='track') matchStage = t.currentDay>=16&&t.currentDay<=19;
-        else if (activeStageFilter==='exam')  matchStage = t.currentDay>=20;
-        return matchSearch && matchPkg && matchStage;
+        if (activeStageFilter === 'stage1') matchStage = t.currentDay <= 10;
+        else if (activeStageFilter === 'stage2') matchStage = t.currentDay >= 11 && t.currentDay <= 15;
+        else if (activeStageFilter === 'stage3') matchStage = t.currentDay >= 16;
+        const matchInst = activeInstructorFilter === 'all' || t.assignedTrainerId === activeInstructorFilter;
+        return matchSearch && matchPkg && matchStage && matchInst;
       });
+
+      const filteredInactive = inactiveTraineesAll.filter(t => {
+        const matchSearch = !q || t.name.toLowerCase().includes(q) || (t.studentCode || t.id).toLowerCase().includes(q) || (t.permitNumber||'').toLowerCase().includes(q) || (t.phone||'').includes(q);
+        const matchPkg = activePackageFilter === 'all' ||
+          (activePackageFilter === 'without-licence' && (t.package || '').includes('Without Licence')) ||
+          (activePackageFilter === 'with-licence' && (t.package || '').includes('With Licence'));
+        const matchInst = activeInstructorFilter === 'all' || t.assignedTrainerId === activeInstructorFilter;
+        return matchSearch && matchPkg && matchInst;
+      });
+
+      const displayList = studentCategoryTab === 'active' ? filteredActive : filteredInactive;
 
       html = `
         ${topbar}
-        ${stageNav}
 
+        <!-- Top Header Banner -->
         <div class="portal-page-header">
           <div>
-            <h1 class="portal-page-title">Students Directory &amp; Driving Records</h1>
-            <p class="portal-page-sub">All enrolled students with daily 8 km driving records, fee payment status, and test readiness. ${filteredTrainees.length} of ${trainees.length} shown.</p>
+            <div style="display:flex; align-items:center; gap:0.65rem; margin-bottom:0.25rem;">
+              <h1 class="portal-page-title" style="margin:0;">Students Directory &amp; Course Management</h1>
+              <span class="p-badge p-badge-gold" style="font-size:0.75rem;">${trainees.length} Total Enrolled</span>
+            </div>
+            <p class="portal-page-sub">
+              ${studentCategoryTab === 'active' 
+                ? `Active Students: Candidates currently undergoing 20-day progressive driving training. ${filteredActive.length} of ${activeTraineesAll.length} shown.`
+                : `Inactive Students: Candidates who completed Day 20 or graduated. Complete 20-day history, GPS routes, and notes are preserved. ${filteredInactive.length} of ${inactiveTraineesAll.length} shown.`
+              }
+            </p>
           </div>
           <div style="display:flex; gap:0.65rem; flex-wrap:wrap; align-items:center;">
             <button type="button" class="p-ghost-btn btn-open-supabase-modal">⚡ Cloud DB (Supabase)</button>
@@ -279,120 +293,385 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
           </div>
         </div>
 
-        <!-- Search & Filter -->
-        <div style="padding:1.1rem 2rem; border-bottom:1px solid var(--border-light); display:flex; gap:0.85rem; align-items:center; flex-wrap:wrap; background:rgba(255,255,255,0.01);">
-          <input type="text" class="mnc-input" id="search-trainee" placeholder="Search by name, ID, LLR permit, phone…" value="${searchQuery}" style="width:300px; flex-shrink:0;" />
-          <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
-            <button type="button" class="p-chip-btn ${activePackageFilter==='all'             ? 'p-chip-active':''}" data-pkg="all">All Courses</button>
-            <button type="button" class="p-chip-btn ${activePackageFilter==='without-licence' ? 'p-chip-active':''}" data-pkg="without-licence">Without Licence</button>
-            <button type="button" class="p-chip-btn ${activePackageFilter==='with-licence'    ? 'p-chip-active':''}" data-pkg="with-licence">With Licence</button>
+        <!-- 1. TWO STUDENT CATEGORIES TABS BAR (Active vs Inactive) -->
+        <div class="student-category-tabs-bar">
+          <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+            <button type="button" class="btn-category-tab ${studentCategoryTab === 'active' ? 'active' : ''}" data-cat-tab="active">
+              <span class="status-indicator-dot active"></span>
+              Active Students
+              <span class="tab-badge">${activeTraineesAll.length}</span>
+            </button>
+            <button type="button" class="btn-category-tab ${studentCategoryTab === 'inactive' ? 'active' : ''}" data-cat-tab="inactive">
+              <span class="status-indicator-dot inactive"></span>
+              Inactive Students
+              <span class="tab-badge">${inactiveTraineesAll.length}</span>
+            </button>
+          </div>
+
+          <!-- View Mode Toggle & Quick Info -->
+          <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+            <div class="view-mode-toggle">
+              <button type="button" class="btn-view-toggle ${studentViewMode === 'table' ? 'active' : ''}" data-view-mode="table" title="Table View">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                Table View
+              </button>
+              <button type="button" class="btn-view-toggle ${studentViewMode === 'cards' ? 'active' : ''}" data-view-mode="cards" title="Cards View">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                Cards View
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Students Box Grid (Separate Block Cards) -->
-        <div class="portal-section" style="padding-top:0; padding-bottom:1.5rem;">
-          ${filteredTrainees.length === 0 ? `
-            <div style="text-align:center; color:var(--slate-muted); padding:3.5rem; font-size:0.9rem; background:rgba(255,255,255,0.02); border:1px solid var(--border-light); border-radius:var(--radius-md);">
-              No students match the active search or filters.
+        <!-- 6. SEARCH AND FILTERING BAR -->
+        <div style="padding:1rem 2rem; border-bottom:1px solid var(--border-light); display:flex; gap:0.85rem; align-items:center; flex-wrap:wrap; background:rgba(255,255,255,0.01);">
+          <div style="position:relative; width:300px; flex-shrink:0;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--slate-muted)" stroke-width="2.5" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); pointer-events:none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" class="mnc-input" id="search-trainee" placeholder="Search by name, ID, phone, LLR…" value="${searchQuery}" style="width:100%; padding-left:2.2rem; font-size:0.85rem;" />
+          </div>
+
+          ${studentCategoryTab === 'active' ? `
+            <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+              <button type="button" class="p-chip-btn ${activeStageFilter==='all' ? 'p-chip-active':''}" data-stage-target="all">All Stages</button>
+              <button type="button" class="p-chip-btn ${activeStageFilter==='stage1' ? 'p-chip-active':''}" data-stage-target="stage1">Stage 1 · Basic (Days 1–10)</button>
+              <button type="button" class="p-chip-btn ${activeStageFilter==='stage2' ? 'p-chip-active':''}" data-stage-target="stage2">Stage 2 · Intermediate (Days 11–15)</button>
+              <button type="button" class="p-chip-btn ${activeStageFilter==='stage3' ? 'p-chip-active':''}" data-stage-target="stage3">Stage 3 · Final Test (Days 16–20)</button>
             </div>
           ` : `
+            <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+              <span class="p-badge p-badge-green" style="font-size:0.75rem;">Course: Completed 🏁</span>
+              <span class="p-badge p-badge-dim" style="font-size:0.75rem; color:#ffffff;">Training: 20 / 20 Days</span>
+              <span class="p-badge p-badge-gold" style="font-size:0.75rem;">Passed RTO DL Test 🟢</span>
+            </div>
+          `}
+
+          <!-- Instructor Dropdown Filter -->
+          <div style="margin-left:auto; display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+            <select id="select-instructor-filter" class="mnc-select" style="font-size:0.8rem; padding:0.45rem 1.6rem 0.45rem 0.75rem;">
+              <option value="all" ${activeInstructorFilter === 'all' ? 'selected' : ''}>All Instructors</option>
+              ${trainers.map(tr => `
+                <option value="${tr.id}" ${activeInstructorFilter === tr.id ? 'selected' : ''}>👨‍🏫 ${tr.name}</option>
+              `).join('')}
+            </select>
+
+            <!-- Package Dropdown Filter -->
+            <select id="select-package-filter" class="mnc-select" style="font-size:0.8rem; padding:0.45rem 1.6rem 0.45rem 0.75rem;">
+              <option value="all" ${activePackageFilter === 'all' ? 'selected' : ''}>All Courses</option>
+              <option value="with-licence" ${activePackageFilter === 'with-licence' ? 'selected' : ''}>With Licence (₹11,000)</option>
+              <option value="without-licence" ${activePackageFilter === 'without-licence' ? 'selected' : ''}>Without Licence (₹7,000)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- CONTENT AREA: TABLE VIEW VS CARDS VIEW -->
+        ${displayList.length === 0 ? `
+          <div style="margin: 2.5rem 2rem; text-align:center; color:var(--slate-muted); padding:3.5rem; font-size:0.9rem; background:rgba(255,255,255,0.02); border:1px solid var(--border-light); border-radius:var(--radius-md);">
+            No ${studentCategoryTab === 'active' ? 'active' : 'inactive'} students match the search criteria.
+          </div>
+        ` : studentViewMode === 'table' ? `
+          <!-- ========================================== -->
+          <!-- 9. ADMIN DASHBOARD LAYOUT: TABLE VIEW      -->
+          <!-- ========================================== -->
+          <div class="student-data-table-wrap">
+            <table class="student-data-table">
+              <thead>
+                ${studentCategoryTab === 'active' ? `
+                  <tr>
+                    <th>Student</th>
+                    <th>Progress</th>
+                    <th>Stage</th>
+                    <th>Today's Status</th>
+                    <th>Start Date</th>
+                    <th>Expected Completion</th>
+                    <th>Instructor</th>
+                    <th style="text-align:right;">Actions</th>
+                  </tr>
+                ` : `
+                  <tr>
+                    <th>Student</th>
+                    <th>Course</th>
+                    <th>Start Date</th>
+                    <th>Completion Date</th>
+                    <th>Total Training</th>
+                    <th>Instructor</th>
+                    <th>Final Assessment</th>
+                    <th style="text-align:right;">Actions</th>
+                  </tr>
+                `}
+              </thead>
+              <tbody>
+                ${displayList.map(t => {
+                  const tr = trainers.find(x => x.id === t.assignedTrainerId) || trainers[0];
+                  const sched = store.getStudentSchedule(t.id);
+                  const p = payments.find(x => x.traineeId === t.id) || { amount: 7500, paid: 7500, balance: 0, status: 'paid' };
+                  const pct = Math.min(100, Math.round((t.currentDay / 20) * 100));
+                  
+                  let stageName = t.currentDay <= 10 ? 'Stage 1 · Basic Driving' :
+                                  t.currentDay <= 15 ? 'Stage 2 · Intermediate Driving' : 'Stage 3 · Final Assessment & Parking';
+
+                  const startDateDisplay = sched?.startDate ? formatDateDisplay(sched.startDate) : (t.registeredDate || 'Oct 2, 2026');
+                  const expCompDateDisplay = sched?.completionDate ? formatDateDisplay(sched.completionDate) : 'Oct 28, 2026';
+                  const actualCompDateDisplay = t.actualCompletionDate ? formatDateDisplay(t.actualCompletionDate) : expCompDateDisplay;
+
+                  if (studentCategoryTab === 'active') {
+                    // Active Table Row
+                    return `
+                      <tr>
+                        <!-- Student Column -->
+                        <td>
+                          <div style="display:flex; align-items:center; gap:0.75rem;">
+                            ${renderStudentBoxAvatar(t)}
+                            <div>
+                              <div class="student-table-name btn-open-dossier" data-trainee-id="${t.id}" title="Click to open full profile">${t.name}</div>
+                              <div style="display:flex; align-items:center; gap:0.4rem; margin-top:0.15rem;">
+                                <span class="p-badge p-badge-gold" style="font-size:0.62rem; padding:0.1rem 0.35rem;">${t.studentCode || t.id}</span>
+                                <span style="font-size:0.75rem; color:#94a3b8;">📞 ${t.phone || '+91 98480 22334'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <!-- Progress Column -->
+                        <td style="min-width:180px;">
+                          <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:0.25rem;">
+                            <strong style="color:#ffffff;">Day ${t.currentDay} / 20</strong>
+                            <span style="color:#38bdf8; font-weight:800;">${pct}%</span>
+                          </div>
+                          <div style="width:100%; height:6px; background:rgba(255,255,255,0.08); border-radius:999px; overflow:hidden;">
+                            <div style="width:${pct}%; height:100%; background:var(--neem-green); border-radius:999px;"></div>
+                          </div>
+                          <span style="font-size:0.7rem; color:var(--slate-muted); display:block; margin-top:0.2rem;">
+                            ${t.currentDay * 8} km logged · 160 km target
+                          </span>
+                        </td>
+
+                        <!-- Stage Column -->
+                        <td>
+                          <span class="p-badge p-badge-dim" style="font-size:0.72rem; color:#ffffff; border-color:rgba(255,255,255,0.25);">
+                            ${stageName}
+                          </span>
+                        </td>
+
+                        <!-- Today's Training Status -->
+                        <td>
+                          <span class="p-badge p-badge-green" style="font-size:0.72rem;">
+                            🟢 Scheduled
+                          </span>
+                        </td>
+
+                        <!-- Course Start Date -->
+                        <td style="white-space:nowrap; font-size:0.82rem; color:#e2e8f0;">
+                          ${startDateDisplay}
+                        </td>
+
+                        <!-- Expected Completion Date -->
+                        <td style="white-space:nowrap; font-size:0.82rem; font-weight:700; color:var(--primary-gold);">
+                          ${expCompDateDisplay}
+                        </td>
+
+                        <!-- Assigned Instructor -->
+                        <td>
+                          <div style="font-size:0.82rem; font-weight:700; color:#ffffff;">👨‍🏫 ${tr.name}</div>
+                          <div style="font-size:0.7rem; color:var(--slate-muted);">${tr.car.split('#')[0].trim()}</div>
+                        </td>
+
+                        <!-- Actions Column -->
+                        <td style="text-align:right; white-space:nowrap;">
+                          <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm btn-open-dossier" data-trainee-id="${t.id}" style="font-size:0.78rem; padding:0.45rem 0.85rem;">
+                            Open Details →
+                          </button>
+                        </td>
+                      </tr>
+                    `;
+                  } else {
+                    // Inactive Table Row (Completed / Alumni)
+                    return `
+                      <tr>
+                        <!-- Student Column -->
+                        <td>
+                          <div style="display:flex; align-items:center; gap:0.75rem;">
+                            ${renderStudentBoxAvatar(t)}
+                            <div>
+                              <div class="student-table-name btn-open-dossier" data-trainee-id="${t.id}" title="Click to open full profile">${t.name}</div>
+                              <div style="display:flex; align-items:center; gap:0.4rem; margin-top:0.15rem;">
+                                <span class="p-badge p-badge-gold" style="font-size:0.62rem; padding:0.1rem 0.35rem;">${t.studentCode || t.id}</span>
+                                <span style="font-size:0.75rem; color:#94a3b8;">📞 ${t.phone || '+91 98480 22334'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <!-- Course Column -->
+                        <td>
+                          <div style="font-weight:700; color:#ffffff; font-size:0.82rem;">${t.package.split('(')[0].trim()}</div>
+                          <span class="p-badge p-badge-dim" style="font-size:0.65rem; color:#22c55e; border-color:rgba(34,197,94,0.4); margin-top:0.2rem;">
+                            Course: Completed 🏁
+                          </span>
+                        </td>
+
+                        <!-- Start Date -->
+                        <td style="white-space:nowrap; font-size:0.82rem; color:#e2e8f0;">
+                          ${startDateDisplay}
+                        </td>
+
+                        <!-- Course Completion Date -->
+                        <td style="white-space:nowrap; font-size:0.82rem; font-weight:800; color:#22c55e;">
+                          ${actualCompDateDisplay}
+                        </td>
+
+                        <!-- Total Training Days -->
+                        <td style="white-space:nowrap;">
+                          <div style="font-weight:800; color:#ffffff; font-size:0.85rem;">20 / 20 Days</div>
+                          <span style="font-size:0.7rem; color:var(--slate-muted);">160 km · 100% Attendance</span>
+                        </td>
+
+                        <!-- Assigned Instructor -->
+                        <td>
+                          <div style="font-size:0.82rem; font-weight:700; color:#ffffff;">👨‍🏫 ${tr.name}</div>
+                          <div style="font-size:0.7rem; color:var(--slate-muted);">${tr.car.split('#')[0].trim()}</div>
+                        </td>
+
+                        <!-- Final Assessment Status -->
+                        <td>
+                          <span class="p-badge p-badge-green" style="font-size:0.72rem;">
+                            Passed RTO DL Test 🟢
+                          </span>
+                        </td>
+
+                        <!-- Actions Column -->
+                        <td style="text-align:right; white-space:nowrap;">
+                          <div style="display:inline-flex; gap:0.4rem; align-items:center;">
+                            <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm btn-open-dossier" data-trainee-id="${t.id}" style="font-size:0.78rem; padding:0.45rem 0.85rem;">
+                              Open Student Details →
+                            </button>
+                            <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-view-inactive-routes" data-trainee-id="${t.id}" data-student="${t.name}" title="View Driving Routes on Map" style="font-size:0.75rem; padding:0.45rem 0.65rem;">
+                              Routes 🗺️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : `
+          <!-- ========================================== -->
+          <!-- CARDS VIEW (SEPARATE DOSSIER BOX CARDS)    -->
+          <!-- ========================================== -->
+          <div class="portal-section" style="padding-top:1.5rem; padding-bottom:1.5rem;">
             <div class="student-box-grid">
-              ${filteredTrainees.map(t => {
-                const tr  = trainers.find(x => x.id === t.assignedTrainerId) || trainers[0];
-                const p   = payments.find(x => x.traineeId === t.id) || { amount: 7500, paid: 7500, balance: 0, status: 'paid' };
+              ${displayList.map(t => {
+                const tr = trainers.find(x => x.id === t.assignedTrainerId) || trainers[0];
+                const sched = store.getStudentSchedule(t.id);
+                const p = payments.find(x => x.traineeId === t.id) || { amount: 7500, paid: 7500, balance: 0, status: 'paid' };
                 const pct = Math.min(100, Math.round((t.currentDay / 20) * 100));
-                let stageName = t.currentDay <= 2 ? 'Stage 1 · LLR Intake' :
-                                t.currentDay <= 7 ? 'Stage 2 · Ground Practice' :
-                                t.currentDay <= 15 ? 'Stage 3 · Town Driving' :
-                                t.currentDay <= 19 ? 'Stage 4 · RTO 8-Track' : 'Stage 5 · Test Ready';
+                
+                let stageName = t.currentDay <= 2 ? 'Stage 1 · Basic Driving' :
+                                t.currentDay <= 7 ? 'Stage 2 · Traffic Circles' :
+                                t.currentDay <= 15 ? 'Stage 3 · Speed & Gears' :
+                                t.currentDay <= 19 ? 'Stage 4 · Complex Parking' : 'Stage 5 · Final Assessment';
+
                 const isPulsed = lastPulsedTraineeId === t.id;
-                const initials = t.avatar || t.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                const startDateDisplay = sched?.startDate ? formatDateDisplay(sched.startDate) : (t.registeredDate || 'Oct 2, 2026');
+                const expCompDateDisplay = sched?.completionDate ? formatDateDisplay(sched.completionDate) : 'Oct 28, 2026';
+                const actualCompDateDisplay = t.actualCompletionDate ? formatDateDisplay(t.actualCompletionDate) : expCompDateDisplay;
 
                 return `
                   <div class="student-box-card ${isPulsed ? 'p-row-pulsed' : ''}">
-                    
-                    <!-- Header: Avatar, Name, Reg ID, Fee Status -->
+                    <!-- Card Header -->
                     <div>
                       <div class="student-box-header">
                         <div class="student-box-identity">
-                        ${renderStudentBoxAvatar(t)}
+                          ${renderStudentBoxAvatar(t)}
                           <div style="min-width:0;">
-                            <div class="student-box-name btn-open-dossier" data-trainee-id="${t.id}" title="Click to view full student file">${t.name}</div>
+                            <div class="student-box-name btn-open-dossier" data-trainee-id="${t.id}" title="Click to view full student profile">${t.name}</div>
                             <div class="student-box-meta-line">
-                              <span class="p-badge p-badge-gold" style="font-size:0.62rem; padding:0.15rem 0.4rem;">${t.id}</span>
+                              <span class="p-badge p-badge-gold" style="font-size:0.62rem; padding:0.15rem 0.4rem;">${t.studentCode || t.id}</span>
                               <span style="font-family:var(--font-mono); color:var(--primary-cyan); font-size:0.72rem;">${t.permitNumber || 'AP004/LLR/2026/8941'}</span>
                             </div>
                           </div>
                         </div>
 
-                        <span class="p-badge ${p.balance > 0 ? 'p-badge-gold' : 'p-badge-green'}" style="font-size:0.65rem; white-space:nowrap;">
-                          ${p.balance > 0 ? `₹${p.balance.toLocaleString('en-IN')} Due` : 'Fee Cleared ✓'}
-                        </span>
+                        ${studentCategoryTab === 'active' ? `
+                          <span class="p-badge ${p.balance > 0 ? 'p-badge-gold' : 'p-badge-green'}" style="font-size:0.65rem; white-space:nowrap;">
+                            ${p.balance > 0 ? `₹${p.balance.toLocaleString('en-IN')} Due` : 'Fee Cleared ✓'}
+                          </span>
+                        ` : `
+                          <span class="p-badge p-badge-green" style="font-size:0.65rem; white-space:nowrap;">
+                            Course: Completed 🏁
+                          </span>
+                        `}
                       </div>
 
                       <div style="display:flex; align-items:center; gap:0.4rem; margin-top:0.75rem; flex-wrap:wrap;">
                         <span class="p-badge p-badge-dim" style="font-size:0.65rem; color:#ffffff; border-color:rgba(255,255,255,0.2);">
-                          ${stageName}
+                          ${studentCategoryTab === 'active' ? stageName : 'Passed RTO DL Test 🟢'}
                         </span>
                         <span style="font-size:0.72rem; color:var(--slate-muted);">•</span>
                         <span style="font-size:0.75rem; color:var(--slate-muted); font-weight:600;">${t.package.split('(')[0].trim()}</span>
                       </div>
                     </div>
 
-                    <!-- Body: Progress bar and Telemetry Grid -->
+                    <!-- Card Body -->
                     <div class="student-box-body">
                       <div class="student-box-progress-wrap">
                         <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem;">
-                          <span style="font-weight:700; color:#ffffff;">Practical Course Progress</span>
-                          <span style="font-weight:800; color:#ffffff; font-family:var(--font-mono);">${pct}% (${t.currentDay}/20 Days)</span>
+                          <span style="font-weight:700; color:#ffffff;">
+                            ${studentCategoryTab === 'active' ? 'Course Progress' : 'Course Status: Completed'}
+                          </span>
+                          <span style="font-weight:800; color:#ffffff; font-family:var(--font-mono);">
+                            ${studentCategoryTab === 'active' ? `Day ${t.currentDay} / 20 (${pct}%)` : '20 / 20 (100%)'}
+                          </span>
                         </div>
                         <div class="student-box-progress-bar">
-                          <div class="student-box-progress-fill" style="width:${pct}%;"></div>
+                          <div class="student-box-progress-fill" style="width:${studentCategoryTab === 'active' ? pct : 100}%;"></div>
                         </div>
                         <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--slate-muted);">
-                          <span>${t.currentDay * 8} km logged</span>
-                          <span>Target: 160 km total</span>
+                          <span>${studentCategoryTab === 'active' ? `Start: ${startDateDisplay}` : `Start: ${startDateDisplay}`}</span>
+                          <span style="color:${studentCategoryTab === 'active' ? 'var(--primary-gold)' : '#22c55e'}; font-weight:700;">
+                            ${studentCategoryTab === 'active' ? `Expected: ${expCompDateDisplay}` : `Completed: ${actualCompDateDisplay}`}
+                          </span>
                         </div>
                       </div>
 
                       <div class="student-box-info-grid">
                         <div class="student-box-info-item">
                           <span class="student-box-info-label">Instructor &amp; Car</span>
-                          <span class="student-box-info-val" title="${tr.name} (${tr.car})">👨‍🏫 ${tr.name}</span>
+                          <span class="student-box-info-val" title="${tr.name}">👨‍🏫 ${tr.name}</span>
                           <span style="font-size:0.7rem; color:var(--slate-muted);">${tr.car.split(' ')[0]} Dual-Ctrl</span>
                         </div>
                         <div class="student-box-info-item">
-                          <span class="student-box-info-label">Contact &amp; Town</span>
+                          <span class="student-box-info-label">Contact &amp; Location</span>
                           <span class="student-box-info-val">📞 ${t.phone || '+91 98480 22334'}</span>
                           <span style="font-size:0.7rem; color:var(--slate-muted);">${t.address ? t.address.split(',')[0] : 'Pulivendula'}</span>
                         </div>
                       </div>
                     </div>
 
-                    <!-- Footer: Dedicated Action Buttons -->
+                    <!-- Card Footer Actions -->
                     <div class="student-box-footer">
                       <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm btn-open-dossier" data-trainee-id="${t.id}" style="font-size:0.78rem; padding:0.45rem 0.85rem;">
-                        Open Student File &amp; Services →
+                        Open Student Details →
                       </button>
                       
                       <div style="display:flex; gap:0.4rem; align-items:center;">
-                        <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-quick-step-day" data-trainee-id="${t.id}" data-current-day="${t.currentDay}" title="Log 1 Practical Day (+8 km)" style="font-size:0.75rem; padding:0.45rem 0.65rem;">
-                          + 1 Day
-                        </button>
-                        ${t.currentDay >= 18 ? `
-                          <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-schedule-rto-slot" data-trainee-id="${t.id}" data-student="${t.name}" style="font-size:0.75rem; padding:0.45rem 0.65rem; color:#ffffff; border-color:rgba(255,255,255,0.3);">
-                            📅 RTO Slot
+                        ${studentCategoryTab === 'active' ? `
+                          <span style="font-size:0.72rem; color:var(--slate-muted);">✓ Instructor logs rides</span>
+                        ` : `
+                          <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-view-inactive-routes" data-trainee-id="${t.id}" data-student="${t.name}" title="Inspect Day 20 Route Map" style="font-size:0.75rem; padding:0.45rem 0.65rem;">
+                            Routes 🗺️
                           </button>
-                        ` : ''}
+                        `}
                       </div>
                     </div>
-
                   </div>
                 `;
               }).join('')}
             </div>
-          `}
-        </div>
+          </div>
+        `}
       `;
     }
 
@@ -864,117 +1143,7 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
       `;
     }
 
-    // =====================================================
-    // VEHICLE FLEET & SAFETY RIGS SERVICE
-    // =====================================================
-    if (subService === 'fleet') {
-      const fleetUnits = trainers.map((tr, idx) => {
-        const traineesOnRig = trainees.filter(t => t.assignedTrainerId === tr.id);
-        const kmLogged = traineesOnRig.reduce((a, t) => a + (t.currentDay * 8), 0);
-        return {
-          id: `CAR-0${idx + 1}`,
-          model: tr.car,
-          trainerName: tr.name,
-          trainerId: tr.id,
-          activeCandidates: traineesOnRig.length,
-          totalKm: kmLogged,
-          brakeSystem: 'Dual Hydraulic Master Cylinder (Govt. Approved)',
-          fitnessExpiry: '2027-04-15',
-          status: 'Operational'
-        };
-      });
 
-      html = `
-        ${topbar}
-
-        <div class="portal-page-header">
-          <div>
-            <h1 class="portal-page-title">Dual-Control Training Cars &amp; Safety Checks</h1>
-            <p class="portal-page-sub">Dual-control training cars equipped with instructor brake pedals and valid RTO fitness certificates.</p>
-          </div>
-          <div style="display:flex; gap:0.65rem; align-items:center;">
-            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-fleet-audit-all">Perform Dual-Brake Safety Inspection ✓</button>
-          </div>
-        </div>
-
-        <div class="portal-stats-strip">
-          <div class="portal-stat">
-            <span class="portal-stat-value">${fleetUnits.length}</span>
-            <span class="portal-stat-label">Training Cars</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value" style="color:var(--neem-green);">100%</span>
-            <span class="portal-stat-label">Dual-Brake Verified</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value">${fleetUnits.reduce((a,f)=>a+f.totalKm, 0).toLocaleString('en-IN')} km</span>
-            <span class="portal-stat-label">Total Driving Logged</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value" style="color:var(--primary-gold);">0</span>
-            <span class="portal-stat-label">Safety Alerts</span>
-          </div>
-        </div>
-
-        <div class="portal-section">
-          <div class="portal-section-header">
-            <span class="portal-section-title">Training Cars Directory</span>
-            <span class="portal-section-meta">${fleetUnits.length} dual-control cars operating in Pulivendula</span>
-          </div>
-          <div class="p-table-wrap">
-            <table class="p-table">
-              <thead>
-                <tr>
-                  <th>Vehicle &amp; Reg. No.</th>
-                  <th>Assigned Driving Instructor</th>
-                  <th>Dual-Control Safety System</th>
-                  <th>Active Students</th>
-                  <th>Total Kilometers</th>
-                  <th>RTO Fitness Certificate</th>
-                  <th style="text-align:right;">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${fleetUnits.map(unit => `
-                  <tr>
-                    <td>
-                      <div class="p-td-name">${unit.model}</div>
-                      <div class="p-td-sub">${unit.id} · Pulivendula RTO Registered</div>
-                    </td>
-                    <td>
-                      <div style="font-size:0.875rem; font-weight:700; color:#ffffff;">${unit.trainerName}</div>
-                      <div class="p-td-sub">Senior Driving Instructor (${unit.trainerId})</div>
-                    </td>
-                    <td>
-                      <div style="font-size:0.85rem; font-weight:600; color:var(--neem-green);">${unit.brakeSystem}</div>
-                      <div class="p-td-sub">Dual-brake override active · Emergency instructor control</div>
-                    </td>
-                    <td>
-                      <div style="font-size:1.15rem; font-weight:800; color:#ffffff;">${unit.activeCandidates}</div>
-                      <div class="p-td-sub">Active students</div>
-                    </td>
-                    <td>
-                      <div style="font-size:1.05rem; font-weight:700; color:var(--slate-body); font-family:var(--font-mono);">${unit.totalKm.toLocaleString('en-IN')} km</div>
-                      <div class="p-td-sub">School training log</div>
-                    </td>
-                    <td>
-                      <span class="p-badge p-badge-green" style="font-size:0.65rem;">RTO VALID TILL 2027</span>
-                      <div class="p-td-sub" style="margin-top:0.25rem;">Inspected Sept 2026</div>
-                    </td>
-                    <td style="text-align:right;">
-                      <button type="button" class="p-link-btn btn-test-brake" data-unit="${unit.model}">Test Dual-Brake →</button>
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      `;
-    }
 
     // =====================================================
     // RTO DL TEST & EXAM SCHEDULER SERVICE
@@ -1085,7 +1254,159 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
       `;
     }
 
+    // =====================================================
+    // ACADEMY CALENDAR & 20-DAY PROGRESSIVE TRAINING SERVICE
+    // =====================================================
+    // ACADEMY CALENDAR — HOLIDAY SCHEDULER SERVICE
+    // =====================================================
+    if (subService === 'calendar' || subService === 'calendar-manager') {
+      const holidays = store.getHolidays();
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      html = `
+        ${topbar}
+
+        <div class="portal-page-header">
+          <div>
+            <h1 class="portal-page-title">Academy Calendar — Holiday Scheduler</h1>
+            <p class="portal-page-sub">Schedule academy holidays, festival closures, or emergency non-training days. When marked, every active student's 20-day course automatically recalculates and shifts forward by 1 valid training day.</p>
+          </div>
+          <div style="display:flex; gap:0.65rem; align-items:center; flex-wrap:wrap;">
+            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-admin-mark-today-holiday" style="display:flex; align-items:center; gap:0.4rem;">
+              🌴 Mark Today as Holiday
+            </button>
+            <button type="button" class="btn-mnc btn-mnc-secondary btn-launch-sub" data-target="trainees">
+              View Students Directory →
+            </button>
+          </div>
+        </div>
+
+        <!-- STATS STRIP -->
+        <div class="portal-stats-strip">
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:var(--neem-green);">${holidays.length}</span>
+            <span class="portal-stat-label">Scheduled Holidays</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:#ffffff;">52</span>
+            <span class="portal-stat-label">Sundays Auto-Closed</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value">${activeTraineesAll.length}</span>
+            <span class="portal-stat-label">Active Student Courses Synced</span>
+          </div>
+        </div>
+
+        <!-- QUICK ADD HOLIDAY FORM CARD -->
+        <div class="portal-section" style="background:#101319; border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:1.25rem 1.5rem; margin-bottom:1.5rem;">
+          <div style="font-size:0.95rem; font-weight:800; color:#ffffff; margin-bottom:0.25rem;">
+            + Schedule New Academy Holiday
+          </div>
+          <p style="font-size:0.78rem; color:#a1a1aa; margin-bottom:1rem;">
+            Select a date to declare the academy closed. All enrolled students will skip this date on their progressive calendars.
+          </p>
+          <form id="form-admin-quick-add-holiday" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)) 180px; gap:0.85rem; align-items:end;">
+            <div>
+              <label class="p-label" style="font-size:0.75rem; color:#94a3b8; font-weight:700; margin-bottom:0.35rem; display:block;">Holiday Date</label>
+              <input type="date" id="input-admin-holiday-date" required value="${todayStr}" class="mnc-input" style="width:100%; padding:0.5rem 0.75rem; font-size:0.85rem;" />
+            </div>
+            <div>
+              <label class="p-label" style="font-size:0.75rem; color:#94a3b8; font-weight:700; margin-bottom:0.35rem; display:block;">Holiday / Occasion Name</label>
+              <input type="text" id="input-admin-holiday-name" required placeholder="e.g. Dussehra / Ayudha Puja Festival" class="mnc-input" style="width:100%; padding:0.5rem 0.75rem; font-size:0.85rem;" />
+            </div>
+            <div>
+              <label class="p-label" style="font-size:0.75rem; color:#94a3b8; font-weight:700; margin-bottom:0.35rem; display:block;">Category</label>
+              <select id="select-admin-holiday-type" class="mnc-select" style="width:100%; padding:0.5rem 0.75rem; font-size:0.85rem;">
+                <option value="festival">Festival Holiday</option>
+                <option value="closure">Academy Closure</option>
+                <option value="government">Government / Public Holiday</option>
+                <option value="weather">Weather / Emergency Closure</option>
+              </select>
+            </div>
+            <div>
+              <button type="submit" class="btn-mnc btn-mnc-primary" style="width:100%; padding:0.55rem 0.75rem; font-size:0.825rem; font-weight:700; white-space:nowrap;">
+                + Save Holiday
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- SCHEDULED HOLIDAYS TABLE -->
+        <div class="portal-section">
+          <div class="portal-section-header">
+            <span class="portal-section-title">Registered Academy Holidays (${holidays.length})</span>
+            <span class="portal-section-meta">All active student schedules automatically skip these dates</span>
+          </div>
+
+          <div class="p-table-wrap">
+            <table class="p-table">
+              <thead>
+                <tr>
+                  <th>Holiday Date</th>
+                  <th>Occasion / Reason</th>
+                  <th>Category</th>
+                  <th>Schedule Impact</th>
+                  <th style="text-align:right;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${holidays.length === 0 ? `
+                  <tr>
+                    <td colspan="5" style="text-align:center; padding:2rem; color:#71717a;">
+                      No custom holidays scheduled. Click "Mark Today as Holiday" or use the form above to add a holiday.
+                    </td>
+                  </tr>
+                ` : holidays.map(h => {
+                  const dObj = new Date(h.date + 'T00:00:00');
+                  const weekday = dObj.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                  const isToday = h.date === todayStr;
+                  return `
+                    <tr style="${isToday ? 'background:rgba(234,179,8,0.06);' : ''}">
+                      <td style="font-family:monospace; font-weight:700; color:#ffffff;">
+                        ${weekday}
+                        ${isToday ? '<span class="p-badge p-badge-gold" style="font-size:0.6rem; margin-left:0.4rem;">Today</span>' : ''}
+                      </td>
+                      <td>
+                        <div style="font-weight:700; color:#ffffff;">${h.name}</div>
+                        ${h.notes ? `<div class="p-td-sub">${h.notes}</div>` : ''}
+                      </td>
+                      <td>
+                        <span class="p-badge p-badge-dim" style="font-size:0.65rem; text-transform:uppercase;">
+                          ${h.type || 'Holiday'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style="font-size:0.75rem; color:#22c55e; font-weight:600;">
+                          ✓ Auto-Skipped for all ${activeTraineesAll.length} students
+                        </div>
+                      </td>
+                      <td style="text-align:right;">
+                        <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-delete-holiday" data-holiday-id="${h.id}" data-holiday-name="${h.name}" style="border-color:rgba(239,68,68,0.3); color:#f87171;">
+                          Delete 🗑
+                        </button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SUNDAYS POLICY CARD -->
+        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:1rem 1.25rem; display:flex; align-items:center; gap:0.75rem; margin-top:1.25rem;">
+          <span style="font-size:1.25rem;">📌</span>
+          <div style="font-size:0.78rem; color:#94a3b8; line-height:1.4;">
+            <strong style="color:#ffffff;">Sunday Policy:</strong> Gafoor Driving School is closed every Sunday. The 20-day progressive training algorithm automatically skips all Sundays without requiring manual entries.
+          </div>
+        </div>
+      `;
+    }
+
     container.innerHTML = `<div class="portal-shell">${html}</div>`;
+
     attachEvents();
     lastPulsedTraineeId = null;
   }
@@ -1095,8 +1416,97 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
       btn.addEventListener('click', () => onNavigate(btn.dataset.target));
     });
 
+    // Holiday Scheduler Form
+    const formAddHoliday = container.querySelector('#form-admin-quick-add-holiday');
+    if (formAddHoliday) {
+      formAddHoliday.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const date = container.querySelector('#input-admin-holiday-date')?.value;
+        const name = container.querySelector('#input-admin-holiday-name')?.value.trim();
+        const type = container.querySelector('#select-admin-holiday-type')?.value || 'closure';
+
+        if (!date || !name) return;
+
+        const holidays = store.getHolidays();
+        if (holidays.some(h => h.date === date)) {
+          showToast(`A holiday is already scheduled for ${date}`, 'warning');
+          return;
+        }
+
+        store.addHoliday({
+          id: 'HOL-' + Date.now(),
+          date,
+          name,
+          type,
+          notes: 'Added via Admin Holiday Scheduler'
+        });
+
+        showToast(`✓ Scheduled "${name}" on ${date}. All active student courses shifted forward!`, 'success');
+        render();
+      });
+    }
+
+    // Delete Holiday
+    container.querySelectorAll('.btn-delete-holiday').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.holidayId;
+        const name = btn.dataset.holidayName;
+        if (window.confirm(`Delete scheduled holiday "${name}"? Active student courses will automatically adjust.`)) {
+          store.deleteHoliday(id);
+          showToast(`Deleted holiday "${name}". Student courses restored.`, 'info');
+          render();
+        }
+      });
+    });
+
     const btnGoAdd = container.querySelector('#btn-goto-add-student');
     if (btnGoAdd) btnGoAdd.addEventListener('click', () => onNavigate('new-student'));
+
+    // Category Tabs (Active vs Inactive)
+    container.querySelectorAll('.btn-category-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        studentCategoryTab = btn.dataset.catTab;
+        render();
+      });
+    });
+
+    // View Mode Toggle (Table vs Cards)
+    container.querySelectorAll('.btn-view-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        studentViewMode = btn.dataset.viewMode;
+        render();
+      });
+    });
+
+    // Instructor Filter Dropdown
+    const selInst = container.querySelector('#select-instructor-filter');
+    if (selInst) {
+      selInst.addEventListener('change', e => {
+        activeInstructorFilter = e.target.value;
+        render();
+      });
+    }
+
+    // Package Filter Dropdown
+    const selPkg = container.querySelector('#select-package-filter');
+    if (selPkg) {
+      selPkg.addEventListener('change', e => {
+        activePackageFilter = e.target.value;
+        render();
+      });
+    }
+
+    // Route Map inspection for inactive/completed students
+    container.querySelectorAll('.btn-view-inactive-routes').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.traineeId;
+        const sched = store.getStudentSchedule(id);
+        const s = sched?.sessions.find(x => x.dayNumber === 20) || sched?.sessions[11] || sched?.sessions[0];
+        if (s) {
+          openRouteMapModal({ session: s, studentName: btn.dataset.student });
+        }
+      });
+    });
 
     container.querySelectorAll('[data-stage-target]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1129,37 +1539,29 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
       btn.addEventListener('click', () => onNavigate('trainer-profile', btn.dataset.trainerId));
     });
 
-    container.querySelectorAll('.btn-quick-step-day').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.traineeId;
-        const newDay = Math.min(20, parseInt(btn.dataset.currentDay,10)+1);
-        store.updateTrainee(id, { currentDay:newDay, category: newDay<=5?'street':newDay<=15?'highway':'test' });
-        lastPulsedTraineeId = id;
-        const t = store.trainees.find(x=>x.id===id);
-        showToast(`${t.name} advanced to Day ${newDay} (+8 km · ${newDay*8} km total)`, 'success');
+    const btnMarkTodayHoliday = container.querySelector('#btn-admin-mark-today-holiday');
+    if (btnMarkTodayHoliday) {
+      btnMarkTodayHoliday.addEventListener('click', () => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const holidays = store.getHolidays();
+        const existing = holidays.find(h => h.date === todayStr);
+        if (existing) {
+          showToast(`Today (${todayStr}) is already marked as holiday: "${existing.name}"`, 'info');
+          return;
+        }
+        const reason = window.prompt(`Mark Today (${todayStr}) as Academy Holiday?\nEnter holiday reason / title:`, 'Academy Holiday');
+        if (reason === null) return;
+        store.addHoliday({
+          id: 'HOL-' + Date.now(),
+          date: todayStr,
+          name: reason.trim() || 'Academy Holiday (Admin Declared)',
+          type: 'closure',
+          notes: 'Marked by administrator on Academy Calendar'
+        });
+        showToast(`✓ Marked today (${todayStr}) as Academy Holiday. All student schedules automatically adjusted!`, 'success');
         render();
       });
-    });
-
-    container.querySelectorAll('.btn-schedule-rto-slot').forEach(btn => {
-      btn.addEventListener('click', () => openScheduleRtoModal(btn.dataset.traineeId, btn.dataset.student));
-    });
-
-    const btnExportCsv = container.querySelector('#btn-export-rto-csv');
-    if (btnExportCsv) btnExportCsv.addEventListener('click', () => exportRtoAuditCsv(store.trainees, store.payments));
-
-    const btnFleetAudit = container.querySelector('#btn-fleet-audit-all');
-    if (btnFleetAudit) {
-      btnFleetAudit.addEventListener('click', () => {
-        showToast('Vehicle Safety Check: All 4 training cars passed dual-brake inspection! (100% Ready)', 'success');
-      });
     }
-
-    container.querySelectorAll('.btn-test-brake').forEach(btn => {
-      btn.addEventListener('click', () => {
-        showToast(`Safety check passed for ${btn.dataset.unit}: Instructor dual-brake control verified ✓`, 'success');
-      });
-    });
 
     const btnQuickPay = container.querySelector('#btn-quick-record-payment');
     if (btnQuickPay) {

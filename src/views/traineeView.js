@@ -11,6 +11,7 @@ import { store } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
 import { renderStudentAvatar } from '../components/studentAvatar.js';
 import { triggerPhotoUpload } from '../components/photoCropModal.js';
+import { renderProgressiveCalendar } from '../components/progressiveCalendar.js';
 
 export function renderTraineeView(container, showToast, subService = 'curriculum', onNavigate) {
   let activeFilter = 'all';
@@ -27,16 +28,12 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
 
     const currentSub = subService || 'curriculum';
 
-    const filteredCurriculum = curriculum.filter(item =>
-      activeFilter === 'all' ? true : item.category === activeFilter
-    );
-
     const topbar = '';
 
     let contentHtml = '';
 
     // =========================================================
-    // SERVICE 01: 20-DAY CURRICULUM ROADMAP (8 KM/DAY)
+    // SERVICE 01: 20-DAY CURRICULUM ROADMAP (CALENDAR ENGINE)
     // =========================================================
     if (currentSub === 'curriculum') {
       contentHtml = `
@@ -53,110 +50,8 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
           </div>
         </div>
 
-        <!-- STATS STRIP -->
-        <div class="portal-stats-strip">
-          <div class="portal-stat">
-            <span class="portal-stat-value">${currentDay}<span style="font-size:1rem; color:var(--slate-muted);"> / 20</span></span>
-            <span class="portal-stat-label">Days Completed</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value" style="color:var(--primary-cyan);">${kmDriven} km</span>
-            <span class="portal-stat-label">Distance Driven</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value">${kmRemaining} km</span>
-            <span class="portal-stat-label">Remaining</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value">${progressPercent}%</span>
-            <span class="portal-stat-label">Course Progress</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value" style="color:${invoice.balance > 0 ? 'var(--primary-gold)' : 'var(--neem-green)'};">
-              ${invoice.balance > 0 ? '₹' + invoice.balance.toLocaleString('en-IN') : 'Cleared ✓'}
-            </span>
-            <span class="portal-stat-label">Fee Balance</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value" style="color:var(--neem-green);">${trainee.attendanceRate || '96%'}</span>
-            <span class="portal-stat-label">Attendance Rate</span>
-          </div>
-        </div>
-
-        <!-- PROGRESS BAR -->
-        <div class="portal-progress-bar-wrap">
-          <div class="portal-progress-bar" style="width:${progressPercent}%;"></div>
-        </div>
-
-        <!-- CURRICULUM TABLE -->
-        <div class="portal-section">
-          <div class="portal-section-header">
-            <span class="portal-section-title">20-Day Practical Driving Lessons (8 km per day)</span>
-            <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-              <span style="font-size:0.75rem; color:var(--slate-muted);">Check day status:</span>
-              <button type="button" class="p-chip-btn ${currentDay === 7  ? 'p-chip-active':''}" data-test-day="7">Day 7</button>
-              <button type="button" class="p-chip-btn ${currentDay === 14 ? 'p-chip-active':''}" data-test-day="14">Day 14</button>
-              <button type="button" class="p-chip-btn ${currentDay === 20 ? 'p-chip-active':''}" data-test-day="20">Day 20 (RTO)</button>
-            </div>
-          </div>
-
-          <!-- Category filter buttons -->
-          <div class="portal-filter-bar">
-            <button type="button" class="p-filter-btn ${activeFilter==='all'     ?'p-filter-active':''}" data-cat="all">All 20 Days</button>
-            <button type="button" class="p-filter-btn ${activeFilter==='street'  ?'p-filter-active':''}" data-cat="street">Ground &amp; Town (Days 1–10)</button>
-            <button type="button" class="p-filter-btn ${activeFilter==='highway' ?'p-filter-active':''}" data-cat="highway">Highway &amp; Flyover (Days 11–19)</button>
-            <button type="button" class="p-filter-btn ${activeFilter==='test'    ?'p-filter-active':''}" data-cat="test">RTO 8-Track Test (Day 20)</button>
-          </div>
-
-          <div class="p-table-wrap">
-            <table class="p-table">
-              <thead>
-                <tr>
-                  <th>Course Day</th>
-                  <th>Practical Driving Lesson</th>
-                  <th>Stage</th>
-                  <th>Daily Distance</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${filteredCurriculum.map(item => {
-                  const isDone  = item.day < currentDay;
-                  const isToday = item.day === currentDay;
-                  return `
-                    <tr class="${isDone?'p-row-done':isToday?'p-row-today':''}">
-                      <td class="p-td-mono" style="font-size:0.875rem; font-weight:800; color:${isDone?'var(--neem-green)':isToday?'var(--primary-gold)':'#ffffff'};">
-                        Day ${item.day}
-                      </td>
-                      <td>
-                        <div class="p-td-name" style="${isDone?'opacity:0.75;':''}">
-                          ${isDone?'<span style="color:var(--neem-green); margin-right:0.35rem;">✓</span>':isToday?'<span style="color:var(--primary-gold); margin-right:0.35rem;">●</span>':''}${item.topic}
-                        </div>
-                        <div class="p-td-sub">${item.details || 'Standard RTO Practical Syllabus'}</div>
-                      </td>
-                      <td>
-                        <span class="p-badge p-badge-dim" style="font-size:0.62rem;">${item.category.toUpperCase()}</span>
-                      </td>
-                      <td class="p-td-muted">
-                        ${item.distance || '8 km'}
-                      </td>
-                      <td>
-                        <span class="${isDone?'p-status-done':isToday?'p-status-today':'p-status-upcoming'}">
-                          ${isDone ? '✓ Completed' : isToday ? '● Today’s Lesson' : 'Upcoming'}
-                        </span>
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <!-- PROGRESSIVE CALENDAR MOUNT -->
+        <div id="progressive-calendar-mount"></div>
       `;
     }
 
@@ -360,6 +255,17 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
         ${contentHtml}
       </div>
     `;
+
+    // Mount 20-Day Progressive Driving Training Calendar
+    const calendarMount = container.querySelector('#progressive-calendar-mount');
+    if (calendarMount) {
+      renderProgressiveCalendar(calendarMount, trainee.id, {
+        showToast,
+        canEdit: false,
+        isTrainer: false,
+        onUpdate: () => render()
+      });
+    }
 
     // Service Navigation Events
     container.querySelectorAll('[data-trainee-nav]').forEach(btn => {

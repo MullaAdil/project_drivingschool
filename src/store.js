@@ -8,6 +8,16 @@
 
 import { extractInitials, getNextStudentSequence, generateStudentCode, generateTrainerCode, getNextTrainerSequence, normalizeCode } from './utils/studentCode.js';
 import { saveStudentToSupabase, fetchStudentsFromSupabase, updateStudentInSupabase } from './supabase.js';
+import { OFFICIAL_20_DAY_CURRICULUM, getStageForDay } from './utils/trainingCurriculum.js';
+import { 
+  DEFAULT_ACADEMY_HOLIDAYS, 
+  generate20DaySchedule, 
+  postponeSession as calendarPostponeSession, 
+  completeSession as calendarCompleteSession,
+  recalculateScheduleWithHolidays,
+  toDateStr,
+  parseDateStr
+} from './utils/academyCalendar.js';
 
 const STORAGE_KEY = 'gafoor_driving_school_v1_pulivendula_state';
 
@@ -131,8 +141,10 @@ const INITIAL_TRAINEES = [
     currentDay: 20,
     totalDays: 20,
     category: 'test',
-    status: 'Graduating',
+    status: 'Completed',
+    isActive: false,
     registeredDate: '2026-08-01',
+    actualCompletionDate: '2026-08-25',
     package: '20-Day Comprehensive Licensing Package',
     avatar: 'HC',
     attendanceRate: '100%',
@@ -155,6 +167,7 @@ const INITIAL_TRAINEES = [
     totalDays: 20,
     category: 'street',
     status: 'Active',
+    isActive: true,
     registeredDate: '2026-09-05',
     package: 'City Traffic & 8-Track Mastery',
     avatar: 'VK',
@@ -178,6 +191,7 @@ const INITIAL_TRAINEES = [
     totalDays: 20,
     category: 'highway',
     status: 'Active',
+    isActive: true,
     registeredDate: '2026-08-18',
     package: '20-Day Comprehensive Licensing Package',
     avatar: 'SR',
@@ -201,6 +215,7 @@ const INITIAL_TRAINEES = [
     totalDays: 20,
     category: 'street',
     status: 'Active',
+    isActive: true,
     registeredDate: '2026-08-20',
     package: 'City Traffic & 8-Track Mastery',
     avatar: 'KR',
@@ -224,6 +239,7 @@ const INITIAL_TRAINEES = [
     totalDays: 20,
     category: 'highway',
     status: 'Active',
+    isActive: true,
     registeredDate: '2026-08-05',
     package: '20-Day Comprehensive Licensing Package',
     avatar: 'DB',
@@ -247,11 +263,62 @@ const INITIAL_TRAINEES = [
     totalDays: 20,
     category: 'street',
     status: 'New Intake',
-    registeredDate: '2026-09-15',
+    isActive: true,
+    registeredDate: '2026-10-02',
     package: 'City Traffic & 8-Track Mastery',
     avatar: 'MK',
     attendanceRate: '100%',
     paymentStatus: 'pending',
+    isFirstLogin: true,
+    password: null
+  },
+  {
+    id: 'MA- GS09',
+    studentCode: 'MA- GS09',
+    name: 'Mulla Adil',
+    email: 'mulla.adil@gafoordriving.in',
+    phone: '+91 98480 33445',
+    permitNumber: 'AP004/LLR/2026/1029',
+    address: 'Near Old Bus Stand, Pulivendula, AP',
+    emergencyContact: 'Bashir Ahmed (Father)',
+    emergencyPhone: '+91 98480 11999',
+    assignedTrainerId: 'TRN-1',
+    currentDay: 20,
+    totalDays: 20,
+    category: 'test',
+    status: 'Completed',
+    isActive: false,
+    registeredDate: '2026-10-02',
+    actualCompletionDate: '2026-10-28',
+    package: '20-Day Comprehensive Licensing Package',
+    avatar: 'MA',
+    attendanceRate: '100%',
+    paymentStatus: 'paid',
+    isFirstLogin: true,
+    password: null
+  },
+  {
+    id: 'PL- GS10',
+    studentCode: 'PL- GS10',
+    name: 'Prasanna Lakshmi',
+    email: 'prasanna.l@gafoordriving.in',
+    phone: '+91 94401 77665',
+    permitNumber: 'AP004/LLR/2026/5012',
+    address: 'Ring Road, Pulivendula, AP',
+    emergencyContact: 'Venkataiah (Father)',
+    emergencyPhone: '+91 94401 44332',
+    assignedTrainerId: 'TRN-2',
+    currentDay: 20,
+    totalDays: 20,
+    category: 'test',
+    status: 'Completed',
+    isActive: false,
+    registeredDate: '2026-09-01',
+    actualCompletionDate: '2026-09-26',
+    package: 'Ladies Special Mentorship Package',
+    avatar: 'PL',
+    attendanceRate: '100%',
+    paymentStatus: 'paid',
     isFirstLogin: true,
     password: null
   }
@@ -265,7 +332,9 @@ const INITIAL_PAYMENTS = [
   { id: 'INV-4015', traineeId: 'SR- GS05', traineeName: 'Sneha Reddy', package: '20-Day Comprehensive', amount: 7500, paid: 7500, balance: 0, dueDate: '2026-08-28', status: 'paid', method: 'Paytm UPI' },
   { id: 'INV-4016', traineeId: 'KR- GS06', traineeName: 'Karthik Raju', package: 'City & Track Mastery', amount: 5500, paid: 2500, balance: 3000, dueDate: '2026-09-25', status: 'partial', method: 'Cash at Branch' },
   { id: 'INV-4017', traineeId: 'DB- GS07', traineeName: 'Divya Bharathi', package: '20-Day Comprehensive', amount: 7500, paid: 3500, balance: 4000, dueDate: '2026-09-02', status: 'overdue', method: 'Late Notice Sent' },
-  { id: 'INV-4018', traineeId: 'MK- GS08', traineeName: 'Manoj Kumar', package: 'City & Track Mastery', amount: 5500, paid: 0, balance: 5500, dueDate: '2026-09-29', status: 'pending', method: 'Awaiting UPI Deposit' }
+  { id: 'INV-4018', traineeId: 'MK- GS08', traineeName: 'Manoj Kumar', package: 'City & Track Mastery', amount: 5500, paid: 0, balance: 5500, dueDate: '2026-09-29', status: 'pending', method: 'Awaiting UPI Deposit' },
+  { id: 'INV-4019', traineeId: 'MA- GS09', traineeName: 'Mulla Adil', package: '20-Day Comprehensive', amount: 11000, paid: 11000, balance: 0, dueDate: '2026-10-15', status: 'paid', method: 'Google Pay UPI' },
+  { id: 'INV-4020', traineeId: 'PL- GS10', traineeName: 'Prasanna Lakshmi', package: 'Ladies Special Batch', amount: 8500, paid: 8500, balance: 0, dueDate: '2026-09-15', status: 'paid', method: 'PhonePe UPI' }
 ];
 
 const INITIAL_SCHEDULE = [
@@ -275,28 +344,19 @@ const INITIAL_SCHEDULE = [
   { id: 'SLOT-4', time: '04:00 PM – 05:30 PM', traineeId: 'VK- GS04', studentName: 'Vamshi Krishna', topic: 'Day 3: Clutch Modulation, Biting Point & 3-Point Turn', car: 'Tata Punch Dual-Ctrl #AP-04-CT-7072', attendance: 'none' }
 ];
 
-const CURRICULUM_DAYS = [
-  { day: 1, category: 'street', title: 'Vehicle Cockpit Drill & Controls', desc: 'ABC (Accelerator, Brake, Clutch) orientation, mirror positioning, seat ergonomics, and blind-spot identification.' },
-  { day: 2, category: 'street', title: 'Smooth Moving & Progressive Braking', desc: 'Gentle creeping in 1st gear, threshold braking without jerks, and 1st to 2nd gear transition.' },
-  { day: 3, category: 'street', title: 'Half-Clutch Modulation & Biting Point', desc: 'Discovering the friction bite point, low-speed crawling without stalling, and 3-point street turnaround.' },
-  { day: 4, category: 'street', title: 'Steering Rotation & Controlled U-Turns', desc: 'Hand-over-hand steering rhythm, indicator discipline, and pedestrian yielding at intersections.' },
-  { day: 5, category: 'street', title: 'RTO 8-Track Forward Arc Alignment', desc: 'Entering the official figure-8 circuit, maintaining arc trajectory, and zero pole collision penalty.' },
-  { day: 6, category: 'street', title: 'RTO 8-Track Reverse Navigation', desc: 'Reverse 8-track maneuvers using side mirrors, steady reverse creeping, and reverse steering geometry.' },
-  { day: 7, category: 'street', title: 'RTO H-Track & Perpendicular Bay Docking', desc: 'Navigating into the narrow H-track bay, reverse 45-degree angle entry, and centered curbside docking.' },
-  { day: 8, category: 'street', title: 'Traffic Signals & Intersection Rules', desc: 'Stop lines, zebra crossings, signal light sequence, and traffic circle (roundabout) right of way.' },
-  { day: 9, category: 'street', title: 'Pulivendula Ghat Incline & Hill Hold Balance', desc: 'Handbrake coordination on steep inclines and flyovers, zero rollback half-clutch start technique.' },
-  { day: 10, category: 'street', title: 'Bumper-to-Bumper Pulivendula Town Traffic Crawling', desc: 'Heavy town traffic micro-navigation, auto-rickshaw and bike scanning, and anti-stall clutch modulation.' },
-  { day: 11, category: 'highway', title: '4-Lane Kadapa-Pulivendula Highway Entry', desc: 'Merging from service roads to main highway flow, 3-second buffer rule, and cruising at 60+ km/h.' },
-  { day: 12, category: 'highway', title: 'Highway Lane Keeping & Mirror Check Rhythm', desc: 'Lane discipline, mirror-signal-maneuver routine, crosswind compensation, and blind spot sweeps.' },
-  { day: 13, category: 'highway', title: 'Commercial Vehicle & Bus Overtaking', desc: 'Anticipating heavy vehicle blind spots, speed differential calculation, and safe return to cruising lane.' },
-  { day: 14, category: 'highway', title: 'Pulivendula Ring Road Junction & Deceleration', desc: 'High-speed deceleration lane approach, curved ramp speed control, and exit ramp signage awareness.' },
-  { day: 15, category: 'highway', title: 'Monsoon Wet Road & Skid Prevention', desc: 'Hydroplaning mitigation, extended stopping distance, defogger and wiper operation on wet tarmac.' },
-  { day: 16, category: 'highway', title: 'Night Driving & High-Beam Discipline', desc: 'Headlight glare reduction, low-beam etiquette, and nocturnal pedestrian hazard recognition.' },
-  { day: 17, category: 'highway', title: 'Narrow Pulivendula Bazaar Street Micro-Steering', desc: 'Navigating tight residential lanes with parked bikes, horn courtesy, and spatial clearance judgment.' },
-  { day: 18, category: 'highway', title: 'Emergency Braking & Shoulder Pull-Off', desc: 'Controlled threshold emergency stop, hazard light activation, and vehicle triangle placement.' },
-  { day: 19, category: 'test', title: 'Pulivendula RTO Automated Sensor Track Rehearsal', desc: 'Full automated driving test simulation covering 8-track, H-track, gradient stop, and S-bend.' },
-  { day: 20, category: 'test', title: 'Official AP RTO Driving License Test & Graduation', desc: 'Independent examination with Motor Vehicle Inspector (MVI) and certificate of competency issuance.' }
-];
+export const CURRICULUM_DAYS = OFFICIAL_20_DAY_CURRICULUM.map(c => ({
+  day: c.day,
+  category: c.stageKey === 'basic' ? 'street' : (c.stageKey === 'circles' || c.stageKey === 'gears') ? 'highway' : 'test',
+  title: c.objective,
+  topic: `Day ${c.day}: ${c.objective}`,
+  desc: c.skills.join(' · '),
+  details: c.skills.join(' · '),
+  skills: c.skills,
+  stage: c.stageName,
+  stageKey: c.stageKey,
+  distance: `${c.route.distanceKm} km`,
+  route: c.route
+}));
 
 class Store {
   constructor() {
@@ -308,7 +368,7 @@ class Store {
 
   loadState() {
     try {
-      const cached = localStorage.getItem(STORAGE_KEY);
+      const cached = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
       if (cached) {
         const parsed = JSON.parse(cached);
         this.currentRole = parsed.currentRole || 'admin';
@@ -319,6 +379,11 @@ class Store {
         this.schedule = parsed.schedule || INITIAL_SCHEDULE;
         this.traineeTestDay = parsed.traineeTestDay || 14;
         this.feedbackSubmitted = parsed.feedbackSubmitted || false;
+        // Purge legacy dummy hardcoded holidays so calendar follows normal year calendar
+        this.holidays = (parsed.holidays && Array.isArray(parsed.holidays))
+          ? parsed.holidays.filter(h => !h.id || !/^HOL-(0[1-9]|1[0-3])$/.test(h.id))
+          : [];
+        this.studentSchedules = parsed.studentSchedules || {};
 
         // Ensure all trainees have studentCode and isFirstLogin flag, migrating legacy IDs
         this.trainees.forEach((t, i) => {
@@ -331,6 +396,38 @@ class Store {
           if (t.isFirstLogin === undefined) t.isFirstLogin = !t.password;
         });
 
+        // Ensure newly defined initial trainees (e.g. Mulla Adil, Prasanna Lakshmi) exist
+        INITIAL_TRAINEES.forEach(initT => {
+          const found = this.trainees.find(t => t.id === initT.id || t.studentCode === initT.studentCode);
+          if (!found) {
+            this.trainees.push(initT);
+          } else if (initT.status === 'Completed' && initT.id === 'MA- GS09') {
+            // Ensure canonical Mulla Adil graduate status is preserved
+            found.currentDay = 20;
+            found.status = 'Completed';
+            found.isActive = false;
+            found.actualCompletionDate = '2026-10-28';
+            found.registeredDate = '2026-10-02';
+          }
+        });
+
+        // Deduplicate any duplicate Mulla Adil entries from legacy test registrations
+        const mullaMatches = this.trainees.filter(t => t.name.toLowerCase().trim() === 'mulla adil');
+        if (mullaMatches.length > 1) {
+          this.trainees = this.trainees.filter(t => {
+            if (t.name.toLowerCase().trim() === 'mulla adil') {
+              return t.id === 'MA- GS09' || t.studentCode === 'MA- GS09';
+            }
+            return true;
+          });
+        }
+
+        INITIAL_PAYMENTS.forEach(initP => {
+          if (!this.payments.find(p => p.id === initP.id)) {
+            this.payments.push(initP);
+          }
+        });
+
         // Ensure all trainers have trainerCode and isFirstLogin flag, migrating legacy IDs
         this.trainers.forEach((tr, i) => {
           if (!tr.trainerCode || tr.trainerCode.startsWith('TRN-') || /-T\d+$/i.test(tr.trainerCode)) {
@@ -340,6 +437,10 @@ class Store {
           }
           if (tr.isFirstLogin === undefined) tr.isFirstLogin = !tr.password;
         });
+
+        this._initStudentSchedules();
+        this._ensureEnrollments();
+        this.saveState();
         return;
       }
     } catch (e) {
@@ -354,6 +455,8 @@ class Store {
     this.schedule = INITIAL_SCHEDULE;
     this.traineeTestDay = 14;
     this.feedbackSubmitted = false;
+    this.holidays = [];
+    this.studentSchedules = {};
 
     // Ensure all trainees have studentCode and isFirstLogin
     this.trainees.forEach((t, i) => {
@@ -375,10 +478,117 @@ class Store {
       if (tr.isFirstLogin === undefined) tr.isFirstLogin = !tr.password;
     });
 
+    this._initStudentSchedules();
+    this._ensureEnrollments();
     this.saveState();
   }
 
+  // =========================================================================
+  // SEPARATION OF STUDENT ACCOUNT DATA & COURSE ENROLLMENT DATA (Requirement 10)
+  // =========================================================================
+  _ensureEnrollments() {
+    this.trainees.forEach(t => {
+      const isCompleted = t.currentDay >= 20 || t.status === 'Completed';
+      if (t.isActive === undefined) {
+        t.isActive = !isCompleted;
+      }
+      if (isCompleted) {
+        t.status = 'Completed';
+        t.isActive = false;
+        if (!t.actualCompletionDate) {
+          const sched = this.studentSchedules ? this.studentSchedules[t.id] : null;
+          t.actualCompletionDate = sched?.completionDate || '2026-10-28';
+        }
+      }
+      const sched = this.studentSchedules ? this.studentSchedules[t.id] : null;
+      const expDate = sched?.completionDate || '2026-10-28';
+      t.expectedCompletionDate = expDate;
+
+      if (!t.enrollments || t.enrollments.length === 0) {
+        t.enrollments = [
+          {
+            enrollmentId: `ENR-${t.id}-01`,
+            courseType: t.package || '20-Day Comprehensive Licensing Package',
+            package: t.package || '20-Day Comprehensive Licensing Package',
+            startDate: sched?.startDate || t.registeredDate || '2026-10-02',
+            expectedCompletionDate: expDate,
+            actualCompletionDate: t.actualCompletionDate || null,
+            currentDay: t.currentDay,
+            totalDays: 20,
+            status: isCompleted ? 'completed' : 'active',
+            isActive: !isCompleted,
+            assignedTrainerId: t.assignedTrainerId || 'TRN-1',
+            finalAssessmentStatus: isCompleted ? 'Passed RTO Practical Driving Exam ✓' : 'In Progress',
+            attendanceRate: t.attendanceRate || '100%'
+          }
+        ];
+      } else {
+        const enr = t.enrollments[0];
+        enr.currentDay = t.currentDay;
+        enr.status = isCompleted ? 'completed' : 'active';
+        enr.isActive = !isCompleted;
+        enr.expectedCompletionDate = expDate;
+        if (isCompleted && !enr.actualCompletionDate) {
+          enr.actualCompletionDate = t.actualCompletionDate;
+        }
+        if (isCompleted) {
+          enr.finalAssessmentStatus = 'Passed RTO Practical Driving Exam ✓';
+        }
+      }
+    });
+  }
+
+  _initStudentSchedules() {
+    this.studentSchedules = this.studentSchedules || {};
+    this.holidays = this.holidays || [];
+
+    this.trainees.forEach(t => {
+      if (!this.studentSchedules[t.id]) {
+        // Manoj Kumar & Mulla Adil start on Oct 2, 2026
+        const sDate = (t.id === 'MK- GS08' || t.id === 'MA- GS09') ? '2026-10-02' : (t.registeredDate || '2026-09-01');
+        const trainer = this.getTrainerById(t.assignedTrainerId) || this.trainers[0];
+        const isAuto = t.package && t.package.toLowerCase().includes('auto');
+
+        const sched = generate20DaySchedule({
+          studentId: t.id,
+          studentName: t.name,
+          startDate: sDate,
+          instructorId: trainer.id,
+          instructorName: trainer.name,
+          transmission: isAuto ? 'automatic' : 'manual',
+          holidays: this.holidays
+        });
+
+        // Mark completed sessions for past days up to t.currentDay - 1
+        const completedDaysTarget = t.currentDay >= 20 ? 20 : Math.max(0, (t.currentDay || 1) - 1);
+
+        for (let d = 1; d <= completedDaysTarget; d++) {
+          const sess = sched.sessions.find(s => s.dayNumber === d);
+          if (sess) {
+            sess.status = 'completed';
+            sess.completionTimestamp = `${sess.date}T09:30:00.000Z`;
+            sess.instructorNotes = `Completed Day ${d} training on ${sess.objective}. Excellent vehicle control, mirror check routine, and traffic awareness.`;
+          }
+        }
+
+        if (t.currentDay >= 20 || t.status === 'Completed') {
+          sched.sessions.forEach(s => {
+            s.status = 'completed';
+            s.completionTimestamp = `${s.date}T09:30:00.000Z`;
+            s.instructorNotes = `Day ${s.dayNumber} assessment verified: ${s.objective}. Complete competence demonstrated.`;
+          });
+          t.status = 'Completed';
+          t.isActive = false;
+          t.actualCompletionDate = t.actualCompletionDate || sched.completionDate || '2026-10-28';
+        }
+
+        this.studentSchedules[t.id] = sched;
+      }
+    });
+  }
+
   saveState() {
+    if (typeof localStorage === 'undefined') return;
     try {
       const payload = {
         currentRole: this.currentRole,
@@ -388,7 +598,9 @@ class Store {
         payments: this.payments,
         schedule: this.schedule,
         traineeTestDay: this.traineeTestDay,
-        feedbackSubmitted: this.feedbackSubmitted
+        feedbackSubmitted: this.feedbackSubmitted,
+        holidays: this.holidays,
+        studentSchedules: this.studentSchedules
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
@@ -585,6 +797,7 @@ class Store {
       totalDays: 20,
       category: 'street',
       status: 'Active',
+      isActive: true,
       registeredDate: data.registeredDate || new Date().toISOString().split('T')[0],
       package: data.package || 'With Licence (₹11,000)',
       avatar: initials,
@@ -614,6 +827,19 @@ class Store {
       status: trainee.paymentStatus,
       method: 'UPI (PhonePe / Google Pay QR)'
     });
+
+    // Generate 20-day progressive schedule for new trainee
+    const sched = generate20DaySchedule({
+      studentId: trainee.id,
+      studentName: trainee.name,
+      startDate: trainee.registeredDate || toDateStr(new Date()),
+      instructorId: trainee.assignedTrainerId || 'TRN-1',
+      instructorName: this.getTrainerById(trainee.assignedTrainerId)?.name || 'K. Srinivas Rao',
+      transmission: trainee.package && trainee.package.toLowerCase().includes('auto') ? 'automatic' : 'manual',
+      holidays: this.holidays
+    });
+    this.studentSchedules = this.studentSchedules || {};
+    this.studentSchedules[trainee.id] = sched;
 
     this.notify('TRAINEE_ADDED', trainee);
 
@@ -677,17 +903,51 @@ class Store {
 
   setTraineeTestDay(dayNumber) {
     this.traineeTestDay = parseInt(dayNumber, 10);
-    const mainTrainee = this.trainees.find(t => t.id === 'APX-9021');
-    if (mainTrainee) {
-      mainTrainee.currentDay = this.traineeTestDay;
+    const trainee = this.getCurrentTrainee();
+    if (trainee) {
+      trainee.currentDay = this.traineeTestDay;
       if (this.traineeTestDay <= 10) {
-        mainTrainee.category = 'street';
+        trainee.category = 'street';
       } else if (this.traineeTestDay < 20) {
-        mainTrainee.category = 'highway';
+        trainee.category = 'highway';
       } else {
-        mainTrainee.category = 'test';
+        trainee.category = 'test';
+      }
+
+      const sched = this.getStudentSchedule(trainee.id);
+      if (sched) {
+        sched.sessions.forEach(s => {
+          if (s.dayNumber < this.traineeTestDay) {
+            s.status = 'completed';
+            if (!s.completionTimestamp) s.completionTimestamp = `${s.date}T09:30:00.000Z`;
+            if (!s.instructorNotes) s.instructorNotes = `Completed Day ${s.dayNumber} training on ${s.objective}. Good vehicle control.`;
+          } else if (s.dayNumber === this.traineeTestDay) {
+            s.status = 'today';
+          } else {
+            s.status = 'scheduled';
+          }
+        });
+        if (this.traineeTestDay >= 20) {
+          const s20 = sched.sessions.find(s => s.dayNumber === 20);
+          if (s20) {
+            s20.status = 'completed';
+            if (!s20.completionTimestamp) s20.completionTimestamp = `${s20.date}T09:30:00.000Z`;
+            if (!s20.instructorNotes) s20.instructorNotes = `Official Pulivendula RTO automated driving test passed with distinction. Form 5 certified.`;
+          }
+          trainee.status = 'Completed';
+          trainee.isActive = false;
+          trainee.actualCompletionDate = s20?.date || sched.completionDate || toDateStr(new Date());
+          if (trainee.enrollments && trainee.enrollments[0]) {
+            trainee.enrollments[0].status = 'completed';
+            trainee.enrollments[0].isActive = false;
+            trainee.enrollments[0].actualCompletionDate = trainee.actualCompletionDate;
+            trainee.enrollments[0].currentDay = 20;
+            trainee.enrollments[0].finalAssessmentStatus = 'Passed RTO Practical Driving Exam ✓';
+          }
+        }
       }
     }
+    this.saveState();
     this.notify('TRAINEE_DAY_CHANGED', this.traineeTestDay);
   }
 
@@ -702,6 +962,205 @@ class Store {
 
   getCurriculum() {
     return CURRICULUM_DAYS;
+  }
+
+  // ========================================================
+  // CALENDAR-BASED 20-DAY SCHEDULE & HOLIDAYS MANAGEMENT
+  // ========================================================
+
+  getHolidays() {
+    return this.holidays || DEFAULT_ACADEMY_HOLIDAYS;
+  }
+
+  addHoliday(holiday) {
+    this.holidays = this.holidays || [...DEFAULT_ACADEMY_HOLIDAYS];
+    this.holidays.push(holiday);
+    this.recalculateAllSchedules();
+    this.notify('HOLIDAY_ADDED', holiday);
+    return holiday;
+  }
+
+  deleteHoliday(id) {
+    this.holidays = (this.holidays || DEFAULT_ACADEMY_HOLIDAYS).filter(h => h.id !== id);
+    this.recalculateAllSchedules();
+    this.notify('HOLIDAY_DELETED', id);
+    return true;
+  }
+
+  getStudentSchedule(studentId) {
+    this._initStudentSchedules();
+    if (this.studentSchedules && this.studentSchedules[studentId]) {
+      return this.studentSchedules[studentId];
+    }
+    const trainee = this.trainees.find(t => t.id === studentId || t.studentCode === studentId);
+    if (!trainee) return null;
+    const trainer = this.getTrainerById(trainee.assignedTrainerId) || this.trainers[0];
+    const sched = generate20DaySchedule({
+      studentId: trainee.id,
+      studentName: trainee.name,
+      startDate: trainee.registeredDate || '2026-10-02',
+      instructorId: trainer.id,
+      instructorName: trainer.name,
+      transmission: trainee.package && trainee.package.toLowerCase().includes('auto') ? 'automatic' : 'manual',
+      holidays: this.holidays
+    });
+    this.studentSchedules[trainee.id] = sched;
+    this.saveState();
+    return sched;
+  }
+
+  updateStudentStartDate(studentId, newStartDate) {
+    const sched = this.getStudentSchedule(studentId);
+    const trainee = this.trainees.find(t => t.id === studentId || t.studentCode === studentId);
+    if (!sched || !trainee) return false;
+
+    const trainer = this.getTrainerById(trainee.assignedTrainerId) || this.trainers[0];
+    const newSched = generate20DaySchedule({
+      studentId: trainee.id,
+      studentName: trainee.name,
+      startDate: newStartDate,
+      instructorId: trainer.id,
+      instructorName: trainer.name,
+      transmission: sched.transmission || 'manual',
+      holidays: this.holidays
+    });
+
+    // Copy completed state from existing sessions
+    sched.sessions.forEach(oldSess => {
+      if (oldSess.status === 'completed') {
+        const target = newSched.sessions.find(s => s.dayNumber === oldSess.dayNumber);
+        if (target) {
+          target.status = 'completed';
+          target.completionTimestamp = oldSess.completionTimestamp;
+          target.instructorNotes = oldSess.instructorNotes;
+          if (oldSess.route) target.route = oldSess.route;
+        }
+      }
+    });
+
+    trainee.registeredDate = newStartDate;
+    this.studentSchedules[trainee.id] = newSched;
+    this.saveState();
+    this.notify('SCHEDULE_UPDATED', newSched);
+    return newSched;
+  }
+
+  postponeSession(studentId, dayNumber, reason) {
+    const sched = this.getStudentSchedule(studentId);
+    if (!sched) return false;
+
+    calendarPostponeSession(sched, dayNumber, reason, this.holidays);
+    this.saveState();
+    this.notify('SESSION_POSTPONED', { studentId, dayNumber, sched });
+    return sched;
+  }
+
+  completeSession(studentId, dayNumber, { instructorNotes = '', customRoute = null } = {}) {
+    const sched = this.getStudentSchedule(studentId);
+    const trainee = this.trainees.find(t => t.id === studentId || t.studentCode === studentId);
+    if (!sched || !trainee) return false;
+
+    calendarCompleteSession(sched, dayNumber, {
+      instructorNotes: instructorNotes || `Day ${dayNumber} completed with high precision.`,
+      customRoute,
+      completionTime: new Date().toISOString()
+    });
+
+    trainee.currentDay = Math.min(20, dayNumber + 1);
+    const sessionCompleted = sched.sessions.find(s => s.dayNumber === dayNumber);
+    const sessDate = sessionCompleted?.date || toDateStr(new Date());
+
+    if (dayNumber >= 20) {
+      trainee.currentDay = 20;
+      trainee.status = 'Completed';
+      trainee.isActive = false;
+      trainee.actualCompletionDate = sessDate;
+      trainee.category = 'test';
+
+      if (trainee.enrollments && trainee.enrollments[0]) {
+        trainee.enrollments[0].status = 'completed';
+        trainee.enrollments[0].isActive = false;
+        trainee.enrollments[0].actualCompletionDate = sessDate;
+        trainee.enrollments[0].currentDay = 20;
+        trainee.enrollments[0].finalAssessmentStatus = 'Passed RTO Practical Driving Exam ✓';
+      }
+    } else if (trainee.currentDay <= 10) {
+      trainee.category = 'street';
+    } else if (trainee.currentDay <= 17) {
+      trainee.category = 'highway';
+    } else {
+      trainee.category = 'test';
+    }
+
+    if (trainee.enrollments && trainee.enrollments[0]) {
+      trainee.enrollments[0].currentDay = trainee.currentDay;
+    }
+
+    const completedCount = sched.sessions.filter(s => s.status === 'completed').length;
+    trainee.attendanceRate = `${Math.min(100, Math.round((completedCount / dayNumber) * 100))}%`;
+
+    this.saveState();
+    this.notify('SESSION_COMPLETED', { studentId, dayNumber, sched, trainee });
+    return sched;
+  }
+
+  // =========================================================================
+  // PERMANENT STUDENT DELETION (Requirement 7)
+  // =========================================================================
+  deleteTrainee(studentId) {
+    const idx = this.trainees.findIndex(t => t.id === studentId || t.studentCode === studentId);
+    if (idx === -1) return false;
+
+    const removed = this.trainees.splice(idx, 1)[0];
+
+    // Remove from studentSchedules
+    if (this.studentSchedules) {
+      if (this.studentSchedules[removed.id]) delete this.studentSchedules[removed.id];
+      if (removed.studentCode && this.studentSchedules[removed.studentCode]) delete this.studentSchedules[removed.studentCode];
+    }
+
+    // Remove associated payments
+    this.payments = this.payments.filter(p => p.traineeId !== removed.id && p.traineeId !== removed.studentCode);
+
+    // If active currentTrainee was removed, update pointer
+    if (this.currentTraineeId === removed.id || this.currentTraineeId === removed.studentCode) {
+      this.currentTraineeId = this.trainees.length > 0 ? this.trainees[0].id : null;
+    }
+
+    this.saveState();
+    this.notify('TRAINEE_DELETED', removed);
+    return true;
+  }
+
+  // Reactivate an inactive student (e.g. enrolling in a new package or refreshing)
+  reactivateStudent(studentId, newPackage = null) {
+    const trainee = this.trainees.find(t => t.id === studentId || t.studentCode === studentId);
+    if (!trainee) return false;
+
+    trainee.status = 'Active';
+    trainee.isActive = true;
+    if (newPackage) trainee.package = newPackage;
+
+    if (trainee.enrollments && trainee.enrollments[0]) {
+      trainee.enrollments[0].status = 'active';
+      trainee.enrollments[0].isActive = true;
+    }
+
+    this.saveState();
+    this.notify('TRAINEE_UPDATED', trainee);
+    return true;
+  }
+
+  recalculateAllSchedules() {
+    this.studentSchedules = this.studentSchedules || {};
+    Object.keys(this.studentSchedules).forEach(sId => {
+      const sched = this.studentSchedules[sId];
+      if (sched) {
+        recalculateScheduleWithHolidays(sched, this.holidays);
+      }
+    });
+    this.saveState();
+    this.notify('SCHEDULES_RECALCULATED', this.studentSchedules);
   }
 }
 

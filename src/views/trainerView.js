@@ -10,6 +10,8 @@
 import { store } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
 import { renderStudentBoxAvatar, renderStudentAvatar } from '../components/studentAvatar.js';
+import { openRouteMapModal } from '../components/drivingRouteMap.js';
+import { openLiveRideMapModal } from '../components/liveRideTrackingModal.js';
 
 export function renderTrainerView(container, showToast, subService = 'schedule', onNavigate) {
   function render() {
@@ -147,7 +149,15 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
                           </button>
                         </div>
                       </td>
-                      <td style="text-align:right;">
+                      <td style="text-align:right; white-space:nowrap;">
+                        ${trainee && trainee.currentDay <= 20 && trainee.isActive ? `
+                          <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm btn-trainer-log-ride" data-trainee-id="${trainee.id}" style="margin-right:0.5rem; background:#22c55e; border-color:#22c55e; color:#000000; font-weight:800;">
+                            🚀 Start Day ${trainee.currentDay} Ride (8 km Live Map)
+                          </button>
+                        ` : trainee && !trainee.isActive ? `
+                          <span class="p-badge p-badge-green" style="font-size:0.65rem; margin-right:0.5rem;">Completed 🏁</span>
+                        ` : ''}
+                        <button type="button" class="p-link-btn btn-trainer-view-route" data-trainee-id="${slot.traineeId}" style="margin-right:0.6rem;">🗺️ Route Map</button>
                         <button type="button" class="p-link-btn btn-session-debrief" data-student="${slot.studentName}" data-topic="${slot.topic}">Driving Notes →</button>
                       </td>
                     </tr>
@@ -186,10 +196,9 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
             ${myTrainees.map(t => {
               const pct = Math.min(100, Math.round((t.currentDay / 20) * 100));
               const initials = t.avatar || t.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-              let stageName = t.currentDay <= 2 ? 'Stage 1 · LLR Intake' :
-                              t.currentDay <= 7 ? 'Stage 2 · Ground Practice' :
-                              t.currentDay <= 15 ? 'Stage 3 · Town Driving' :
-                              t.currentDay <= 19 ? 'Stage 4 · RTO 8-Track' : 'Stage 5 · Test Ready';
+              let stageName = t.currentDay <= 10 ? 'Stage 1 · Basic Driving' :
+                              t.currentDay <= 15 ? 'Stage 2 · Intermediate Driving' :
+                              'Stage 3 · Final Assessment & Parking';
               return `
                 <div class="student-box-card">
                   <div>
@@ -246,9 +255,15 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
                     </div>
                   </div>
 
-                  <div class="student-box-footer">
-                    <span style="font-size:0.72rem; color:var(--slate-muted);">Assigned Car: <strong>${trainer.car}</strong></span>
-                    <span class="p-badge p-badge-green" style="font-size:0.62rem;">Dual-Control OK</span>
+                  <div class="student-box-footer" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                    <span style="font-size:0.72rem; color:var(--slate-muted);">Car: <strong>${trainer.car}</strong></span>
+                    ${t.isActive && t.currentDay <= 20 ? `
+                      <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm btn-trainer-log-ride" data-trainee-id="${t.id}" style="background:#22c55e; border-color:#22c55e; color:#000000; font-weight:800; padding:0.35rem 0.75rem; font-size:0.75rem;">
+                        🚀 Start Day ${t.currentDay} Ride (8 km Live Map)
+                      </button>
+                    ` : `
+                      <span class="p-badge p-badge-green" style="font-size:0.65rem;">Course Completed 🏁</span>
+                    `}
                   </div>
                 </div>
               `;
@@ -276,50 +291,50 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
         <div class="portal-stats-strip">
           <div class="portal-stat">
             <span class="portal-stat-value" style="color:var(--neem-green);">PASSED</span>
-            <span class="portal-stat-label">Dual-Brake Status</span>
+            <span class="portal-stat-label">Dual-Brake Check</span>
           </div>
           <div class="portal-stat-div"></div>
           <div class="portal-stat">
-            <span class="portal-stat-value">${totalKm.toLocaleString('en-IN')} km</span>
-            <span class="portal-stat-label">Total Distance Logged</span>
+            <span class="portal-stat-value">8.0 km</span>
+            <span class="portal-stat-label">Daily Lesson Distance</span>
           </div>
           <div class="portal-stat-div"></div>
           <div class="portal-stat">
-            <span class="portal-stat-value" style="color:var(--primary-cyan);">45.2 PSI</span>
-            <span class="portal-stat-label">Brake Master Pressure</span>
+            <span class="portal-stat-value" style="color:var(--neem-green);">CHECKED</span>
+            <span class="portal-stat-label">Tire &amp; Mirror Check</span>
           </div>
           <div class="portal-stat-div"></div>
           <div class="portal-stat">
-            <span class="portal-stat-value" style="color:var(--neem-green);">100%</span>
-            <span class="portal-stat-label">Speed Governor Active</span>
+            <span class="portal-stat-value" style="color:var(--neem-green);">READY</span>
+            <span class="portal-stat-label">Vehicle Readiness</span>
           </div>
         </div>
 
         <div class="portal-section">
           <div class="portal-section-header">
-            <span class="portal-section-title">Car Safety Specifications &amp; Inspection Checklist</span>
+            <span class="portal-section-title">Car Specifications &amp; Daily Checklist</span>
             <span class="portal-section-meta">${trainer.car}</span>
           </div>
           <div class="p-detail-grid">
             <div class="p-detail-cell">
               <div class="p-detail-key">Assigned Training Car</div>
               <div class="p-detail-value">${trainer.car}</div>
-              <div class="p-detail-sub">Pulivendula Academy Training Fleet</div>
+              <div class="p-detail-sub">Pulivendula Academy Training Car</div>
             </div>
             <div class="p-detail-cell">
               <div class="p-detail-key">Dual Controls</div>
-              <div class="p-detail-value" style="color:var(--neem-green);">Dual-Pedal Hydraulic Override</div>
+              <div class="p-detail-value" style="color:var(--neem-green);">Dual-Brake Pedal Installed</div>
               <div class="p-detail-sub">Instructor emergency brake pedal active</div>
             </div>
             <div class="p-detail-cell">
-              <div class="p-detail-key">RTO Inspection Compliance</div>
-              <div class="p-detail-value">AP RTO Verified (Valid 2027)</div>
-              <div class="p-detail-sub">Safety inspection passed Sept 2026</div>
+              <div class="p-detail-key">Inspection Compliance</div>
+              <div class="p-detail-value">AP RTO Verified</div>
+              <div class="p-detail-sub">Safety inspection passed</div>
             </div>
             <div class="p-detail-cell">
               <div class="p-detail-key">Safety Equipment</div>
-              <div class="p-detail-value">Speed Governor (40 km/h)</div>
-              <div class="p-detail-sub">Instructor dual control &amp; first aid kit</div>
+              <div class="p-detail-value">First Aid Kit &amp; Dual Mirrors</div>
+              <div class="p-detail-sub">Instructor dual control verification</div>
             </div>
           </div>
         </div>
@@ -353,6 +368,51 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
         store.updateAttendance(slotId, status);
         showToast(`${slot.studentName} marked ${status.toUpperCase()}`, 'success');
         render();
+      });
+    });
+
+    // Trainer Start / Log Ride (Opens Live 8km Map)
+    container.querySelectorAll('.btn-trainer-log-ride').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const traineeId = btn.dataset.traineeId;
+        const trainee = allTrainees.find(t => t.id === traineeId);
+        if (!trainee) return;
+        const dayToComplete = trainee.currentDay;
+        const sched = store.getStudentSchedule(traineeId);
+        const session = sched?.sessions?.find(s => s.dayNumber === dayToComplete) || {
+          dayNumber: dayToComplete,
+          objective: 'Practical Road Driving',
+          date: '2026-10-01'
+        };
+
+        openLiveRideMapModal({
+          session,
+          student: trainee,
+          trainer,
+          canTrainerComplete: true,
+          onRideCompleted: () => {
+            showToast(`Day ${dayToComplete} 8.0 km ride completed for ${trainee.name} ✓`, 'success');
+            render();
+          }
+        });
+      });
+    });
+
+    // Route map buttons
+    container.querySelectorAll('.btn-trainer-view-route').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const traineeId = btn.dataset.traineeId;
+        const trainee = allTrainees.find(t => t.id === traineeId);
+        const sched = store.getStudentSchedule(traineeId);
+        const dayNum = trainee?.currentDay || 1;
+        const session = sched?.sessions?.find(s => s.dayNumber === dayNum) || sched?.sessions?.[0];
+        if (session) {
+          openRouteMapModal({
+            session,
+            studentName: trainee ? trainee.name : 'Student',
+            carInfo: trainer.car
+          });
+        }
       });
     });
 
