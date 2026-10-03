@@ -4,16 +4,18 @@
 
    Features:
    - Live GPS Geolocation: Anchors map and road corridor directly at the user's
-     actual live coordinates with real-time movement tracking
+     actual live coordinates
+   - STRICT MOVEMENT-ONLY TRACKING: Zero automatic movement. The vehicle ONLY moves
+     when actual physical movement is detected by the device GPS (or manual test move)
+   - When stationary (parked / stopped), speed is 0 km/h and distance stays frozen
    - "Road-Only" navigation view: clean dark terrain, wide multi-layer asphalt highway,
      high-contrast center dashed divider, outer white shoulders, zero clutter
-   - Real-time meter-by-meter movement tracking from start until the 8.0 km ride ends
    - 16 Milestone checkpoints at exact 500m intervals (500m, 1000m ... 8000m)
    - Real-time countdown to next 500m milestone target
    - Web Audio chime & celebration toast on every 500m checkpoint passed
    - Dynamic real-time glowing path drawn directly on the road behind the vehicle
    - Directional navigation puck with forward headlights rotating with road curves
-   - Real device GPS hardware watch (`watchPosition`) + smooth road tracking
+   - Real device GPS hardware watch (`watchPosition`)
    - Minimalist floating HUD island & luxury dark obsidian/gold completion screen
    ========================================================================== */
 
@@ -22,7 +24,6 @@ import { store } from '../store.js';
 
 let activeLiveMap = null;
 let activeWatchId = null;
-let movementTrackerInterval = null;
 let durationTimer = null;
 
 // Helper: Haversine distance in meters between two lat/lng points
@@ -130,7 +131,7 @@ function buildRoadCorridorFromOrigin(originLat, originLng, existingRoute = null)
   if (existingRoute && existingRoute.length >= 2) {
     rawPoints = existingRoute;
   } else {
-    // Generate realistic 8.0 km road driving loop starting from the user's actual live coordinates
+    // Realistic 8.0 km road driving loop starting from the user's actual live coordinates
     const deltaOffsets = [
       [0, 0],
       [0.0022, 0.0028],
@@ -154,7 +155,7 @@ function buildRoadCorridorFromOrigin(originLat, originLng, existingRoute = null)
 
   // 16 Checkpoints at exact 500m intervals (500m, 1000m ... 8000m)
   const checkpointLabels = [
-    { title: 'Cockpit ABC Drill', place: 'Starting Sector' },
+    { title: 'Cockpit ABC Drill', place: 'Starting Corridor' },
     { title: 'Steering Centering Check', place: 'Bakarapuram Avenue' },
     { title: 'Smooth Upshift Gear 2', place: 'Residential Link' },
     { title: 'Pedestrian Yield Zone', place: 'Town North Bypass' },
@@ -218,13 +219,11 @@ export function openLiveRideMapModal({
   const DEFAULT_LAT = session?.route?.startPoint?.lat || 14.4230;
   const DEFAULT_LNG = session?.route?.startPoint?.lng || 78.2285;
 
-  // Real-Time Movement State
+  // Real-Time Movement State (STRICTLY PHYSICAL MOVEMENT ONLY)
   let totalDistanceMeters = 0;
-  let currentSpeedKmh = 0;
   let secondsElapsed = 0;
   let isTrackingPaused = false;
   let isRideCompleted = false;
-  let hasRealGpsMovement = false;
 
   let lastGpsPoint = null;
   let lastGpsTimestamp = null;
@@ -290,7 +289,7 @@ export function openLiveRideMapModal({
 
             <!-- Center: Essential Telemetry Metrics -->
             <div style="display: flex; align-items: center; gap: 1.25rem;">
-              <!-- Speed -->
+              <!-- Speed (0 km/h when not moving!) -->
               <div style="text-align: center;">
                 <div style="font-size: 0.58rem; color: #71717a; text-transform: uppercase; font-weight: 700;">Speed</div>
                 <div style="font-size: 1.5rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono); line-height: 1.1;">
@@ -414,10 +413,11 @@ export function openLiveRideMapModal({
           z-index: 1000;
           flex-wrap: wrap;
         ">
-          <button type="button" id="btn-pause-resume-tracking" style="
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            color: #ffffff;
+          <!-- Manual Test Move Button (Only moves when clicked!) -->
+          <button type="button" id="btn-manual-test-move" style="
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            color: #38bdf8;
             padding: 0.55rem 1rem;
             border-radius: 10px;
             font-size: 0.8rem;
@@ -426,9 +426,9 @@ export function openLiveRideMapModal({
             display: flex;
             align-items: center;
             gap: 0.4rem;
-          ">
-            <span id="pause-resume-icon">⏸</span>
-            <span id="pause-resume-text">Pause</span>
+          " title="Manually step 50m forward for testing without driving">
+            <span>🚗</span>
+            <span>Test Move (+50m)</span>
           </button>
 
           <button type="button" id="btn-reacquire-gps" style="
@@ -584,10 +584,6 @@ export function openLiveRideMapModal({
       navigator.geolocation.clearWatch(activeWatchId);
       activeWatchId = null;
     }
-    if (movementTrackerInterval) {
-      clearInterval(movementTrackerInterval);
-      movementTrackerInterval = null;
-    }
     if (durationTimer) {
       clearInterval(durationTimer);
       durationTimer = null;
@@ -603,8 +599,9 @@ export function openLiveRideMapModal({
 
   // =========================================================
   // MOVEMENT TELEMETRY HANDLER
+  // Only called when ACTUAL movement happens!
   // =========================================================
-  function recordMovementStep(latitude, longitude, bearing = 0, speedKmh = 30, deltaMeters = 0) {
+  function recordMovementStep(latitude, longitude, bearing = 0, speedKmh = 0, deltaMeters = 0) {
     if (isRideCompleted || isTrackingPaused) return;
 
     totalDistanceMeters = Math.min(8000, totalDistanceMeters + deltaMeters);
@@ -704,7 +701,6 @@ export function openLiveRideMapModal({
     if (isRideCompleted) return;
     isRideCompleted = true;
 
-    if (movementTrackerInterval) clearInterval(movementTrackerInterval);
     if (activeWatchId !== null && navigator.geolocation) {
       navigator.geolocation.clearWatch(activeWatchId);
       activeWatchId = null;
@@ -745,8 +741,8 @@ export function openLiveRideMapModal({
         statusDot.style.boxShadow = '0 0 10px #22c55e';
         statusText.style.color = '#22c55e';
         statusText.textContent = accuracy 
-          ? `LIVE GPS ACTIVE (±${Math.round(accuracy)}m) · ROAD TRACKING`
-          : 'LIVE ROAD MOVEMENT TRACKING ACTIVE';
+          ? `LIVE GPS ACTIVE (±${Math.round(accuracy)}m) · STATIONARY`
+          : 'LIVE GPS READY · WAITING FOR MOVEMENT';
       }
 
       // Edge-to-edge locked driving camera (fixed zoom 18, zero zoom jumps)
@@ -991,7 +987,7 @@ export function openLiveRideMapModal({
       mapInstance.invalidateSize();
       setTimeout(() => mapInstance?.invalidateSize(), 200);
 
-      // Duration Timer
+      // Duration Timer (Counts lesson duration)
       if (!durationTimer) {
         durationTimer = setInterval(() => {
           if (isRideCompleted || isTrackingPaused) return;
@@ -1004,7 +1000,8 @@ export function openLiveRideMapModal({
       }
 
       // =========================================================
-      // LIVE GPS HARDWARE WATCH (Tracks real device movement outdoors)
+      // LIVE GPS HARDWARE WATCH (STRICT PHYSICAL MOVEMENT ONLY)
+      // Zero auto-movement. Only updates when delta >= 2.5 meters!
       // =========================================================
       if (navigator.geolocation && activeWatchId === null) {
         activeWatchId = navigator.geolocation.watchPosition(
@@ -1014,26 +1011,40 @@ export function openLiveRideMapModal({
 
             const dot = document.getElementById('gps-status-dot');
             const txt = document.getElementById('gps-status-text');
-            if (dot && txt) {
-              dot.style.background = '#22c55e';
-              dot.style.boxShadow = '0 0 10px #22c55e';
-              txt.style.color = '#22c55e';
-              txt.textContent = `LIVE GPS ACTIVE (±${Math.round(fixAcc || 5)}m) · ROAD TRACKING`;
-            }
 
             if (lastGpsPoint) {
               const delta = haversineMeters([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
-              if (delta >= 1.0) { // Actual movement detected by physical GPS sensor!
-                hasRealGpsMovement = true;
+              
+              if (delta >= 2.5) {
+                // Physical movement confirmed!
                 const dSec = (now - lastGpsTimestamp) / 1000;
-                const spd = (speed != null && speed > 0) ? (speed * 3.6) : (dSec > 0 ? (delta / dSec) * 3.6 : 28);
+                const spd = (speed != null && speed > 0) 
+                  ? (speed * 3.6) 
+                  : (dSec > 0 ? (delta / dSec) * 3.6 : 25);
                 const brng = (heading != null && !isNaN(heading)) 
                   ? heading 
                   : calculateBearing([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
 
+                if (dot && txt) {
+                  dot.style.background = '#22c55e';
+                  txt.style.color = '#22c55e';
+                  txt.textContent = `LIVE GPS ACTIVE · MOVING (${Math.round(spd)} km/h)`;
+                }
+
                 recordMovementStep(latitude, longitude, brng, spd, delta);
                 lastGpsPoint = { lat: latitude, lng: longitude };
                 lastGpsTimestamp = now;
+              } else {
+                // Stationary (sitting still / parked at light)
+                // Speed = 0 km/h, distance remains frozen
+                const speedElem = document.getElementById('hud-speed');
+                if (speedElem) speedElem.textContent = '0';
+
+                if (dot && txt) {
+                  dot.style.background = '#22c55e';
+                  txt.style.color = '#22c55e';
+                  txt.textContent = `LIVE GPS ACTIVE (±${Math.round(fixAcc || 5)}m) · STATIONARY`;
+                }
               }
             } else {
               lastGpsPoint = { lat: latitude, lng: longitude };
@@ -1050,29 +1061,6 @@ export function openLiveRideMapModal({
           }
         );
       }
-
-      // =========================================================
-      // ROAD MOVEMENT SIMULATION / FALLBACK ENGINE
-      // If stationary or testing indoors, tracks smooth movement along the road
-      // =========================================================
-      let motionTick = 0;
-      if (movementTrackerInterval) clearInterval(movementTrackerInterval);
-      movementTrackerInterval = setInterval(() => {
-        if (isRideCompleted || isTrackingPaused) return;
-
-        // If real GPS physical movement is already driving the updates, skip simulated motion
-        if (hasRealGpsMovement) return;
-
-        motionTick++;
-        const dynamicSpeed = 28 + Math.round(Math.sin(motionTick / 8) * 4);
-        // At 250ms interval: delta ≈ speed * (1000/3600) * 0.25 ≈ 2.0 meters per tick
-        const tickDeltaMeters = (dynamicSpeed * 1000 / 3600) * 0.25;
-
-        const nextMeters = totalDistanceMeters + tickDeltaMeters;
-        const pt = getPointAtMeters(allRoadCoords, nextMeters, 8000);
-
-        recordMovementStep(pt.lat, pt.lng, pt.bearing, dynamicSpeed, tickDeltaMeters);
-      }, 250);
 
     } catch (err) {
       console.error('Failed to initialize Road-Only Tracking Map:', err);
@@ -1122,22 +1110,19 @@ export function openLiveRideMapModal({
     handleLocationFallback();
   }
 
-  // Pause / Resume
-  const btnPauseResume = modalRoot.querySelector('#btn-pause-resume-tracking');
-  const iconSpan = modalRoot.querySelector('#pause-resume-icon');
-  const textSpan = modalRoot.querySelector('#pause-resume-text');
+  // Manual Test Move Button: advances 50m forward along the road ONLY when clicked!
+  modalRoot.querySelector('#btn-manual-test-move')?.addEventListener('click', () => {
+    if (isRideCompleted || isTrackingPaused || !allRoadCoords.length) return;
+    const testDelta = 50;
+    const nextMeters = Math.min(8000, totalDistanceMeters + testDelta);
+    const pt = getPointAtMeters(allRoadCoords, nextMeters, 8000);
+    recordMovementStep(pt.lat, pt.lng, pt.bearing, 32, testDelta);
 
-  btnPauseResume?.addEventListener('click', () => {
-    isTrackingPaused = !isTrackingPaused;
-    if (isTrackingPaused) {
-      iconSpan.textContent = '▶';
-      textSpan.textContent = 'Resume';
+    // Reset speed to 0 after 1 second if no further clicks
+    setTimeout(() => {
       const speedElem = document.getElementById('hud-speed');
       if (speedElem) speedElem.textContent = '0';
-    } else {
-      iconSpan.textContent = '⏸';
-      textSpan.textContent = 'Pause';
-    }
+    }, 1200);
   });
 
   // Re-sync GPS
@@ -1148,7 +1133,6 @@ export function openLiveRideMapModal({
           const { latitude, longitude, accuracy } = pos.coords;
           lastGpsPoint = { lat: latitude, lng: longitude };
           lastGpsTimestamp = Date.now();
-          hasRealGpsMovement = true;
 
           if (carMarker) carMarker.setLatLng([latitude, longitude]);
           if (mapInstance) mapInstance.setView([latitude, longitude], 18, { animate: false });
