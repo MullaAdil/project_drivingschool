@@ -1,0 +1,44 @@
+[
+  {
+    "id": "ACC-USR-001",
+    "role": "USER",
+    "targetId": "SK- GS01",
+    "name": "Sai Kiran Varma",
+    "loginId": "saikiran",
+    "salt": "00764fafc5a5384642cbf09893f5393e",
+    "hash": "48ead8fa10946329ac6409101439561970d42e660131e7e201269d6a300da273dd58c1d05ee4bcb643c2eeb0c534f65b51f4c308e163d6ddea2bf65e515a497b",
+    "status": "Active",
+    "email": "sai.kiran@gafoordriving.in",
+    "phone": "+91 98480 22334",
+    "createdAt": "2026-10-02T09:24:11.764Z",
+    "updatedAt": "2026-10-02T09:24:11.764Z"
+  },
+  {
+    "id": "ACC-USR-002",
+    "role": "USER",
+    "targetId": "APX-9021",
+    "name": "Mulla Adil",
+    "loginId": "mullaadil",
+    "salt": "00764fafc5a5384642cbf09893f5393e",
+    "hash": "48ead8fa10946329ac6409101439561970d42e660131e7e201269d6a300da273dd58c1d05ee4bcb643c2eeb0c534f65b51f4c308e163d6ddea2bf65e515a497b",
+    "status": "Active",
+    "email": "mulla.adil@gafoordriving.in",
+    "phone": "+91 98491 55667",
+    "createdAt": "2026-10-02T09:24:11.770Z",
+    "updatedAt": "2026-10-02T09:24:11.770Z"
+  },
+  {
+    "id": "ACC-TRN-001",
+    "role": "TRAINER",
+    "targetId": "TRN-1",
+    "name": "K. Srinivas Rao",
+    "loginId": "srinivas",
+    "salt": "a246170ff3a145a21d1adf2915a48bc5",
+    "hash": "e7d1105e6a9253a375d3a08282a7920e9c3b45720b832e2cab6ce916f48a6e4302108cc5d590ce64f8995bb1509794a73c4b3b90457b7bed5a158619b2512cfe",
+    "status": "Active",
+    "email": "srinivas.rao@gafoordriving.in",
+    "phone": "+91 98480 11223",
+    "createdAt": "2026-10-02T09:24:11.793Z",
+    "updatedAt": "2026-10-02T09:24:11.793Z"
+  }
+]

@@ -7,13 +7,26 @@
    - Service 03: Candidate Master KYC, LLR Permit & RTO Readiness Dossier
    ========================================================================== */
 
-import { store } from '../store.js';
+import { store, formatReadableDate, getLocalTodayDate } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
 import { renderStudentAvatar } from '../components/studentAvatar.js';
 import { triggerPhotoUpload } from '../components/photoCropModal.js';
 
 export function renderTraineeView(container, showToast, subService = 'curriculum', onNavigate) {
   let activeFilter = 'all';
+  let selectedDate = store.getTodayDateStr();
+  let traineeSlotTab = 'slots'; // 'slots' | 'my-rides'
+  let traineeSlotViewMode = 'table'; // 'table' | 'cards'
+  let traineeSlotStatusFilter = 'all'; // 'all' | 'available' | 'my-bookings' | 'completed' | 'full'
+  let traineeSlotSearch = '';
+
+  function formatSlotDateShort(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length < 3) return dateStr;
+    const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  }
 
   function render() {
     const trainee  = store.getCurrentTrainee();
@@ -48,8 +61,9 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
               <p class="portal-page-sub">${trainee.package} · LLR Permit: ${trainee.permitNumber || 'AP004/LLR/2026/8941'} · Instructor: ${trainer.name}</p>
             </div>
           </div>
-          <div style="display:flex; gap:0.65rem; align-items:center;">
-            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-show-qr-voucher">Pay Course Fee (UPI QR) →</button>
+          <div style="display:flex; gap:0.65rem; align-items:center; flex-wrap:wrap;">
+            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-go-to-book-slot">Book Driving Slot →</button>
+            <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-show-qr-voucher">Pay Course Fee (UPI QR)</button>
           </div>
         </div>
 
@@ -355,6 +369,472 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
       `;
     }
 
+    // =========================================================
+    // SERVICE 04: PRACTICAL DRIVING SLOTS & RIDE STATUS
+    // Visually follows the Admin Portal design (shell, stats strip,
+    // quick dates, table & card dispatch views) with STRICTLY student-only
+    // permissions: READ-ONLY slot viewing, booking available slots, and
+    // viewing personal ride statuses (✓ RIDE COMPLETED, CONFIRMED, AVAILABLE, FULL).
+    // NO admin management controls ([Edit], [Delete], [Assign], etc.)
+    // =========================================================
+    if (currentSub === 'slots') {
+      const allSlotsOnDate = store.getSlotsForDate(selectedDate);
+      const totalDayCapacity = allSlotsOnDate.reduce((acc, s) => acc + s.totalCapacity, 0);
+      const totalAvailableDay = allSlotsOnDate.reduce((acc, s) => acc + s.availableSeats, 0);
+
+      // Student's personal bookings across all dates
+      const myAllBookings = store.getLearnerAllBookings ? store.getLearnerAllBookings(trainee.id) : store.slotBookings.filter(b => b.traineeId === trainee.id);
+      const myActiveBookings = myAllBookings.filter(b => b.status === 'CONFIRMED');
+      const myCompletedRides = myAllBookings.filter(b => b.status === 'COMPLETED' || b.attendance === 'present');
+
+      // Filter slots for the selected date
+      let filteredSlots = allSlotsOnDate.filter(slot => {
+        const myBooking = slot.bookings.find(b => b.traineeId === trainee.id || (b.date === slot.date && b.startTime === slot.startTime && b.traineeId === trainee.id));
+        const isCompleted = (myBooking && (myBooking.status === 'COMPLETED' || myBooking.attendance === 'present')) || slot.calculatedStatus === 'Completed' || slot.status === 'Completed';
+        const isConfirmed = !isCompleted && myBooking && myBooking.status === 'CONFIRMED';
+        const isFull = !isCompleted && !isConfirmed && (slot.calculatedStatus === 'Full' || slot.availableSeats <= 0);
+        const isAvailable = !isCompleted && !isConfirmed && !isFull && slot.availableSeats > 0 && slot.calculatedStatus !== 'Cancelled' && slot.calculatedStatus !== 'Closed' && slot.calculatedStatus !== 'Maintenance';
+
+        const fStatus = traineeSlotStatusFilter.toLowerCase();
+        let matchStatus = true;
+        if (fStatus === 'available') matchStatus = isAvailable;
+        else if (fStatus === 'my-bookings') matchStatus = isConfirmed;
+        else if (fStatus === 'completed') matchStatus = isCompleted;
+        else if (fStatus === 'full') matchStatus = isFull;
+
+        const q = traineeSlotSearch.toLowerCase().trim();
+        const matchQuery = !q ||
+          slot.timeDisplay.toLowerCase().includes(q) ||
+          slot.startTime.toLowerCase().includes(q) ||
+          (slot.vehicleOverride && slot.vehicleOverride.toLowerCase().includes(q)) ||
+          slot.trainerAllocations.some(a => (a.trainerName && a.trainerName.toLowerCase().includes(q)) || (a.vehicle && a.vehicle.toLowerCase().includes(q)));
+
+        return matchStatus && matchQuery;
+      });
+
+      const availableSlotsCount = allSlotsOnDate.filter(s => {
+        const myBooking = s.bookings.find(b => b.traineeId === trainee.id);
+        const isCompleted = (myBooking && (myBooking.status === 'COMPLETED' || myBooking.attendance === 'present')) || s.calculatedStatus === 'Completed' || s.status === 'Completed';
+        const isConfirmed = !isCompleted && myBooking && myBooking.status === 'CONFIRMED';
+        const isFull = s.calculatedStatus === 'Full' || s.availableSeats <= 0;
+        return !isCompleted && !isConfirmed && !isFull && s.availableSeats > 0 && s.calculatedStatus !== 'Cancelled' && s.calculatedStatus !== 'Closed' && s.calculatedStatus !== 'Maintenance';
+      }).length;
+
+      // Quick dates (next 5 days)
+      const quickDates = [];
+      const baseDt = new Date();
+      for (let i = 0; i < 5; i++) {
+        const d = new Date(baseDt);
+        d.setDate(d.getDate() + i);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dtStr = `${y}-${m}-${day}`;
+        const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+        quickDates.push({ dateStr: dtStr, label });
+      }
+
+      contentHtml = `
+        <div class="portal-page-header">
+          <div>
+            <h1 class="portal-page-title">Practical Driving Slots</h1>
+            <p class="portal-page-sub">Select an available practical driving slot to reserve your training session · Dual-control training cars with AP RTO certified instructors.</p>
+          </div>
+          <div style="display:flex; gap:0.65rem; align-items:center; flex-wrap:wrap;">
+            <span class="p-badge p-badge-green" style="font-size:0.75rem;">● Student Portal · Booking &amp; Ride Status</span>
+            <span class="p-badge p-badge-dim" style="font-size:0.75rem;">Candidate: ${trainee.name} (${trainee.studentCode || trainee.id})</span>
+          </div>
+        </div>
+
+        <!-- STATS STRIP (Admin Portal Design Language) -->
+        <div class="portal-stats-strip">
+          <div class="portal-stat">
+            <span class="portal-stat-value">${allSlotsOnDate.length}</span>
+            <span class="portal-stat-label">Daily Slots</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:${totalAvailableDay > 0 ? 'var(--neem-green)' : '#f87171'};">${totalAvailableDay}</span>
+            <span class="portal-stat-label">Available Seats Today</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:var(--primary-cyan);">${myActiveBookings.length}</span>
+            <span class="portal-stat-label">Upcoming Bookings</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:var(--neem-green);">${myCompletedRides.length}</span>
+            <span class="portal-stat-label">Completed Rides</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:var(--primary-gold);">${currentDay} / 20</span>
+            <span class="portal-stat-label">Course Progress</span>
+          </div>
+        </div>
+
+        <!-- SUB-TABS -->
+        <div style="display:flex; gap:0.5rem; padding:0 2rem; border-bottom:1px solid var(--border-light); background:rgba(255,255,255,0.01);">
+          <button type="button" class="p-tab-btn ${traineeSlotTab === 'slots' ? 'p-tab-active' : ''} btn-trainee-slot-tab" data-tab="slots" style="padding:0.75rem 1.25rem; font-weight:700; font-size:0.875rem; background:transparent; border:none; color:${traineeSlotTab==='slots'?'#ffffff':'var(--slate-muted)'}; border-bottom:2px solid ${traineeSlotTab==='slots'?'#ffffff':'transparent'}; cursor:pointer;">
+            📅 Available Practical Driving Slots (${allSlotsOnDate.length})
+          </button>
+          <button type="button" class="p-tab-btn ${traineeSlotTab === 'my-rides' ? 'p-tab-active' : ''} btn-trainee-slot-tab" data-tab="my-rides" style="padding:0.75rem 1.25rem; font-weight:700; font-size:0.875rem; background:transparent; border:none; color:${traineeSlotTab==='my-rides'?'#ffffff':'var(--slate-muted)'}; border-bottom:2px solid ${traineeSlotTab==='my-rides'?'#ffffff':'transparent'}; cursor:pointer;">
+            🚗 My Practical Rides &amp; Status (${myAllBookings.length})
+          </button>
+        </div>
+
+        ${traineeSlotTab === 'slots' ? `
+          <!-- DATE & FILTER BAR -->
+          <div class="slot-date-nav">
+            <span style="font-size:0.875rem; font-weight:800; color:#ffffff; margin-right:0.35rem;">Training Date:</span>
+            ${quickDates.map(qd => `
+              <button type="button" class="slot-quick-date-btn ${selectedDate === qd.dateStr ? 'active' : ''}" data-student-date="${qd.dateStr}">
+                📅 ${qd.label}
+              </button>
+            `).join('')}
+            <div style="display:flex; align-items:center; gap:0.45rem;">
+              <input type="date" class="mnc-input" id="inp-student-slot-date" value="${selectedDate}" style="padding:0.4rem 0.65rem; font-size:0.8125rem; width:150px;" />
+            </div>
+
+            <div style="display:flex; align-items:center; gap:0.65rem; margin-left:auto; flex-wrap:wrap;">
+              <select class="mnc-select" id="sel-student-slot-status" style="padding:0.4rem 0.65rem; font-size:0.8125rem;">
+                <option value="all" ${traineeSlotStatusFilter==='all'?'selected':''}>All Slots</option>
+                <option value="available" ${traineeSlotStatusFilter==='available'?'selected':''}>Available Only</option>
+                <option value="my-bookings" ${traineeSlotStatusFilter==='my-bookings'?'selected':''}>My Bookings</option>
+                <option value="completed" ${traineeSlotStatusFilter==='completed'?'selected':''}>Completed Rides</option>
+                <option value="full" ${traineeSlotStatusFilter==='full'?'selected':''}>Full Slots</option>
+              </select>
+              <input type="text" class="mnc-input" id="inp-student-slot-search" placeholder="Search time, vehicle…" value="${traineeSlotSearch}" style="padding:0.4rem 0.65rem; font-size:0.8125rem; width:170px;" />
+            </div>
+          </div>
+
+          <!-- SLOTS LIST & TABLE VIEW -->
+          <div class="portal-section">
+            <div class="portal-section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+              <div>
+                <span class="portal-section-title">Driving Slots — ${formatReadableDate(selectedDate)}</span>
+                <span class="portal-section-meta">${availableSlotsCount} slot${availableSlotsCount === 1 ? '' : 's'} available for reservation</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <button type="button" class="btn-mnc ${traineeSlotViewMode === 'table' ? 'btn-mnc-primary' : 'btn-mnc-secondary'} btn-mnc-sm btn-trainee-view-mode" data-mode="table" style="font-size:0.75rem; padding:0.35rem 0.75rem;">
+                  📋 Table View
+                </button>
+                <button type="button" class="btn-mnc ${traineeSlotViewMode === 'cards' ? 'btn-mnc-primary' : 'btn-mnc-secondary'} btn-mnc-sm btn-trainee-view-mode" data-mode="cards" style="font-size:0.75rem; padding:0.35rem 0.75rem;">
+                  🗂 Detailed Cards
+                </button>
+              </div>
+            </div>
+
+            ${traineeSlotViewMode === 'table' ? `
+              <!-- DEDICATED DRIVING SLOTS TABLE (STUDENT PORTAL READ-ONLY/BOOKING) -->
+              <div class="p-table-wrap" style="background:rgba(18,20,26,0.85); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-md); overflow:hidden;">
+                <table class="p-table" style="margin:0;">
+                  <thead>
+                    <tr style="background:rgba(255,255,255,0.03); border-bottom:1px solid rgba(255,255,255,0.08);">
+                      <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Date</th>
+                      <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Time</th>
+                      <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; text-align:center;">Capacity</th>
+                      <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Status</th>
+                      <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; text-align:right;">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${filteredSlots.length === 0 ? `
+                      <tr>
+                        <td colspan="5" style="padding:2.5rem 1rem; text-align:center; color:var(--slate-muted);">
+                          No driving slots found matching filters for this date.
+                        </td>
+                      </tr>
+                    ` : filteredSlots.map(slot => {
+                      const myBooking = slot.bookings.find(b => b.traineeId === trainee.id || (b.date === slot.date && b.startTime === slot.startTime && b.traineeId === trainee.id));
+                      const isCompletedRide = (myBooking && (myBooking.status === 'COMPLETED' || myBooking.attendance === 'present')) || slot.calculatedStatus === 'Completed' || slot.status === 'Completed';
+                      const isConfirmedBooking = !isCompletedRide && myBooking && myBooking.status === 'CONFIRMED';
+                      const isFullSlot = !isCompletedRide && !isConfirmedBooking && (slot.calculatedStatus === 'Full' || slot.availableSeats <= 0);
+                      const isCancelledSlot = !isCompletedRide && !isConfirmedBooking && slot.calculatedStatus === 'Cancelled';
+                      const isClosedSlot = !isCompletedRide && !isConfirmedBooking && (slot.calculatedStatus === 'Closed' || slot.calculatedStatus === 'Inactive');
+                      const isMaintSlot = !isCompletedRide && !isConfirmedBooking && slot.calculatedStatus === 'Maintenance';
+                      const isAvailableSlot = !isCompletedRide && !isConfirmedBooking && !isFullSlot && !isCancelledSlot && !isClosedSlot && !isMaintSlot && slot.availableSeats > 0;
+
+                      const shortDate = formatSlotDateShort(slot.date);
+
+                      return `
+                        <tr class="${isCompletedRide ? 'completed-ride-row' : ''}" style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.15s ease;">
+                          <td style="padding:1rem 1.25rem; font-weight:700; color:#ffffff; white-space:nowrap;">
+                            ${shortDate}
+                            <div style="font-size:0.7rem; color:${isCompletedRide ? '#4ade80' : 'var(--slate-muted)'}; font-weight:${isCompletedRide ? '700' : 'normal'};">
+                              ${isCompletedRide ? '✓ Completed Session' : slot.date}
+                            </div>
+                          </td>
+                          <td style="padding:1rem 1.25rem; font-family:var(--font-mono); font-weight:700; color:#ffffff; white-space:nowrap;">
+                            ${slot.timeDisplay || `${slot.startTime} – ${slot.endTime}`}
+                            <div style="font-size:0.7rem; color:${isCompletedRide ? '#86efac' : 'var(--slate-muted)'}; font-family:var(--font-sans); font-weight:normal;">
+                              ${isCompletedRide ? 'Practical Lesson Finished' : '1-hr Practical Session'}
+                            </div>
+                          </td>
+                          <td style="padding:1rem 1.25rem; text-align:center;">
+                            ${isCompletedRide ? `
+                              <span style="font-family:var(--font-mono); font-weight:800; color:#4ade80;">${slot.bookedCount}/${slot.totalCapacity}</span>
+                              <div style="font-size:0.7rem; color:#4ade80; font-weight:700;">✓ Completed</div>
+                            ` : isFullSlot ? `
+                              <span style="font-family:var(--font-mono); font-weight:800; color:#f87171;">${slot.totalCapacity}/${slot.totalCapacity}</span>
+                              <div style="font-size:0.7rem; color:#f87171; font-weight:600;">8/8 FULL</div>
+                            ` : `
+                              <span style="font-family:var(--font-mono); font-weight:800; color:#4ade80;">${slot.bookedCount}/${slot.totalCapacity}</span>
+                              <div style="font-size:0.7rem; color:var(--slate-muted);">${slot.availableSeats} available</div>
+                            `}
+                          </td>
+                          <td style="padding:1rem 1.25rem; white-space:nowrap;">
+                            ${isCompletedRide ? `
+                              <span class="slot-status-pill status-pill-completed">
+                                ✓ RIDE COMPLETED
+                              </span>
+                            ` : isConfirmedBooking ? `
+                              <span class="slot-status-pill status-pill-confirmed">CONFIRMED</span>
+                            ` : isFullSlot ? `
+                              <span class="slot-status-pill status-pill-full">FULL</span>
+                            ` : isMaintSlot ? `
+                              <span class="slot-status-pill status-pill-maintenance">MAINTENANCE</span>
+                            ` : isClosedSlot ? `
+                              <span class="slot-status-pill status-pill-closed">CLOSED</span>
+                            ` : isCancelledSlot ? `
+                              <span class="slot-status-pill status-pill-cancelled">CANCELLED</span>
+                            ` : `
+                              <span class="slot-status-pill status-pill-available">AVAILABLE</span>
+                            `}
+                          </td>
+                          <td style="padding:1rem 1.25rem; text-align:right; white-space:nowrap;">
+                            ${isCompletedRide ? `
+                              <div style="display:inline-flex; flex-direction:column; align-items:flex-end; gap:0.25rem;">
+                                <span class="action-badge-completed">
+                                  <span style="font-size:0.95rem;">✓</span> Ride Completed
+                                </span>
+                                <span style="font-size:0.68rem; color:#94a3b8; font-weight:600;">No further action required</span>
+                              </div>
+                            ` : isConfirmedBooking ? `
+                              <div style="display:inline-flex; align-items:center; gap:0.45rem; justify-content:flex-end;">
+                                <span class="action-badge-booked">BOOKED</span>
+                                <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-trainee-cancel-slot" data-booking-id="${myBooking.id}" style="padding:0.3rem 0.6rem; font-size:0.72rem; color:#f87171; border-color:rgba(239,68,68,0.3);" title="Cancel reservation">Cancel</button>
+                              </div>
+                            ` : isAvailableSlot ? `
+                              <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm btn-trainee-book-slot" data-slot-id="${slot.id}" data-date="${slot.date}" data-start-time="${slot.startTime}" data-end-time="${slot.endTime}" data-time-display="${slot.timeDisplay || `${slot.startTime} – ${slot.endTime}`}" style="padding:0.4rem 1.15rem; font-size:0.75rem; font-weight:800; letter-spacing:0.04em;">
+                                BOOK
+                              </button>
+                            ` : isFullSlot ? `
+                              <span class="action-badge-full">FULL</span>
+                            ` : `
+                              <span class="p-badge p-badge-dim" style="font-size:0.75rem; padding:0.35rem 0.75rem;">UNAVAILABLE</span>
+                            `}
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : `
+              <!-- DETAILED CARDS VIEW -->
+              <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1.25rem;">
+                ${filteredSlots.length === 0 ? `
+                  <div style="grid-column:1/-1; padding:2.5rem 1rem; text-align:center; color:var(--slate-muted); background:rgba(18,20,26,0.6); border:1px solid rgba(255,255,255,0.06); border-radius:var(--radius-md);">
+                    No driving slots found matching filters for this date.
+                  </div>
+                ` : filteredSlots.map(slot => {
+                  const myBooking = slot.bookings.find(b => b.traineeId === trainee.id || (b.date === slot.date && b.startTime === slot.startTime && b.traineeId === trainee.id));
+                  const isCompletedRide = (myBooking && (myBooking.status === 'COMPLETED' || myBooking.attendance === 'present')) || slot.calculatedStatus === 'Completed' || slot.status === 'Completed';
+                  const isConfirmedBooking = !isCompletedRide && myBooking && myBooking.status === 'CONFIRMED';
+                  const isFullSlot = !isCompletedRide && !isConfirmedBooking && (slot.calculatedStatus === 'Full' || slot.availableSeats <= 0);
+                  const isAvailableSlot = !isCompletedRide && !isConfirmedBooking && !isFullSlot && slot.availableSeats > 0 && slot.calculatedStatus !== 'Cancelled' && slot.calculatedStatus !== 'Closed' && slot.calculatedStatus !== 'Maintenance';
+                  const pct = slot.totalCapacity > 0 ? Math.min(100, Math.round((slot.bookedCount / slot.totalCapacity) * 100)) : 0;
+
+                  return `
+                    <div style="background:${isCompletedRide ? 'linear-gradient(180deg, rgba(34,197,94,0.12) 0%, rgba(18,20,26,0.96) 100%)' : 'rgba(18,20,26,0.85)'}; border:${isCompletedRide ? '1.5px solid rgba(34,197,94,0.55)' : isConfirmedBooking ? '1.5px solid rgba(59,130,246,0.45)' : '1px solid rgba(255,255,255,0.08)'}; border-radius:var(--radius-md); padding:1.25rem 1.4rem; display:flex; flex-direction:column; justify-content:space-between; gap:1rem; box-shadow:${isCompletedRide ? '0 4px 20px rgba(34,197,94,0.12)' : 'none'};">
+                      <div>
+                        ${isCompletedRide ? `
+                          <!-- Prominent Completion Ribbon -->
+                          <div style="background:rgba(34,197,94,0.16); border:1px solid rgba(34,197,94,0.35); border-radius:6px; padding:0.45rem 0.75rem; margin-bottom:0.85rem; display:flex; align-items:center; justify-content:space-between;">
+                            <span style="color:#4ade80; font-weight:800; font-size:0.8rem; display:inline-flex; align-items:center; gap:0.4rem;">
+                              <span style="font-size:1rem;">✓</span> PRACTICAL RIDE COMPLETED
+                            </span>
+                            <span style="font-size:0.68rem; color:#86efac; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;">Session Closed</span>
+                          </div>
+                        ` : ''}
+
+                        <!-- Header -->
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem;">
+                          <div>
+                            <div style="font-size:1.15rem; font-weight:800; font-family:var(--font-mono); color:#ffffff;">${slot.timeDisplay || `${slot.startTime} – ${slot.endTime}`}</div>
+                            <div style="font-size:0.75rem; color:${isCompletedRide ? '#4ade80' : 'var(--slate-muted)'};">${formatReadableDate(slot.date)} · ${isCompletedRide ? 'Practical Lesson Finished' : '1-hr Practical'}</div>
+                          </div>
+                          <div>
+                            ${isCompletedRide ? `
+                              <span class="slot-status-pill status-pill-completed">✓ RIDE COMPLETED</span>
+                            ` : isConfirmedBooking ? `
+                              <span class="slot-status-pill status-pill-confirmed">CONFIRMED</span>
+                            ` : isFullSlot ? `
+                              <span class="slot-status-pill status-pill-full">FULL</span>
+                            ` : `
+                              <span class="slot-status-pill status-pill-available">AVAILABLE</span>
+                            `}
+                          </div>
+                        </div>
+
+                        <!-- Capacity Strip -->
+                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:var(--radius-sm); padding:0.65rem 0.85rem; margin-bottom:0.75rem;">
+                          <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:0.35rem;">
+                            <span style="color:var(--slate-muted);">${isCompletedRide ? 'Session Capacity:' : 'Slot Capacity:'}</span>
+                            <span style="font-family:var(--font-mono); font-weight:800; color:${isCompletedRide ? '#4ade80' : isFullSlot ? '#f87171' : '#4ade80'};">${slot.bookedCount} / ${slot.totalCapacity} Booked</span>
+                          </div>
+                          <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                            <div style="height:100%; width:${pct}%; background:${isCompletedRide ? '#4ade80' : pct>=100?'#f87171':pct>=75?'#fbbf24':'#4ade80'}; border-radius:3px;"></div>
+                          </div>
+                          <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--slate-muted); margin-top:0.3rem;">
+                            <span>${isCompletedRide ? 'All seats completed' : `${slot.availableSeats} seat${slot.availableSeats === 1 ? '' : 's'} remaining`}</span>
+                            <span>${slot.availableTrainersCount || 4} On-Duty Instructors</span>
+                          </div>
+                        </div>
+
+                        <!-- Info details -->
+                        <div style="font-size:0.75rem; color:var(--slate-body); display:flex; flex-direction:column; gap:0.25rem;">
+                          <div>🚗 <strong>Vehicle:</strong> Dual-Control RTO Training Car</div>
+                          <div>👨‍🏫 <strong>Instructor:</strong> Certified AP RTO Driving Instructor</div>
+                          ${isCompletedRide && myBooking ? `<div style="color:#4ade80; font-weight:700;">✓ Completed by: ${myBooking.traineeName} (Notes: ${myBooking.notes || 'Attendance Verified ✓'})</div>` : isConfirmedBooking ? `<div style="color:var(--primary-cyan); font-weight:700;">✓ Reserved by: ${myBooking.traineeName} (Car: ${myBooking.vehicle ? myBooking.vehicle.split('#')[0] : 'Swift Dual-Ctrl'})</div>` : ''}
+                        </div>
+                      </div>
+
+                      <!-- Footer Student Actions (STRICTLY NO ADMIN CONTROLS) -->
+                      <div style="border-top:1px solid rgba(255,255,255,0.06); padding-top:0.85rem; display:flex; justify-content:space-between; align-items:center;">
+                        ${isCompletedRide ? `
+                          <div style="background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3); border-radius:8px; padding:0.6rem 0.9rem; width:100%; display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:0.45rem;">
+                              <span style="color:#4ade80; font-size:1.1rem; font-weight:900;">✓</span>
+                              <div>
+                                <div style="color:#4ade80; font-weight:800; font-size:0.82rem; line-height:1.2;">Ride Completed</div>
+                                <div style="font-size:0.7rem; color:#94a3b8;">Practical session logged &amp; verified</div>
+                              </div>
+                            </div>
+                            <span style="font-size:0.72rem; color:#cbd5e1; background:rgba(255,255,255,0.06); padding:0.25rem 0.55rem; border-radius:4px; font-weight:600;">No Action Required</span>
+                          </div>
+                        ` : `
+                          <div>
+                            ${isConfirmedBooking ? `
+                              <span class="action-badge-booked">BOOKED</span>
+                            ` : isAvailableSlot ? `
+                              <span style="color:var(--neem-green); font-size:0.75rem; font-weight:700;">● Available to Book</span>
+                            ` : `
+                              <span style="color:#f87171; font-size:0.75rem; font-weight:700;">● Full (No Seats)</span>
+                            `}
+                          </div>
+                          <div>
+                            ${isConfirmedBooking ? `
+                              <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-trainee-cancel-slot" data-booking-id="${myBooking.id}" style="color:#f87171; border-color:rgba(239,68,68,0.3); font-size:0.75rem;">Cancel</button>
+                            ` : isAvailableSlot ? `
+                              <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm btn-trainee-book-slot" data-slot-id="${slot.id}" data-date="${slot.date}" data-start-time="${slot.startTime}" data-end-time="${slot.endTime}" data-time-display="${slot.timeDisplay || `${slot.startTime} – ${slot.endTime}`}" style="font-size:0.75rem; padding:0.4rem 1.15rem; font-weight:800;">
+                                BOOK
+                              </button>
+                            ` : `
+                              <span class="action-badge-full">FULL</span>
+                            `}
+                          </div>
+                        `}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+        ` : `
+          <!-- SUB-TAB 2: MY PRACTICAL RIDES & STATUS -->
+          <div class="portal-section">
+            <div class="portal-section-header">
+              <div>
+                <span class="portal-section-title">My Practical Driving Record &amp; Ride Status</span>
+                <span class="portal-section-meta">${myAllBookings.length} total driving session${myAllBookings.length === 1 ? '' : 's'} recorded</span>
+              </div>
+            </div>
+
+            <div class="p-table-wrap" style="background:rgba(18,20,26,0.85); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-md); overflow:hidden;">
+              <table class="p-table" style="margin:0;">
+                <thead>
+                  <tr style="background:rgba(255,255,255,0.03); border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Date</th>
+                    <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Time</th>
+                    <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Instructor &amp; Car</th>
+                    <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Status</th>
+                    <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; text-align:right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${myAllBookings.length === 0 ? `
+                    <tr>
+                      <td colspan="5" style="padding:2.5rem 1rem; text-align:center; color:var(--slate-muted);">
+                        You have no driving sessions booked yet. Switch to "Available Practical Driving Slots" to reserve your slot!
+                      </td>
+                    </tr>
+                  ` : myAllBookings.map(bk => {
+                    const isComp = bk.status === 'COMPLETED' || bk.attendance === 'present';
+                    const isConf = bk.status === 'CONFIRMED';
+                    const isCanc = bk.status === 'CANCELLED';
+                    const shortDate = formatSlotDateShort(bk.date);
+
+                    return `
+                      <tr class="${isComp ? 'completed-ride-row' : ''}" style="border-bottom:1px solid rgba(255,255,255,0.05); ${isComp ? 'background:rgba(34,197,94,0.06); border-left:4px solid #22c55e;' : ''}">
+                        <td style="padding:1rem 1.25rem; font-weight:700; color:#ffffff; white-space:nowrap;">
+                          ${shortDate}
+                          <div style="font-size:0.7rem; color:${isComp ? '#4ade80' : 'var(--slate-muted)'}; font-weight:${isComp ? '700' : 'normal'};">
+                            ${isComp ? '✓ Completed Session' : bk.date}
+                          </div>
+                        </td>
+                        <td style="padding:1rem 1.25rem; font-family:var(--font-mono); font-weight:700; color:#ffffff; white-space:nowrap;">
+                          ${bk.timeDisplay || bk.startTime}
+                          <div style="font-size:0.7rem; color:${isComp ? '#86efac' : 'var(--slate-muted)'}; font-family:var(--font-sans); font-weight:normal;">
+                            ${isComp ? 'Practical Lesson Finished' : '1-hr Practical Session'}
+                          </div>
+                        </td>
+                        <td style="padding:1rem 1.25rem;">
+                          <div style="font-size:0.85rem; font-weight:700; color:#ffffff;">Instructor: ${bk.trainerName || 'Assigned'}</div>
+                          <div style="font-size:0.72rem; color:var(--slate-muted);">${bk.vehicle ? bk.vehicle.split('#')[0] : 'Dual-Control Rig'}</div>
+                        </td>
+                        <td style="padding:1rem 1.25rem; white-space:nowrap;">
+                          ${isComp ? `
+                            <span class="slot-status-pill status-pill-completed">✓ RIDE COMPLETED</span>
+                          ` : isConf ? `
+                            <span class="slot-status-pill status-pill-confirmed">CONFIRMED</span>
+                          ` : isCanc ? `
+                            <span class="slot-status-pill status-pill-cancelled">CANCELLED</span>
+                          ` : `
+                            <span class="slot-status-pill">${bk.status}</span>
+                          `}
+                        </td>
+                        <td style="padding:1rem 1.25rem; text-align:right; white-space:nowrap;">
+                          ${isComp ? `
+                            <div style="display:inline-flex; flex-direction:column; align-items:flex-end; gap:0.25rem;">
+                              <span class="action-badge-completed">
+                                <span style="font-size:0.95rem;">✓</span> Ride Completed
+                              </span>
+                              <span style="font-size:0.68rem; color:#94a3b8; font-weight:600;">No further action required</span>
+                            </div>
+                          ` : isConf ? `
+                            <div style="display:inline-flex; align-items:center; gap:0.45rem; justify-content:flex-end;">
+                              <span class="action-badge-booked">BOOKED</span>
+                              <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-trainee-cancel-slot" data-booking-id="${bk.id}" style="padding:0.3rem 0.6rem; font-size:0.72rem; color:#f87171; border-color:rgba(239,68,68,0.3);" title="Cancel reservation">Cancel</button>
+                            </div>
+                          ` : `
+                            <span class="p-badge p-badge-dim" style="font-size:0.75rem; padding:0.35rem 0.75rem;">CANCELLED</span>
+                          `}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `}
+      `;
+    }
+
     container.innerHTML = `
       <div class="portal-shell">
         ${contentHtml}
@@ -369,6 +849,99 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
           onNavigate(targetSub);
         } else {
           renderTraineeView(container, showToast, targetSub, onNavigate);
+        }
+      });
+    });
+
+    const btnGoToBookSlot = container.querySelector('#btn-go-to-book-slot');
+    if (btnGoToBookSlot) {
+      btnGoToBookSlot.addEventListener('click', () => {
+        if (onNavigate) {
+          onNavigate('slots');
+        } else {
+          renderTraineeView(container, showToast, 'slots', onNavigate);
+        }
+      });
+    }
+
+    // Student Slot Sub-Tab Switcher
+    container.querySelectorAll('.btn-trainee-slot-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        traineeSlotTab = btn.dataset.tab;
+        render();
+      });
+    });
+
+    // Student Quick Date Click
+    container.querySelectorAll('[data-student-date]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedDate = btn.dataset.studentDate;
+        render();
+      });
+    });
+
+    // Student Custom Date Picker Change
+    const inpStudentDate = container.querySelector('#inp-student-slot-date');
+    if (inpStudentDate) {
+      inpStudentDate.addEventListener('change', (e) => {
+        if (e.target.value) {
+          selectedDate = e.target.value;
+          render();
+        }
+      });
+    }
+
+    // Student Slot Status Filter
+    const selStudentStatus = container.querySelector('#sel-student-slot-status');
+    if (selStudentStatus) {
+      selStudentStatus.addEventListener('change', (e) => {
+        traineeSlotStatusFilter = e.target.value;
+        render();
+      });
+    }
+
+    // Student Slot Search
+    const inpStudentSearch = container.querySelector('#inp-student-slot-search');
+    if (inpStudentSearch) {
+      inpStudentSearch.addEventListener('input', (e) => {
+        traineeSlotSearch = e.target.value;
+        render();
+      });
+    }
+
+    // Student View Mode Toggle (Table vs Cards)
+    container.querySelectorAll('.btn-trainee-view-mode').forEach(btn => {
+      btn.addEventListener('click', () => {
+        traineeSlotViewMode = btn.dataset.mode;
+        render();
+      });
+    });
+
+    // Student Book Slot Button
+    container.querySelectorAll('.btn-trainee-book-slot').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slotId = btn.dataset.slotId;
+        const slotDate = btn.dataset.date;
+        const startTime = btn.dataset.startTime;
+        const endTime = btn.dataset.endTime;
+        const timeDisplay = btn.dataset.timeDisplay;
+        openConfirmBookingModal({ id: slotId, startTime, endTime, timeDisplay }, slotDate);
+      });
+    });
+
+    // Student Cancel Their Own Slot Booking
+    container.querySelectorAll('.btn-trainee-cancel-slot').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bookingId = btn.dataset.bookingId;
+        const conf = window.confirm('Are you sure you want to cancel your practical driving reservation? Your seat will be released for other learners.');
+        if (conf) {
+          const res = store.cancelSlotBooking(bookingId, trainee.name, 'Learner cancelled session');
+          if (res.success) {
+            showToast('✓ Booking cancelled successfully. Capacity updated.', 'success');
+            render();
+          } else {
+            showToast(res.message || 'Could not cancel booking.', 'warning');
+          }
         }
       });
     });
@@ -474,6 +1047,201 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
       close();
       showToast(`Payment of ₹${balance.toLocaleString('en-IN')} confirmed! Thank you.`, 'success');
       render();
+    });
+  }
+
+  function openCalendarPickerModal() {
+    const modalRoot = document.getElementById('modal-root');
+    const [selY, selM, selD] = selectedDate.split('-').map(Number);
+    let viewYear = selY || new Date().getFullYear();
+    let viewMonth = (selM ? selM - 1 : new Date().getMonth());
+
+    function renderCal() {
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const weekdays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+      const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
+      const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+      const todayStr = store.getTodayDateStr();
+
+      let daysHtml = '';
+      for (let i = 0; i < firstDayOfMonth; i++) {
+        daysHtml += '<div style="aspect-ratio:1;"></div>';
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const mStr = String(viewMonth + 1).padStart(2, '0');
+        const dStr = String(d).padStart(2, '0');
+        const dtStr = `${viewYear}-${mStr}-${dStr}`;
+
+        const isPast = dtStr < todayStr;
+        const isSelected = dtStr === selectedDate;
+        const isToday = dtStr === todayStr;
+
+        let cls = 'sb-cal-day';
+        if (isPast) cls += ' disabled';
+        if (isSelected) cls += ' selected';
+        if (isToday) cls += ' today';
+
+        daysHtml += `
+          <button type="button" class="${cls}" data-cal-day="${dtStr}" ${isPast ? 'disabled' : ''}>
+            ${d}
+          </button>
+        `;
+      }
+
+      modalRoot.innerHTML = `
+        <div class="sb-calendar-modal-overlay">
+          <div class="sb-calendar-card">
+            <div class="sb-cal-header">
+              <button type="button" class="sb-cal-nav-btn" id="btn-cal-prev" title="Previous Month">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <div class="sb-cal-title">${monthNames[viewMonth]} ${viewYear}</div>
+              <button type="button" class="sb-cal-nav-btn" id="btn-cal-next" title="Next Month">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+            </div>
+
+            <div class="sb-cal-grid-weekdays">
+              ${weekdays.map(w => `<div>${w}</div>`).join('')}
+            </div>
+
+            <div class="sb-cal-grid-days">
+              ${daysHtml}
+            </div>
+
+            <div class="sb-cal-footer">
+              <button type="button" id="btn-cal-close" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#cbd5e1; padding:0.5rem 1.25rem; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.825rem;">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      modalRoot.querySelector('#btn-cal-close')?.addEventListener('click', () => {
+        modalRoot.innerHTML = '';
+      });
+
+      modalRoot.querySelector('#btn-cal-prev')?.addEventListener('click', () => {
+        viewMonth--;
+        if (viewMonth < 0) {
+          viewMonth = 11;
+          viewYear--;
+        }
+        renderCal();
+      });
+
+      modalRoot.querySelector('#btn-cal-next')?.addEventListener('click', () => {
+        viewMonth++;
+        if (viewMonth > 11) {
+          viewMonth = 0;
+          viewYear++;
+        }
+        renderCal();
+      });
+
+      modalRoot.querySelectorAll('[data-cal-day]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const pickedDate = btn.dataset.calDay;
+          if (pickedDate) {
+            selectedDate = pickedDate;
+            selectedSlotId = null;
+            modalRoot.innerHTML = '';
+            render();
+            setTimeout(() => {
+              const activeCard = container.querySelector(`[data-date-card="${pickedDate}"]`);
+              if (activeCard) {
+                activeCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+              }
+            }, 60);
+          }
+        });
+      });
+    }
+
+    renderCal();
+  }
+
+  function openConfirmBookingModal(slotInfo, targetDateStr = null) {
+    const modalRoot = document.getElementById('modal-root');
+    const bookingDate = targetDateStr || selectedDate;
+    const readableDate = formatReadableDate(bookingDate);
+
+    modalRoot.innerHTML = `
+      <div class="mnc-modal-overlay">
+        <div class="p-modal" style="max-width: 460px;">
+          <div class="p-modal-header">
+            <div>
+              <div class="p-modal-title">Confirm Driving Slot Booking</div>
+              <div class="p-modal-sub">Gafoor Driving School · Practical Road Training</div>
+            </div>
+            <button type="button" id="btn-close-confirm-modal" class="p-modal-close">✕</button>
+          </div>
+
+          <div class="p-modal-body">
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-sm); padding:1rem 1.15rem; margin-bottom:1.15rem; display:flex; flex-direction:column; gap:0.5rem;">
+              <div class="p-summary-row" style="padding:0.25rem 0;">
+                <span class="p-summary-key">Training Date:</span>
+                <span class="p-summary-value" style="color:#ffffff; font-weight:700;">${readableDate}</span>
+              </div>
+              <div class="p-summary-row" style="padding:0.25rem 0;">
+                <span class="p-summary-key">Session Time:</span>
+                <span class="p-summary-value" style="color:var(--primary-gold); font-weight:800; font-family:var(--font-mono);">${slotInfo.timeDisplay || `${slotInfo.startTime} - ${slotInfo.endTime}`}</span>
+              </div>
+              <div class="p-summary-row" style="padding:0.25rem 0;">
+                <span class="p-summary-key">Candidate:</span>
+                <span class="p-summary-value" style="color:#ffffff; font-weight:700;">${trainee.name} (${trainee.studentCode || trainee.id})</span>
+              </div>
+              <div class="p-summary-row" style="padding:0.25rem 0;">
+                <span class="p-summary-key">Course Package:</span>
+                <span class="p-summary-value" style="color:var(--slate-body);">${trainee.package}</span>
+              </div>
+            </div>
+
+            <div style="font-size:0.75rem; color:var(--slate-muted); line-height:1.5;">
+              ℹ️ <strong>Dual-Control Safety:</strong> Practical road training slot includes dedicated dual-control vehicle and certified AP RTO instructor assignment.
+            </div>
+          </div>
+
+          <div class="p-modal-footer">
+            <button type="button" class="p-ghost-btn" id="btn-cancel-slot-confirm">Cancel</button>
+            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-submit-confirm-booking">Confirm Booking ✓</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const close = () => { modalRoot.innerHTML = ''; };
+    modalRoot.querySelector('#btn-close-confirm-modal').addEventListener('click', close);
+    modalRoot.querySelector('#btn-cancel-slot-confirm').addEventListener('click', close);
+
+    const btnSubmit = modalRoot.querySelector('#btn-submit-confirm-booking');
+    btnSubmit.addEventListener('click', async () => {
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = 'Securing Seat...';
+
+      const res = await store.bookSlot({
+        date: bookingDate,
+        startTime: slotInfo.startTime,
+        endTime: slotInfo.endTime,
+        timeDisplay: slotInfo.timeDisplay,
+        traineeId: trainee.id,
+        bookedBy: `${trainee.name} (${trainee.studentCode || trainee.id})`
+      });
+
+      if (res.success) {
+        close();
+        selectedSlotId = null;
+        showToast('✓ Practical driving slot reserved successfully!', 'success');
+        render();
+      } else {
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = 'Confirm Reservation';
+        showToast(res.message || 'Booking failed.', 'warning');
+        render();
+      }
     });
   }
 

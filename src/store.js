@@ -7,7 +7,366 @@
    ========================================================================== */
 
 import { extractInitials, getNextStudentSequence, generateStudentCode, generateTrainerCode, getNextTrainerSequence, normalizeCode } from './utils/studentCode.js';
-import { saveStudentToSupabase, fetchStudentsFromSupabase, updateStudentInSupabase } from './supabase.js';
+import { 
+  saveStudentToSupabase, 
+  fetchStudentsFromSupabase, 
+  updateStudentInSupabase,
+  fetchSlotsFromSupabase,
+  fetchBookingsFromSupabase,
+  bookSlotInSupabase,
+  cancelSlotBookingInSupabase,
+  saveSlotToSupabase,
+  updateTrainerAvailabilityInSupabase
+} from './supabase.js';
+import api from './api/client.js';
+
+export const DEFAULT_BOOKABLE_SLOTS = [
+  { idSuffix: '0800-0900', startTime: '08:00 AM', endTime: '09:00 AM', timeDisplay: '08:00 AM – 09:00 AM', start24: '08:00', end24: '09:00' },
+  { idSuffix: '0915-1015', startTime: '09:15 AM', endTime: '10:15 AM', timeDisplay: '09:15 AM – 10:15 AM', start24: '09:15', end24: '10:15' },
+  { idSuffix: '1030-1130', startTime: '10:30 AM', endTime: '11:30 AM', timeDisplay: '10:30 AM – 11:30 AM', start24: '10:30', end24: '11:30' },
+  { idSuffix: '1300-1400', startTime: '01:00 PM', endTime: '02:00 PM', timeDisplay: '01:00 PM – 02:00 PM', start24: '13:00', end24: '14:00' },
+  { idSuffix: '1415-1515', startTime: '02:15 PM', endTime: '03:15 PM', timeDisplay: '02:15 PM – 03:15 PM', start24: '14:15', end24: '15:15' },
+  { idSuffix: '1530-1630', startTime: '03:30 PM', endTime: '04:30 PM', timeDisplay: '03:30 PM – 04:30 PM', start24: '15:30', end24: '16:30' }
+];
+
+export function getLocalTodayDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function formatReadableDate(dateStr) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-');
+  const dt = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+  return dt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+export function formatTime24to12(timeStr) {
+  if (!timeStr) return '';
+  const clean = timeStr.trim();
+  if (/^[0-9]{1,2}:[0-9]{2}\s*(AM|PM)$/i.test(clean)) {
+    return clean.toUpperCase();
+  }
+  const parts = clean.split(':');
+  if (parts.length < 2) return clean;
+  let h = parseInt(parts[0], 10);
+  const m = String(parseInt(parts[1], 10) || 0).padStart(2, '0');
+  const period = h >= 12 ? 'PM' : 'AM';
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${String(h).padStart(2, '0')}:${m} ${period}`;
+}
+
+export function timeToMinutes(timeStr) {
+  if (!timeStr) return 0;
+  const cleaned = timeStr.trim();
+  const isPM = cleaned.toUpperCase().includes('PM');
+  const isAM = cleaned.toUpperCase().includes('AM');
+  const [hStr, mStr] = cleaned.replace(/[APMapm\s]/g, '').split(':');
+  let h = parseInt(hStr, 10) || 0;
+  const m = parseInt(mStr, 10) || 0;
+  if (isPM && h < 12) h += 12;
+  if (isAM && h === 12) h = 0;
+  return h * 60 + m;
+}
+
+export function doIntervalsOverlap(startA, endA, startB, endB) {
+  const sA = timeToMinutes(startA);
+  const eA = timeToMinutes(endA) || (sA + 60);
+  const sB = timeToMinutes(startB);
+  const eB = timeToMinutes(endB) || (sB + 60);
+  return Math.max(sA, sB) < Math.min(eA, eB);
+}
+
+function getOffsetDateStr(offsetDays = 0) {
+  const baseDt = new Date();
+  baseDt.setDate(baseDt.getDate() + offsetDays);
+  const y = baseDt.getFullYear();
+  const m = String(baseDt.getMonth() + 1).padStart(2, '0');
+  const d = String(baseDt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function generateInitialSlotBookings() {
+  const today = getOffsetDateStr(0);
+  const tomorrow = getOffsetDateStr(1);
+  const dayAfter = getOffsetDateStr(2);
+
+  return [
+    // Today (01 Oct): 08:00 AM – 09:00 AM completed ride for Sai Kiran Varma (SK- GS01)
+    {
+      id: `SB-${today.replace(/-/g, '')}-0800-SK`,
+      slotId: `SLOT-${today}-0800-0900`,
+      date: today,
+      startTime: '08:00 AM',
+      endTime: '09:00 AM',
+      timeDisplay: '08:00 AM – 09:00 AM',
+      traineeId: 'SK- GS01',
+      traineeName: 'Sai Kiran Varma',
+      trainerId: 'TRN-1',
+      trainerName: 'K. Srinivas Rao',
+      vehicle: 'Maruti Suzuki Swift Dual-Ctrl #AP-04-ED-4041',
+      course: '20-Day Comprehensive Licensing Package',
+      status: 'COMPLETED',
+      attendance: 'present',
+      notes: 'Ride Completed ✓ · AP RTO 8-track maneuvers verified',
+      bookedAt: `${today}T06:00:00.000Z`
+    },
+    {
+      id: `SB-${today.replace(/-/g, '')}-0800-01`,
+      slotId: `SLOT-${today}-0800-0900`,
+      date: today,
+      startTime: '08:00 AM',
+      endTime: '09:00 AM',
+      timeDisplay: '08:00 AM – 09:00 AM',
+      traineeId: 'LG- GS02',
+      traineeName: 'Lavanya Goud',
+      trainerId: 'TRN-1',
+      trainerName: 'K. Srinivas Rao',
+      vehicle: 'Maruti Suzuki Swift Dual-Ctrl #AP-04-ED-4041',
+      course: 'Ladies Special Mentorship Package',
+      status: 'COMPLETED',
+      attendance: 'present',
+      notes: 'Ride Completed ✓',
+      bookedAt: `${today}T07:15:00.000Z`
+    },
+    {
+      id: `SB-${today.replace(/-/g, '')}-0800-02`,
+      slotId: `SLOT-${today}-0800-0900`,
+      date: today,
+      startTime: '08:00 AM',
+      endTime: '09:00 AM',
+      timeDisplay: '08:00 AM – 09:00 AM',
+      traineeId: 'HC- GS03',
+      traineeName: 'Harika Chowdary',
+      trainerId: 'TRN-2',
+      trainerName: 'Anitha Reddy',
+      vehicle: 'Hyundai Grand i10 Dual-Ctrl #AP-04-AB-2020',
+      course: '20-Day Comprehensive Licensing Package',
+      status: 'COMPLETED',
+      attendance: 'present',
+      notes: 'Ride Completed ✓',
+      bookedAt: `${today}T07:20:00.000Z`
+    },
+    {
+      id: `SB-${today.replace(/-/g, '')}-0800-03`,
+      slotId: `SLOT-${today}-0800-0900`,
+      date: today,
+      startTime: '08:00 AM',
+      endTime: '09:00 AM',
+      timeDisplay: '08:00 AM – 09:00 AM',
+      traineeId: 'VK- GS04',
+      traineeName: 'Vamshi Krishna',
+      trainerId: 'TRN-2',
+      trainerName: 'Anitha Reddy',
+      vehicle: 'Hyundai Grand i10 Dual-Ctrl #AP-04-AB-2020',
+      course: 'City Traffic & 8-Track Mastery',
+      status: 'COMPLETED',
+      attendance: 'present',
+      notes: 'Ride Completed ✓',
+      bookedAt: `${today}T07:25:00.000Z`
+    },
+    {
+      id: `SB-${today.replace(/-/g, '')}-0800-04`,
+      slotId: `SLOT-${today}-0800-0900`,
+      date: today,
+      startTime: '08:00 AM',
+      endTime: '09:00 AM',
+      timeDisplay: '08:00 AM – 09:00 AM',
+      traineeId: 'SR- GS05',
+      traineeName: 'Sneha Reddy',
+      trainerId: 'TRN-3',
+      trainerName: 'M. Venkataramana',
+      vehicle: 'Tata Punch Dual-Ctrl #AP-04-CT-7072',
+      course: '20-Day Comprehensive Licensing Package',
+      status: 'COMPLETED',
+      attendance: 'present',
+      notes: 'Ride Completed ✓',
+      bookedAt: `${today}T07:30:00.000Z`
+    },
+    {
+      id: `SB-${today.replace(/-/g, '')}-0800-05`,
+      slotId: `SLOT-${today}-0800-0900`,
+      date: today,
+      startTime: '08:00 AM',
+      endTime: '09:00 AM',
+      timeDisplay: '08:00 AM – 09:00 AM',
+      traineeId: 'KR- GS06',
+      traineeName: 'Karthik Raju',
+      trainerId: 'TRN-3',
+      trainerName: 'M. Venkataramana',
+      vehicle: 'Tata Punch Dual-Ctrl #AP-04-CT-7072',
+      course: 'City Traffic & 8-Track Mastery',
+      status: 'COMPLETED',
+      attendance: 'present',
+      notes: 'Ride Completed ✓',
+      bookedAt: `${today}T07:35:00.000Z`
+    },
+
+    // Tomorrow (02 Oct): 09:15 AM – 10:15 AM upcoming confirmed booking for Sai Kiran Varma (SK- GS01)
+    {
+      id: `SB-${tomorrow.replace(/-/g, '')}-0915-SK`,
+      slotId: `SLOT-${tomorrow}-0915-1015`,
+      date: tomorrow,
+      startTime: '09:15 AM',
+      endTime: '10:15 AM',
+      timeDisplay: '09:15 AM – 10:15 AM',
+      traineeId: 'SK- GS01',
+      traineeName: 'Sai Kiran Varma',
+      trainerId: 'TRN-1',
+      trainerName: 'K. Srinivas Rao',
+      vehicle: 'Maruti Suzuki Swift Dual-Ctrl #AP-04-ED-4041',
+      course: '20-Day Comprehensive Licensing Package',
+      status: 'CONFIRMED',
+      notes: 'Upcoming Practical Road Lesson',
+      bookedAt: `${today}T09:00:00.000Z`
+    },
+
+    // Day After Tomorrow (03 Oct): 01:00 PM – 02:00 PM is 8/8 FULL
+    {
+      id: `SB-${dayAfter.replace(/-/g, '')}-1300-01`,
+      slotId: `SLOT-${dayAfter}-1300-1400`,
+      date: dayAfter,
+      startTime: '01:00 PM',
+      endTime: '02:00 PM',
+      timeDisplay: '01:00 PM – 02:00 PM',
+      traineeId: 'LG- GS02',
+      traineeName: 'Lavanya Goud',
+      trainerId: 'TRN-1',
+      trainerName: 'K. Srinivas Rao',
+      vehicle: 'Maruti Suzuki Swift Dual-Ctrl #AP-04-ED-4041',
+      course: 'Ladies Special Mentorship Package',
+      status: 'CONFIRMED',
+      bookedAt: `${today}T08:00:00.000Z`
+    },
+    {
+      id: `SB-${dayAfter.replace(/-/g, '')}-1300-02`,
+      slotId: `SLOT-${dayAfter}-1300-1400`,
+      date: dayAfter,
+      startTime: '01:00 PM',
+      endTime: '02:00 PM',
+      timeDisplay: '01:00 PM – 02:00 PM',
+      traineeId: 'HC- GS03',
+      traineeName: 'Harika Chowdary',
+      trainerId: 'TRN-1',
+      trainerName: 'K. Srinivas Rao',
+      vehicle: 'Maruti Suzuki Swift Dual-Ctrl #AP-04-ED-4041',
+      course: '20-Day Comprehensive Licensing Package',
+      status: 'CONFIRMED',
+      bookedAt: `${today}T08:05:00.000Z`
+    },
+    {
+      id: `SB-${dayAfter.replace(/-/g, '')}-1300-03`,
+      slotId: `SLOT-${dayAfter}-1300-1400`,
+      date: dayAfter,
+      startTime: '01:00 PM',
+      endTime: '02:00 PM',
+      timeDisplay: '01:00 PM – 02:00 PM',
+      traineeId: 'VK- GS04',
+      traineeName: 'Vamshi Krishna',
+      trainerId: 'TRN-2',
+      trainerName: 'Anitha Reddy',
+      vehicle: 'Hyundai Grand i10 Dual-Ctrl #AP-04-AB-2020',
+      course: 'City Traffic & 8-Track Mastery',
+      status: 'CONFIRMED',
+      bookedAt: `${today}T08:10:00.000Z`
+    },
+    {
+      id: `SB-${dayAfter.replace(/-/g, '')}-1300-04`,
+      slotId: `SLOT-${dayAfter}-1300-1400`,
+      date: dayAfter,
+      startTime: '01:00 PM',
+      endTime: '02:00 PM',
+      timeDisplay: '01:00 PM – 02:00 PM',
+      traineeId: 'SR- GS05',
+      traineeName: 'Sneha Reddy',
+      trainerId: 'TRN-2',
+      trainerName: 'Anitha Reddy',
+      vehicle: 'Hyundai Grand i10 Dual-Ctrl #AP-04-AB-2020',
+      course: '20-Day Comprehensive Licensing Package',
+      status: 'CONFIRMED',
+      bookedAt: `${today}T08:15:00.000Z`
+    },
+    {
+      id: `SB-${dayAfter.replace(/-/g, '')}-1300-05`,
+      slotId: `SLOT-${dayAfter}-1300-1400`,
+      date: dayAfter,
+      startTime: '01:00 PM',
+      endTime: '02:00 PM',
+      timeDisplay: '01:00 PM – 02:00 PM',
+      traineeId: 'KR- GS06',
+      traineeName: 'Karthik Raju',
+      trainerId: 'TRN-3',
+      trainerName: 'M. Venkataramana',
+      vehicle: 'Tata Punch Dual-Ctrl #AP-04-CT-7072',
+      course: 'City Traffic & 8-Track Mastery',
+      status: 'CONFIRMED',
+      bookedAt: `${today}T08:20:00.000Z`
+    },
+    {
+      id: `SB-${dayAfter.replace(/-/g, '')}-1300-06`,
+      slotId: `SLOT-${dayAfter}-1300-1400`,
+      date: dayAfter,
+      startTime: '01:00 PM',
+      endTime: '02:00 PM',
+      timeDisplay: '01:00 PM – 02:00 PM',
+      traineeId: 'DB- GS07',
+      traineeName: 'Divya Bharathi',
+      trainerId: 'TRN-3',
+      trainerName: 'M. Venkataramana',
+      vehicle: 'Tata Punch Dual-Ctrl #AP-04-CT-7072',
+      course: '20-Day Comprehensive Licensing Package',
+      status: 'CONFIRMED',
+      bookedAt: `${today}T08:25:00.000Z`
+    },
+    {
+      id: `SB-${dayAfter.replace(/-/g, '')}-1300-07`,
+      slotId: `SLOT-${dayAfter}-1300-1400`,
+      date: dayAfter,
+      startTime: '01:00 PM',
+      endTime: '02:00 PM',
+      timeDisplay: '01:00 PM – 02:00 PM',
+      traineeId: 'MK- GS08',
+      traineeName: 'Manoj Kumar',
+      trainerId: 'TRN-4',
+      trainerName: 'D. Ravi Kumar',
+      vehicle: 'Maruti WagonR Dual-Ctrl #AP-04-KL-8088',
+      course: 'City Traffic & 8-Track Mastery',
+      status: 'CONFIRMED',
+      bookedAt: `${today}T08:30:00.000Z`
+    },
+    {
+      id: `SB-${dayAfter.replace(/-/g, '')}-1300-08`,
+      slotId: `SLOT-${dayAfter}-1300-1400`,
+      date: dayAfter,
+      startTime: '01:00 PM',
+      endTime: '02:00 PM',
+      timeDisplay: '01:00 PM – 02:00 PM',
+      traineeId: 'ST- GS09',
+      traineeName: 'Sanjay Mohan',
+      trainerId: 'TRN-4',
+      trainerName: 'D. Ravi Kumar',
+      vehicle: 'Maruti WagonR Dual-Ctrl #AP-04-KL-8088',
+      course: 'City Traffic & 8-Track Mastery',
+      status: 'CONFIRMED',
+      bookedAt: `${today}T08:35:00.000Z`
+    }
+  ];
+}
+
+function ensureSampleStudentBookings(bookings = []) {
+  const samples = generateInitialSlotBookings();
+  samples.forEach(sample => {
+    const exists = bookings.some(b => b.id === sample.id || (b.traineeId === sample.traineeId && b.date === sample.date && b.startTime === sample.startTime));
+    if (!exists) {
+      bookings.push(sample);
+    }
+  });
+  return bookings;
+}
 
 const STORAGE_KEY = 'gafoor_driving_school_v1_pulivendula_state';
 
@@ -302,13 +661,14 @@ class Store {
   constructor() {
     this.listeners = [];
     this.loadState();
-    // Auto-sync with Supabase in background if configured
+    // Auto-sync with backend REST API and Supabase
+    this.syncWithServerSlots();
     this.syncWithSupabase();
   }
 
   loadState() {
     try {
-      const cached = localStorage.getItem(STORAGE_KEY);
+      const cached = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
       if (cached) {
         const parsed = JSON.parse(cached);
         this.currentRole = parsed.currentRole || 'admin';
@@ -319,6 +679,14 @@ class Store {
         this.schedule = parsed.schedule || INITIAL_SCHEDULE;
         this.traineeTestDay = parsed.traineeTestDay || 14;
         this.feedbackSubmitted = parsed.feedbackSubmitted || false;
+
+        // Slot Management System state
+        this.slots = parsed.slots || [];
+        this.slotBookings = ensureSampleStudentBookings((parsed.slotBookings && parsed.slotBookings.length > 0) ? parsed.slotBookings : generateInitialSlotBookings());
+        this.trainerAvailability = parsed.trainerAvailability || {};
+        this.slotAuditLogs = parsed.slotAuditLogs || [];
+        this.deletedSlots = parsed.deletedSlots || [];
+        this.bookingLock = false;
 
         // Ensure all trainees have studentCode and isFirstLogin flag, migrating legacy IDs
         this.trainees.forEach((t, i) => {
@@ -355,6 +723,14 @@ class Store {
     this.traineeTestDay = 14;
     this.feedbackSubmitted = false;
 
+    // Slot Management System state defaults
+    this.slots = [];
+    this.slotBookings = generateInitialSlotBookings();
+    this.trainerAvailability = {};
+    this.slotAuditLogs = [];
+    this.deletedSlots = [];
+    this.bookingLock = false;
+
     // Ensure all trainees have studentCode and isFirstLogin
     this.trainees.forEach((t, i) => {
       if (!t.studentCode) {
@@ -379,6 +755,7 @@ class Store {
   }
 
   saveState() {
+    if (typeof localStorage === 'undefined') return;
     try {
       const payload = {
         currentRole: this.currentRole,
@@ -388,7 +765,12 @@ class Store {
         payments: this.payments,
         schedule: this.schedule,
         traineeTestDay: this.traineeTestDay,
-        feedbackSubmitted: this.feedbackSubmitted
+        feedbackSubmitted: this.feedbackSubmitted,
+        slots: this.slots,
+        slotBookings: this.slotBookings,
+        trainerAvailability: this.trainerAvailability,
+        slotAuditLogs: this.slotAuditLogs,
+        deletedSlots: this.deletedSlots || []
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
@@ -406,6 +788,14 @@ class Store {
   notify(event, payload) {
     this.saveState();
     this.listeners.forEach(fn => fn(event, payload));
+  }
+
+  get role() {
+    return this.currentRole || 'admin';
+  }
+
+  set role(val) {
+    this.currentRole = val;
   }
 
   setRole(role) {
@@ -477,17 +867,240 @@ class Store {
     return true;
   }
 
+  getAdminToken() {
+    return (typeof localStorage !== 'undefined' && localStorage.getItem('gds_admin_token')) || null;
+  }
+
+  setAdminToken(token) {
+    if (typeof localStorage !== 'undefined') {
+      if (token) {
+        localStorage.setItem('gds_admin_token', token);
+      } else {
+        localStorage.removeItem('gds_admin_token');
+      }
+    }
+  }
+
+  isAdminAuthenticated() {
+    if (typeof localStorage === 'undefined' && typeof sessionStorage === 'undefined') return false;
+    const token = localStorage.getItem('gds_admin_token');
+    const isAuth = sessionStorage.getItem('gds_admin_authenticated') === 'true';
+    return Boolean(token && isAuth);
+  }
+
+  async loginAdmin(username, password) {
+    try {
+      const res = await api.post('/auth/login', { username, password });
+      if (res && res.success && res.token) {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('gds_admin_token', res.token);
+          localStorage.setItem('gds_role', 'admin');
+        }
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.setItem('gds_admin_authenticated', 'true');
+        }
+        this.setRole('admin');
+        return { success: true, user: res.user };
+      }
+      return { success: false, message: (res && res.message) || 'Invalid username or password.' };
+    } catch (err) {
+      return { 
+        success: false, 
+        message: err.message || (err.status === 401 ? 'Invalid username or password.' : 'Failed to authenticate. Please try again.') 
+      };
+    }
+  }
+
+  logoutAdmin() {
+    try {
+      api.post('/auth/logout', {}).catch(() => {});
+    } catch (_) {}
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('gds_admin_token');
+      if (localStorage.getItem('gds_role') === 'admin') {
+        localStorage.removeItem('gds_role');
+      }
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('gds_admin_authenticated');
+    }
+    this.role = null;
+  }
+
+  isTrainerAuthenticated() {
+    if (this.isAdminAuthenticated()) return true;
+    if (typeof localStorage === 'undefined' && typeof sessionStorage === 'undefined') return false;
+    const token = localStorage.getItem('gds_trainer_token');
+    const isAuth = sessionStorage.getItem('gds_trainer_authenticated') === 'true';
+    return Boolean(token && isAuth);
+  }
+
+  isUserAuthenticated() {
+    if (this.isAdminAuthenticated()) return true;
+    if (typeof localStorage === 'undefined' && typeof sessionStorage === 'undefined') return false;
+    const token = localStorage.getItem('gds_user_token');
+    const isAuth = sessionStorage.getItem('gds_user_authenticated') === 'true';
+    return Boolean(token && isAuth);
+  }
+
+  async loginUniversal(username, password) {
+    try {
+      const res = await api.post('/auth/login', { username, password });
+      if (res && res.success && res.token) {
+        const role = (res.role || 'user').toLowerCase();
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('gds_auth_token', res.token);
+          localStorage.setItem('gds_role', role);
+        }
+        if (role === 'admin') {
+          if (typeof localStorage !== 'undefined') localStorage.setItem('gds_admin_token', res.token);
+          if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('gds_admin_authenticated', 'true');
+          this.setRole('admin');
+        } else if (role === 'trainer') {
+          if (typeof localStorage !== 'undefined') localStorage.setItem('gds_trainer_token', res.token);
+          if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('gds_trainer_authenticated', 'true');
+          this.setRole('trainer');
+        } else {
+          // user / trainee
+          if (typeof localStorage !== 'undefined') localStorage.setItem('gds_user_token', res.token);
+          if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('gds_user_authenticated', 'true');
+          if (res.user && res.user.targetId) {
+            this.setCurrentTrainee(res.user.targetId);
+          }
+          this.setRole('trainee');
+        }
+        return { success: true, role, user: res.user };
+      }
+      return { success: false, message: (res && res.message) || 'Invalid username or password.' };
+    } catch (err) {
+      return {
+        success: false,
+        message: err.message || (err.status === 403 ? 'Account is inactive. Please contact the administrator.' : 'Invalid username or password.')
+      };
+    }
+  }
+
+  logoutAll() {
+    this.logoutAdmin();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('gds_user_token');
+      localStorage.removeItem('gds_trainer_token');
+      localStorage.removeItem('gds_auth_token');
+      localStorage.removeItem('gds_role');
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('gds_user_authenticated');
+      sessionStorage.removeItem('gds_trainer_authenticated');
+      sessionStorage.removeItem('gds_admin_authenticated');
+    }
+    this.role = null;
+  }
+
+  // Account Management API calls
+  async getAccounts() {
+    try {
+      const res = await api.get('/accounts');
+      if (res && res.success) {
+        return res.accounts || [];
+      }
+      return [];
+    } catch (err) {
+      console.warn('Failed to fetch accounts:', err);
+      return [];
+    }
+  }
+
+  async createAccount(accountData) {
+    try {
+      const res = await api.post('/accounts/create', accountData);
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to create account.' };
+    }
+  }
+
+  async updateAccount(accountId, updateData) {
+    try {
+      const res = await api.put(`/accounts/${accountId}`, updateData);
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to update account.' };
+    }
+  }
+
+  async updateAccountStatus(accountId, status) {
+    try {
+      const res = await api.put(`/accounts/${accountId}/status`, { status });
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to update account status.' };
+    }
+  }
+
+  async resetAccountPassword(accountId, newPassword, confirmPassword) {
+    try {
+      const res = await api.put(`/accounts/${accountId}/reset-password`, { newPassword, confirmPassword });
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to reset password.' };
+    }
+  }
+
+  async getAccountAuditLogs() {
+    try {
+      const res = await api.get('/accounts/audit-logs');
+      if (res && res.success) {
+        return res.logs || [];
+      }
+      return [];
+    } catch (err) {
+      console.warn('Failed to fetch audit logs:', err);
+      return [];
+    }
+  }
+
   verifyAdminLogin(username, password) {
     const clean = (username || '').trim().toLowerCase();
-    const validUsers = ['admin@gafoordriving.in', 'admin', 'admin-hq'];
+    const validUsers = ['admin@gafoordriving.in', 'admin', 'admin-hq', 'gafooradmin'];
     if (!validUsers.includes(clean)) {
-      return { success: false, message: 'Invalid Admin username. Only one master administrator account is authorized.' };
+      return { success: false, message: 'Invalid username or password.' };
     }
-    const validPasswords = ['admin', 'admin123', '••••••••••••'];
+    const validPasswords = ['admin', 'admin123', 'Gafoor@2026', 'admin@123'];
     if (validPasswords.includes(password)) {
+      this.setAdminToken('gds_admin_jwt_secret_token_2026');
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('gds_admin_authenticated', 'true');
+      }
+      this.setRole('admin');
       return { success: true };
     }
-    return { success: false, message: 'Incorrect Administrator security password.' };
+    return { success: false, message: 'Invalid username or password.' };
+  }
+
+  async syncWithServerSlots(dateStr = null) {
+    try {
+      const endpoint = dateStr ? `/slots?date=${encodeURIComponent(dateStr)}` : '/slots';
+      const res = await api.get(endpoint);
+      if (res && res.success && Array.isArray(res.slots)) {
+        let changed = false;
+        res.slots.forEach(serverSlot => {
+          const idx = this.slots.findIndex(s => s.id === serverSlot.id || (s.date === serverSlot.date && s.startTime === serverSlot.startTime));
+          if (idx >= 0) {
+            this.slots[idx] = { ...this.slots[idx], ...serverSlot };
+            changed = true;
+          } else {
+            this.slots.push(serverSlot);
+            changed = true;
+          }
+        });
+        if (changed) {
+          this.saveState();
+          this.notify('SLOTS_SYNCED', this.slots);
+        }
+      }
+    } catch (err) {
+      console.warn('Sync with server slots skipped or offline:', err);
+    }
   }
 
   async syncWithSupabase() {
@@ -694,6 +1307,908 @@ class Store {
   submitFeedback(feedbackData) {
     this.feedbackSubmitted = true;
     this.notify('FEEDBACK_SUBMITTED', feedbackData);
+  }
+
+  // ==========================================================================
+  // DRIVING SLOT MANAGEMENT & ATOMIC BOOKING ENGINE
+  // Dynamic Capacity = Available Trainers × 2 (Max 2 learners per trainer)
+  // Only 6 default bookable slots per day (No gaps displayed)
+  // ==========================================================================
+
+  getTodayDateStr() {
+    return getLocalTodayDate();
+  }
+
+  getAvailableTrainersForSlot(dateStr, startTime) {
+    return this.trainers.filter(tr => {
+      // Check full day unavailability
+      if (this.trainerAvailability[dateStr] && this.trainerAvailability[dateStr][tr.id] === false) {
+        return false;
+      }
+      // Check slot specific unavailability
+      const slotKey = `${tr.id}_${startTime}`;
+      if (this.trainerAvailability[dateStr] && this.trainerAvailability[dateStr][slotKey] === false) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  getSlotsForDate(dateStr) {
+    if (!dateStr) dateStr = this.getTodayDateStr();
+
+    this.deletedSlots = this.deletedSlots || [];
+
+    // 1. Ensure default 6 bookable slots exist in this.slots for this date (unless deleted by Admin)
+    DEFAULT_BOOKABLE_SLOTS.forEach(defSlot => {
+      const slotId = `SLOT-${dateStr}-${defSlot.idSuffix}`;
+      if (this.deletedSlots.includes(slotId) || this.deletedSlots.includes(`${dateStr}_${defSlot.startTime}`)) {
+        return;
+      }
+      const exists = this.slots.find(s => s.id === slotId || (s.date === dateStr && s.startTime === defSlot.startTime));
+      if (!exists) {
+        const isCompletedSampleSlot = (dateStr === getOffsetDateStr(0) && defSlot.idSuffix === '0800-0900');
+        const newSlot = {
+          id: slotId,
+          date: dateStr,
+          startTime: defSlot.startTime,
+          endTime: defSlot.endTime,
+          timeDisplay: defSlot.timeDisplay,
+          status: isCompletedSampleSlot ? 'Completed' : 'Available',
+          isDefault: true,
+          courseId: 'ALL',
+          createdBy: 'SYSTEM'
+        };
+        this.slots.push(newSlot);
+        saveSlotToSupabase(newSlot).catch(() => {});
+      } else if (dateStr === getOffsetDateStr(0) && defSlot.idSuffix === '0800-0900') {
+        exists.status = 'Completed';
+      }
+    });
+
+    // 2. Fetch all slots for this date (defaults + any custom created by Admin)
+    const dateSlots = this.slots.filter(s => s.date === dateStr);
+
+    // Sort chronologically using robust time parser
+    dateSlots.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+
+    // 3. Enhance with dynamic capacity, confirmed bookings, and trainer allocations
+    return dateSlots.map(slot => {
+      const availableTrainers = this.getAvailableTrainersForSlot(dateStr, slot.startTime);
+
+      // Dynamic Capacity: if slot has custom capacity set, use it; otherwise use availableTrainers * 2
+      const totalCapacity = (typeof slot.capacity === 'number' && slot.capacity > 0)
+        ? slot.capacity
+        : (availableTrainers.length * 2);
+
+      // Active bookings for this slot (both confirmed upcoming and completed sessions)
+      const confirmedBookings = this.slotBookings.filter(b => 
+        b.date === dateStr && 
+        (b.slotId === slot.id || b.startTime === slot.startTime) && 
+        (b.status === 'CONFIRMED' || b.status === 'COMPLETED')
+      );
+
+      const bookedCount = confirmedBookings.length;
+      const availableSeats = Math.max(0, totalCapacity - bookedCount);
+
+      // Determine dynamic status: Available, Full, Maintenance, Closed, Cancelled, Almost Full, Completed
+      let calculatedStatus = slot.status || 'Available';
+      const rawStatus = (slot.status || '').toLowerCase();
+      const todayStr = getOffsetDateStr(0);
+      const isSampleTodayCompleted = (dateStr === todayStr && (slot.startTime === '08:00 AM' || slot.id.includes('0800-0900')));
+      const allBookingsCompleted = confirmedBookings.length > 0 && confirmedBookings.every(b => b.status === 'COMPLETED');
+
+      if (rawStatus === 'completed' || isSampleTodayCompleted || allBookingsCompleted) {
+        calculatedStatus = 'Completed';
+      } else if (rawStatus === 'maintenance') {
+        calculatedStatus = 'Maintenance';
+      } else if (rawStatus === 'closed' || rawStatus === 'inactive') {
+        calculatedStatus = 'Closed';
+      } else if (rawStatus === 'cancelled') {
+        calculatedStatus = 'Cancelled';
+      } else if (rawStatus === 'full' || totalCapacity === 0 || availableSeats === 0) {
+        calculatedStatus = 'Full';
+      } else if (availableSeats === 1 && totalCapacity > 1) {
+        calculatedStatus = 'Almost Full';
+      } else {
+        calculatedStatus = 'Available';
+      }
+
+      // Detailed breakdown per instructor
+      const trainerAllocations = availableTrainers.map(tr => {
+        const trainerBookings = confirmedBookings.filter(b => b.trainerId === tr.id);
+        const trainerVehicle = slot.vehicleOverride || tr.car;
+        return {
+          trainer: tr,
+          trainerId: tr.id,
+          trainerName: tr.name,
+          vehicle: trainerVehicle,
+          bookings: trainerBookings,
+          capacity: 2,
+          booked: trainerBookings.length,
+          availableSeats: Math.max(0, 2 - trainerBookings.length),
+          status: trainerBookings.length >= 2 ? 'FULL' : 'AVAILABLE'
+        };
+      });
+
+      return {
+        ...slot,
+        availableTrainersCount: availableTrainers.length,
+        totalCapacity,
+        bookedCount,
+        availableSeats,
+        calculatedStatus,
+        bookings: confirmedBookings,
+        trainerAllocations
+      };
+    });
+  }
+
+  /**
+   * Atomic Driving Slot Booking
+   * Concurrency-safe, enforces:
+   * 1. Trainee eligibility
+   * 2. No duplicate bookings
+   * 3. No overlapping sessions
+   * 4. Capacity = Available Trainers × 2
+   * 5. Max 2 learners per trainer
+   * 6. Vehicle conflict check
+   */
+  async bookSlot({
+    date,
+    startTime,
+    endTime,
+    timeDisplay,
+    traineeId,
+    preferredTrainerId = null,
+    customVehicle = null,
+    bookedBy = null
+  }) {
+    // 0. Mutex check
+    if (this.bookingLock) {
+      return { 
+        success: false, 
+        message: 'Another slot booking transaction is being processed. Please try again in a moment.' 
+      };
+    }
+    this.bookingLock = true;
+
+    try {
+      if (!date) date = this.getTodayDateStr();
+
+      // 1. Learner Validation
+      const trainee = this.findTrainee(traineeId);
+      if (!trainee) {
+        return { success: false, message: 'Student record not found. Please verify your Student ID.' };
+      }
+
+      // Security check: Only Admin can manually assign other students
+      if (this.role !== 'admin' && this.currentTraineeId && trainee.id !== this.currentTraineeId) {
+        return { 
+          success: false, 
+          status: 403, 
+          message: 'Forbidden (HTTP 403): Only ADMIN users can manually assign slots to other students.' 
+        };
+      }
+
+      // Check slot status: Maintenance, Closed, Cancelled, Completed
+      const existingSlot = this.slots.find(s => s.date === date && s.startTime === startTime);
+      if (existingSlot) {
+        const rawStatus = (existingSlot.status || '').toLowerCase();
+        if (rawStatus === 'maintenance') {
+          return { success: false, message: 'This driving slot is currently under Maintenance and unavailable for reservations.' };
+        }
+        if (rawStatus === 'closed' || rawStatus === 'inactive') {
+          return { success: false, message: 'This driving slot is currently Closed for reservations.' };
+        }
+        if (rawStatus === 'cancelled') {
+          return { success: false, message: 'This driving slot has been Cancelled.' };
+        }
+        if (rawStatus === 'completed') {
+          return { success: false, message: 'This driving slot has already been completed and is closed for bookings.' };
+        }
+      }
+
+      // 2. Duplicate Booking Check
+      const existingSameSlot = this.slotBookings.find(b => 
+        b.traineeId === trainee.id && 
+        b.date === date && 
+        b.startTime === startTime && 
+        (b.status === 'CONFIRMED' || b.status === 'COMPLETED')
+      );
+      if (existingSameSlot) {
+        return { 
+          success: false, 
+          message: existingSameSlot.status === 'COMPLETED'
+            ? 'This driving session has already been completed.'
+            : 'You already have a driving session booked for this time slot.' 
+        };
+      }
+
+      // 3. Overlapping Booking Check for Learner
+      const existingSameDay = this.slotBookings.filter(b => 
+        b.traineeId === trainee.id && 
+        b.date === date && 
+        (b.status === 'CONFIRMED' || b.status === 'COMPLETED')
+      );
+      const hasOverlap = existingSameDay.some(b => 
+        doIntervalsOverlap(startTime, endTime, b.startTime, b.endTime)
+      );
+      if (hasOverlap) {
+        return { 
+          success: false, 
+          message: 'You already have a driving session during this time.' 
+        };
+      }
+
+      // 4. Calculate Dynamic Slot Capacity (custom slot capacity takes precedence if set)
+      const availableTrainers = this.getAvailableTrainersForSlot(date, startTime);
+      if (availableTrainers.length === 0) {
+        return { 
+          success: false, 
+          message: 'No instructors are available for this time slot.' 
+        };
+      }
+
+      const totalCapacity = (existingSlot && typeof existingSlot.capacity === 'number' && existingSlot.capacity > 0)
+        ? existingSlot.capacity
+        : (availableTrainers.length * 2);
+
+      const currentBookings = this.slotBookings.filter(b => 
+        b.date === date && 
+        b.startTime === startTime && 
+        (b.status === 'CONFIRMED' || b.status === 'COMPLETED')
+      );
+
+      if (currentBookings.length >= totalCapacity) {
+        return { 
+          success: false, 
+          message: 'Sorry, this slot is now full. Please select another available slot.' 
+        };
+      }
+
+      // 5. Deterministic Trainer Allocation (Max 2 learners per trainer)
+      let chosenTrainer = null;
+
+      if (preferredTrainerId) {
+        const pref = availableTrainers.find(t => t.id === preferredTrainerId);
+        if (pref) {
+          const prefCount = currentBookings.filter(b => b.trainerId === pref.id).length;
+          const prefOverlap = this.slotBookings.some(b =>
+            b.trainerId === pref.id &&
+            b.date === date &&
+            b.status === 'CONFIRMED' &&
+            b.startTime !== startTime &&
+            doIntervalsOverlap(startTime, endTime, b.startTime, b.endTime)
+          );
+          if (prefCount < 2 && !prefOverlap) {
+            chosenTrainer = pref;
+          }
+        }
+      }
+
+      if (!chosenTrainer) {
+        // Pick available trainer who has fewer than 2 learners, prioritizing the one with fewer learners
+        const sortedTrainers = [...availableTrainers].sort((a, b) => {
+          const countA = currentBookings.filter(bk => bk.trainerId === a.id).length;
+          const countB = currentBookings.filter(bk => bk.trainerId === b.id).length;
+          return countA - countB;
+        });
+
+        for (const tr of sortedTrainers) {
+          // Check if trainer is already booked for overlapping time outside this exact slot
+          const trainerConf = this.slotBookings.some(b =>
+            b.trainerId === tr.id &&
+            b.date === date &&
+            b.status === 'CONFIRMED' &&
+            b.startTime !== startTime &&
+            doIntervalsOverlap(startTime, endTime, b.startTime, b.endTime)
+          );
+          if (trainerConf) continue;
+
+          const count = currentBookings.filter(bk => bk.trainerId === tr.id).length;
+          if (count < 2) {
+            chosenTrainer = tr;
+            break;
+          }
+        }
+      }
+
+      if (!chosenTrainer) {
+        return { 
+          success: false, 
+          message: 'All available instructors for this slot have reached their maximum capacity of 2 learners.' 
+        };
+      }
+
+      // 6. Vehicle Conflict Prevention
+      const vehicle = customVehicle || chosenTrainer.car;
+      // Ensure vehicle is not assigned simultaneously to an overlapping session under a DIFFERENT trainer
+      const vehicleConflict = this.slotBookings.find(b => 
+        b.vehicle === vehicle && 
+        b.date === date &&
+        b.trainerId !== chosenTrainer.id && 
+        b.status === 'CONFIRMED' &&
+        doIntervalsOverlap(startTime, endTime, b.startTime, b.endTime)
+      );
+      if (vehicleConflict) {
+        return { 
+          success: false, 
+          message: `Vehicle conflict detected: ${vehicle} is already in use by instructor ${vehicleConflict.trainerName} during this time.` 
+        };
+      }
+
+      // 7. Create Atomic Booking Record
+      const bookingId = `SB-${date.replace(/-/g, '')}-${startTime.replace(/[^0-9]/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const slotId = `SLOT-${date}-${startTime.replace(/[^0-9]/g, '')}`;
+
+      const newBooking = {
+        id: bookingId,
+        slotId: slotId,
+        date: date,
+        startTime: startTime,
+        endTime: endTime || '',
+        timeDisplay: timeDisplay || `${startTime} – ${endTime || ''}`,
+        traineeId: trainee.id,
+        traineeName: trainee.name,
+        trainerId: chosenTrainer.id,
+        trainerName: chosenTrainer.name,
+        vehicle: vehicle,
+        course: trainee.package || '20-Day Practical Driving Course',
+        status: 'CONFIRMED',
+        bookedAt: new Date().toISOString(),
+        cancelledAt: null,
+        notes: ''
+      };
+
+      this.slotBookings.push(newBooking);
+
+      // 8. Add Audit History Entry
+      this.slotAuditLogs.unshift({
+        id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        slotId: slotId,
+        bookingId: bookingId,
+        action: 'BOOKING_CREATED',
+        performedBy: bookedBy || `${trainee.name} (${trainee.studentCode || trainee.id})`,
+        details: `${trainee.name} booked seat under Instructor ${chosenTrainer.name} · Car: ${vehicle}`,
+        timestamp: new Date().toISOString()
+      });
+
+      // 9. Sync with Supabase asynchronously
+      bookSlotInSupabase({
+        bookingId,
+        slotId,
+        date,
+        startTime,
+        endTime,
+        traineeId: trainee.id,
+        traineeName: trainee.name,
+        course: newBooking.course,
+        bookedBy: bookedBy || trainee.name,
+        preferredTrainerId: chosenTrainer.id
+      }).catch(err => {
+        console.warn('Supabase booking sync skipped/offline:', err);
+      });
+
+      this.saveState();
+      this.notify('SLOT_BOOKED', newBooking);
+
+      return {
+        success: true,
+        booking: newBooking,
+        message: '✓ Driving slot booked successfully.'
+      };
+    } finally {
+      this.bookingLock = false;
+    }
+  }
+
+  /**
+   * Cancel a Slot Booking
+   * Frees instructor capacity dynamically for other learners.
+   */
+  cancelSlotBooking(bookingId, cancelledBy = 'Learner', reason = '') {
+    const booking = this.slotBookings.find(b => b.id === bookingId);
+    if (!booking) {
+      return { success: false, message: 'Booking record not found.' };
+    }
+
+    // Security check: Students can only cancel their own reservations; Admin can cancel any booking
+    if (this.role === 'trainee' && this.currentTraineeId && booking.traineeId !== this.currentTraineeId) {
+      return { 
+        success: false, 
+        status: 403, 
+        message: 'Forbidden (HTTP 403): You are not authorized to cancel another student\'s reservation.' 
+      };
+    }
+
+    if (booking.status === 'CANCELLED') {
+      return { success: false, message: 'This booking has already been cancelled.' };
+    }
+
+    booking.status = 'CANCELLED';
+    booking.cancelledAt = new Date().toISOString();
+    if (reason) {
+      booking.notes = (booking.notes ? booking.notes + ' | ' : '') + `Cancelled: ${reason}`;
+    }
+
+    // Add Audit Log
+    this.slotAuditLogs.unshift({
+      id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      slotId: booking.slotId,
+      bookingId: booking.id,
+      action: 'BOOKING_CANCELLED',
+      performedBy: cancelledBy,
+      details: `Booking for ${booking.traineeName} was cancelled by ${cancelledBy}. ${reason ? 'Reason: ' + reason : ''}`,
+      timestamp: new Date().toISOString()
+    });
+
+    // Sync with Supabase
+    cancelSlotBookingInSupabase(bookingId, cancelledBy, reason).catch(() => {});
+
+    this.saveState();
+    this.notify('SLOT_CANCELLED', { bookingId, booking });
+
+    return { 
+      success: true, 
+      message: 'Booking cancelled successfully. Instructor capacity is now freed up.' 
+    };
+  }
+
+  /**
+   * Admin Move a Learner from one slot to another
+   */
+  async moveSlotBooking(bookingId, arg2, arg3, arg4, arg5, arg6) {
+    if (this.role !== 'admin') {
+      return { 
+        success: false, 
+        status: 403, 
+        message: 'Forbidden (HTTP 403): Only ADMIN users can move student bookings between slots.' 
+      };
+    }
+
+    const oldBooking = this.slotBookings.find(b => b.id === bookingId);
+    if (!oldBooking) return { success: false, message: 'Original booking not found.' };
+
+    let newDate = null;
+    let newStartTime = null;
+    let newEndTime = null;
+    let newTimeDisplay = null;
+    let preferredTrainerId = null;
+
+    if (typeof arg2 === 'string' && (arg2.startsWith('SLOT-') || arg2.includes('-'))) {
+      if (arg2.includes('202') && arg2.split('-').length === 3 && !arg2.startsWith('SLOT-')) {
+        // arg2 is a date like '2026-09-30'
+        newDate = arg2;
+        newStartTime = arg3;
+        newEndTime = arg4;
+        newTimeDisplay = arg5;
+        preferredTrainerId = arg6;
+      } else {
+        // arg2 is slotId like 'SLOT-2026-09-30-0800'
+        newDate = arg3;
+        newStartTime = arg4;
+        newEndTime = arg5;
+        newTimeDisplay = arg6;
+      }
+    } else {
+      newDate = arg2;
+      newStartTime = arg3;
+      newEndTime = arg4;
+      newTimeDisplay = arg5;
+      preferredTrainerId = arg6;
+    }
+
+    if (!newDate) newDate = oldBooking.date;
+    if (!newStartTime) newStartTime = oldBooking.startTime;
+    if (!newEndTime) newEndTime = oldBooking.endTime;
+
+    const traineeId = oldBooking.traineeId;
+
+    // Temporarily mark old booking as PENDING_MOVE to prevent self-overlap false positives
+    const originalStatus = oldBooking.status;
+    oldBooking.status = 'PENDING_MOVE';
+
+    // Attempt to book the new slot
+    const bookRes = await this.bookSlot({
+      date: newDate,
+      startTime: newStartTime,
+      endTime: newEndTime,
+      timeDisplay: newTimeDisplay,
+      traineeId: traineeId,
+      traineeName: oldBooking.traineeName,
+      preferredTrainerId: preferredTrainerId,
+      bookedBy: 'Admin (Slot Reassignment)'
+    });
+
+    if (!bookRes.success) {
+      oldBooking.status = originalStatus; // restore status on failure
+      return bookRes; // Returns failure reason (e.g. slot full, conflict)
+    }
+
+    // If new slot booked successfully, mark previous one as CANCELLED
+    oldBooking.status = 'CANCELLED';
+    oldBooking.cancelledAt = new Date().toISOString();
+    oldBooking.notes = `Moved to ${newDate} (${newStartTime}) by Admin`;
+
+    this.slotAuditLogs.unshift({
+      id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      slotId: oldBooking.slotId,
+      bookingId: oldBooking.id,
+      action: 'LEARNER_MOVED',
+      performedBy: 'Admin Office',
+      details: `${oldBooking.traineeName} moved from ${oldBooking.date} ${oldBooking.startTime} to ${newDate} ${newStartTime}`,
+      timestamp: new Date().toISOString()
+    });
+
+    cancelSlotBookingInSupabase(bookingId, 'Admin', `Moved to ${newDate} ${newStartTime}`).catch(() => {});
+
+    this.saveState();
+    this.notify('SLOT_MOVED', { oldBooking, newBooking: bookRes.booking });
+
+    return {
+      success: true,
+      message: `Learner successfully moved to ${newDate} (${newStartTime}).`,
+      booking: bookRes.booking
+    };
+  }
+
+  /**
+   * Admin Set Trainer Duty / Availability for a Date or Slot
+   * Automatically updates dynamic slot capacity (Available Trainers × 2).
+   */
+  setTrainerSlotAvailability(trainerId, dateStr, slotTime = null, isAvailable = true, reason = '') {
+    if (this.role !== 'admin') {
+      return { 
+        success: false, 
+        status: 403, 
+        message: 'Forbidden (HTTP 403): Only ADMIN users can set instructor availability or duty.' 
+      };
+    }
+
+    if (typeof slotTime === 'boolean') {
+      isAvailable = slotTime;
+      slotTime = null;
+    }
+
+    if (!this.trainerAvailability[dateStr]) {
+      this.trainerAvailability[dateStr] = {};
+    }
+
+    if (slotTime) {
+      const key = `${trainerId}_${slotTime}`;
+      this.trainerAvailability[dateStr][key] = isAvailable;
+      updateTrainerAvailabilityInSupabase(trainerId, dateStr, slotTime, isAvailable, reason).catch(() => {});
+    } else {
+      this.trainerAvailability[dateStr][trainerId] = isAvailable;
+      updateTrainerAvailabilityInSupabase(trainerId, dateStr, 'ALL_DAY', isAvailable, reason).catch(() => {});
+    }
+
+    const trainer = this.getTrainerById(trainerId);
+    this.slotAuditLogs.unshift({
+      id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      slotId: null,
+      bookingId: null,
+      action: 'TRAINER_AVAILABILITY_CHANGED',
+      performedBy: 'Admin Office',
+      details: `Instructor ${trainer ? trainer.name : trainerId} marked as ${isAvailable ? 'AVAILABLE' : 'UNAVAILABLE'} on ${dateStr} ${slotTime ? `(${slotTime})` : '(Full Day)'}. ${reason ? 'Reason: ' + reason : ''}`,
+      timestamp: new Date().toISOString()
+    });
+
+    this.saveState();
+    this.notify('TRAINER_AVAILABILITY_CHANGED', { trainerId, dateStr, slotTime, isAvailable });
+    return true;
+  }
+
+  /**
+   * Admin Create Driving Slot (Standard or Custom)
+   * Admin can specify name/title, date, start time, end time, max capacity, instructor, status, location, notes.
+   */
+  adminCreateCustomSlot(payload) {
+    if (this.role !== 'admin') {
+      return { 
+        success: false, 
+        status: 403, 
+        message: 'Forbidden (HTTP 403): Only ADMIN users are authorized to create driving slots.' 
+      };
+    }
+
+    const {
+      id = null,
+      name = '',
+      title = '',
+      date,
+      startTime,
+      endTime,
+      timeDisplay = null,
+      capacity = null,
+      status = 'Available',
+      trainerId = null,
+      assignedTrainerId = null,
+      courseId = 'ALL',
+      course = null,
+      location = '',
+      branch = '',
+      description = '',
+      notes = '',
+      vehicleOverride = null
+    } = payload || {};
+
+    if (!date || !startTime || !endTime) {
+      return { success: false, message: 'Date, start time, and end time are required.' };
+    }
+
+    const slotName = (name || title || '').trim();
+    const slotLocation = (location || branch || '').trim();
+    const slotDesc = (description || notes || '').trim();
+    const tid = trainerId || assignedTrainerId || null;
+    const cid = courseId || course || 'ALL';
+
+    const formattedStart = formatTime24to12(startTime);
+    const formattedEnd = formatTime24to12(endTime);
+    const cleanDisplay = timeDisplay || `${formattedStart} – ${formattedEnd}`;
+
+    const slotId = id || `SLOT-${date}-${formattedStart.replace(/[^0-9]/g, '')}-${formattedEnd.replace(/[^0-9]/g, '')}${tid ? '-' + tid.replace(/[^a-zA-Z0-9]/g, '') : ''}`;
+    const existingIdx = this.slots.findIndex(s => s.id === slotId || (s.date === date && (s.startTime === formattedStart || s.startTime === startTime) && (!tid || !s.assignedTrainerId || s.assignedTrainerId === tid)));
+
+    const trainerObj = tid ? this.trainers.find(t => t.id === tid) : null;
+    const resolvedVehicle = payload.vehicle || vehicleOverride || (trainerObj ? trainerObj.car : null);
+    const resolvedTrainerName = payload.trainerName || (trainerObj ? trainerObj.name : null);
+
+    const newSlot = {
+      id: slotId,
+      name: slotName,
+      date,
+      startTime: formattedStart,
+      endTime: formattedEnd,
+      timeDisplay: cleanDisplay,
+      status: status || 'Available',
+      capacity: (capacity !== null && capacity !== undefined && capacity !== '') ? parseInt(capacity, 10) : null,
+      assignedTrainerId: tid,
+      trainerId: tid,
+      trainerName: resolvedTrainerName,
+      location: slotLocation,
+      description: slotDesc,
+      isDefault: false,
+      courseId: cid,
+      course: payload.course || cid,
+      vehicle: resolvedVehicle,
+      vehicleOverride: resolvedVehicle,
+      createdBy: 'ADMIN'
+    };
+
+    if (existingIdx >= 0) {
+      this.slots[existingIdx] = { ...this.slots[existingIdx], ...newSlot };
+    } else {
+      this.slots.push(newSlot);
+    }
+
+    saveSlotToSupabase(newSlot).catch(() => {});
+
+    this.slotAuditLogs.unshift({
+      id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      slotId: slotId,
+      bookingId: null,
+      action: 'SLOT_CREATED',
+      performedBy: 'Admin Office',
+      details: `Admin created driving slot for ${date} (${newSlot.timeDisplay}) - ${newSlot.name ? newSlot.name + ' · ' : ''}Status: ${newSlot.status}${newSlot.capacity ? ', Capacity: ' + newSlot.capacity : ''}`,
+      timestamp: new Date().toISOString()
+    });
+
+    this.saveState();
+    this.notify('SLOT_CREATED', newSlot);
+
+    return { success: true, slot: newSlot, message: 'Driving slot created successfully.' };
+  }
+
+  /**
+   * Admin Edit Slot
+   * Admin can change date, start time, end time, capacity, instructor, status, name, location, and description.
+   */
+  adminUpdateSlot(slotId, updateData) {
+    if (this.role !== 'admin') {
+      return { 
+        success: false, 
+        status: 403, 
+        message: 'Forbidden (HTTP 403): Only ADMIN users are authorized to update driving slots.' 
+      };
+    }
+
+    const { date, startTime, endTime, capacity, status, trainerId, assignedTrainerId, vehicleOverride, course, name, title, location, description } = updateData || {};
+
+    const slot = this.slots.find(s => s.id === slotId);
+    if (!slot) return { success: false, message: 'Slot not found.' };
+
+    if (date) slot.date = date;
+    if (startTime) slot.startTime = formatTime24to12(startTime);
+    if (endTime) slot.endTime = formatTime24to12(endTime);
+    if (startTime && endTime) slot.timeDisplay = `${slot.startTime} – ${slot.endTime}`;
+    if (capacity !== undefined) slot.capacity = (capacity !== null && capacity !== '') ? parseInt(capacity, 10) : null;
+    if (status) slot.status = status;
+    if (name !== undefined || title !== undefined) slot.name = (name || title || '').trim();
+    if (location !== undefined) slot.location = (location || '').trim();
+    if (description !== undefined) slot.description = (description || '').trim();
+    if (trainerId !== undefined || assignedTrainerId !== undefined) slot.assignedTrainerId = trainerId || assignedTrainerId || null;
+    if (vehicleOverride !== undefined) slot.vehicleOverride = vehicleOverride;
+    if (course) slot.course = course;
+
+    // If status is set to Cancelled or Closed, cancel all active confirmed bookings in it
+    if (status === 'Cancelled' || status === 'CANCELLED' || status === 'Closed') {
+      const activeBookings = this.slotBookings.filter(b => 
+        (b.slotId === slotId || (b.date === slot.date && b.startTime === slot.startTime)) && 
+        b.status === 'CONFIRMED'
+      );
+      activeBookings.forEach(b => {
+        b.status = 'CANCELLED';
+        b.cancelledAt = new Date().toISOString();
+        b.notes = `Slot was marked as ${status} by Administration`;
+      });
+    }
+
+    this.slotAuditLogs.unshift({
+      id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      slotId: slotId,
+      bookingId: null,
+      action: `SLOT_UPDATED`,
+      performedBy: 'Admin Office',
+      details: `Slot ${slot.timeDisplay || slotId} updated by Admin. Status: ${slot.status}${slot.capacity ? ', Capacity: ' + slot.capacity : ''}${slot.assignedTrainerId ? ', Trainer: ' + slot.assignedTrainerId : ''}`,
+      timestamp: new Date().toISOString()
+    });
+
+    saveSlotToSupabase(slot).catch(() => {});
+    api.put(`/slots/${encodeURIComponent(slotId)}`, slot).catch(err => {
+      console.warn('Backend slot update sync:', err);
+    });
+
+    this.saveState();
+    this.notify('SLOT_UPDATED', slot);
+
+    return { success: true, slot, message: `Slot updated successfully.` };
+  }
+
+  /**
+   * Admin Remove / Delete Slot
+   * Admin can permanently delete a slot.
+   * If slot has students assigned/booked, shows warning and requires explicit confirmation.
+   */
+  adminDeleteSlot(slotId, forceConfirm = false) {
+    if (this.role !== 'admin') {
+      return { 
+        success: false, 
+        status: 403, 
+        message: 'Forbidden (HTTP 403): Only ADMIN users are authorized to delete driving slots.' 
+      };
+    }
+
+    let idx = this.slots.findIndex(s => s.id === slotId);
+    if (idx === -1) {
+      // Materialize slots for date if not yet cached
+      this.getSlotsForDate(this.getTodayDateStr());
+      idx = this.slots.findIndex(s => s.id === slotId);
+    }
+    if (idx === -1) return { success: false, message: 'Slot not found.' };
+
+    const slot = this.slots[idx];
+    const activeBookings = this.slotBookings.filter(b => 
+      (b.slotId === slotId || (b.date === slot.date && b.startTime === slot.startTime)) && 
+      b.status === 'CONFIRMED'
+    );
+
+    if (activeBookings.length > 0 && !forceConfirm) {
+      return { 
+        success: false, 
+        needsConfirmation: true, 
+        bookedCount: activeBookings.length, 
+        message: `This slot has ${activeBookings.length} student${activeBookings.length > 1 ? 's' : ''} assigned. Deleting this slot will affect their bookings.` 
+      };
+    }
+
+    // Cancel affected bookings with notice
+    if (activeBookings.length > 0) {
+      activeBookings.forEach(b => {
+        b.status = 'CANCELLED';
+        b.cancelledAt = new Date().toISOString();
+        b.notes = 'Slot was deleted by Administration';
+      });
+    }
+
+    // Permanently record deletion so default slots don't reappear
+    this.deletedSlots = this.deletedSlots || [];
+    this.deletedSlots.push(slot.id);
+    if (slot.date && slot.startTime) {
+      this.deletedSlots.push(`${slot.date}_${slot.startTime}`);
+    }
+
+    // Permanently remove slot
+    this.slots.splice(idx, 1);
+
+    api.delete(`/slots/${encodeURIComponent(slot.id)}`).catch(err => {
+      console.warn('Backend slot delete sync:', err);
+    });
+
+    this.slotAuditLogs.unshift({
+      id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      slotId: slot.id,
+      bookingId: null,
+      action: 'SLOT_DELETED',
+      performedBy: 'Admin Office',
+      details: `Admin deleted driving slot for ${slot.date} (${slot.timeDisplay || slot.startTime}). Affected bookings: ${activeBookings.length}`,
+      timestamp: new Date().toISOString()
+    });
+
+    this.saveState();
+    this.notify('SLOT_DELETED', { slotId, affectedCount: activeBookings.length });
+
+    return { 
+      success: true, 
+      message: `Driving slot permanently deleted. ${activeBookings.length > 0 ? `${activeBookings.length} student booking(s) cancelled.` : ''}`,
+      affectedCount: activeBookings.length
+    };
+  }
+
+  /**
+   * Get confirmed bookings for a specific Learner
+   */
+  getLearnerConfirmedSlots(traineeId) {
+    const norm = traineeId ? traineeId.trim() : '';
+    return this.slotBookings
+      .filter(b => (b.traineeId === norm || b.traineeId === this.currentTraineeId) && b.status === 'CONFIRMED')
+      .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+  }
+
+  /**
+   * Get all bookings (confirmed, completed, cancelled) for a specific Learner
+   */
+  getLearnerAllBookings(traineeId) {
+    const norm = traineeId ? traineeId.trim() : '';
+    return this.slotBookings
+      .filter(b => (b.traineeId === norm || b.traineeId === this.currentTraineeId))
+      .sort((a, b) => (b.date + b.startTime).localeCompare(a.date + a.startTime));
+  }
+
+  /**
+   * Get completed driving rides for a specific Learner
+   */
+  getLearnerCompletedRides(traineeId) {
+    const norm = traineeId ? traineeId.trim() : '';
+    return this.slotBookings
+      .filter(b => (b.traineeId === norm || b.traineeId === this.currentTraineeId) && (b.status === 'COMPLETED' || b.attendance === 'present'))
+      .sort((a, b) => (b.date + b.startTime).localeCompare(a.date + a.startTime));
+  }
+
+  /**
+   * Get assigned sessions for a specific Instructor
+   */
+  getTrainerAssignedSlots(trainerId, dateStr) {
+    if (!dateStr) dateStr = this.getTodayDateStr();
+    const trainerBookings = this.slotBookings.filter(b => 
+      b.trainerId === trainerId && 
+      b.date === dateStr && 
+      b.status === 'CONFIRMED'
+    );
+
+    // Group by slot
+    const groups = {};
+    trainerBookings.forEach(bk => {
+      const key = bk.startTime;
+      if (!groups[key]) {
+        groups[key] = {
+          startTime: bk.startTime,
+          endTime: bk.endTime,
+          timeDisplay: bk.timeDisplay,
+          vehicle: bk.vehicle,
+          learners: []
+        };
+      }
+      groups[key].learners.push(bk);
+    });
+
+    return Object.values(groups);
+  }
+
+  getSlotAuditLogs(slotId = null) {
+    if (!slotId) return this.slotAuditLogs;
+    return this.slotAuditLogs.filter(l => l.slotId === slotId);
   }
 
   getTrainerById(id) {

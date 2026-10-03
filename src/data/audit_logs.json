@@ -1,0 +1,140 @@
+[
+  {
+    "id": "AUDIT-1790934249524-qfu3e",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin reset Trainer password",
+    "accountAffected": "K. Srinivas Rao (Login ID: testtrainer_1790934249324)",
+    "actionType": "RESET_PASSWORD",
+    "role": "TRAINER",
+    "timestamp": "2026-10-02T09:44:09.524Z",
+    "details": null
+  },
+  {
+    "id": "AUDIT-1790934249462-e05h3",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin reset User password",
+    "accountAffected": "Sai Kiran Varma (Login ID: testuser_1790934249189)",
+    "actionType": "RESET_PASSWORD",
+    "role": "USER",
+    "timestamp": "2026-10-02T09:44:09.462Z",
+    "details": null
+  },
+  {
+    "id": "AUDIT-1790934249402-6ow9j",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin activated User account",
+    "accountAffected": "Sai Kiran Varma (Login ID: testuser_1790934249189)",
+    "actionType": "ACTIVATE",
+    "role": "USER",
+    "timestamp": "2026-10-02T09:44:09.402Z",
+    "details": null
+  },
+  {
+    "id": "AUDIT-1790934249396-myn2x",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin deactivated User account",
+    "accountAffected": "Sai Kiran Varma (Login ID: testuser_1790934249189)",
+    "actionType": "DEACTIVATE",
+    "role": "USER",
+    "timestamp": "2026-10-02T09:44:09.396Z",
+    "details": null
+  },
+  {
+    "id": "AUDIT-1790934249360-769t6",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin created Trainer account",
+    "accountAffected": "K. Srinivas Rao (Login ID: testtrainer_1790934249324)",
+    "actionType": "CREATE",
+    "role": "TRAINER",
+    "timestamp": "2026-10-02T09:44:09.360Z",
+    "details": null
+  },
+  {
+    "id": "AUDIT-1790934249276-g2afv",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin created User account",
+    "accountAffected": "Sai Kiran Varma (Login ID: testuser_1790934249189)",
+    "actionType": "CREATE",
+    "role": "USER",
+    "timestamp": "2026-10-02T09:44:09.276Z",
+    "details": null
+  },
+  {
+    "id": "AUDIT-1790934169863-26vwc",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin reset Trainer password",
+    "accountAffected": "K. Srinivas Rao (Login ID: testtrainer_1790934169643)",
+    "actionType": "RESET_PASSWORD",
+    "role": "TRAINER",
+    "timestamp": "2026-10-02T09:42:49.863Z",
+    "details": null
+  },
+  {
+    "id": "AUDIT-1790934169785-1ns1b",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin reset User password",
+    "accountAffected": "Sai Kiran Varma (Login ID: testuser_1790934169533)",
+    "actionType": "RESET_PASSWORD",
+    "role": "USER",
+    "timestamp": "2026-10-02T09:42:49.785Z",
+    "details": null
+  },
+  {
+    "id": "AUDIT-1790934169717-agq2z",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin activated User account",
+    "accountAffected": "Sai Kiran Varma (Login ID: testuser_1790934169533)",
+    "actionType": "ACTIVATE",
+    "role": "USER",
+    "timestamp": "2026-10-02T09:42:49.717Z",
+    "details": null
+  },
+  {
+    "id": "AUDIT-1790934169711-dxkx9",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin deactivated User account",
+    "accountAffected": "Sai Kiran Varma (Login ID: testuser_1790934169533)",
+    "actionType": "DEACTIVATE",
+    "role": "USER",
+    "timestamp": "2026-10-02T09:42:49.711Z",
+    "details": null
+  },
+  {
+    "id": "AUDIT-1790934169674-qkyr6",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin created Trainer account",
+    "accountAffected": "K. Srinivas Rao (Login ID: testtrainer_1790934169643)",
+    "actionType": "CREATE",
+    "role": "TRAINER",
+    "timestamp": "2026-10-02T09:42:49.674Z",
+    "details": null
+  },
+  {
+    "id": "AUDIT-1790934169603-gh434",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin created User account",
+    "accountAffected": "Sai Kiran Varma (Login ID: testuser_1790934169533)",
+    "actionType": "CREATE",
+    "role": "USER",
+    "timestamp": "2026-10-02T09:42:49.603Z",
+    "details": null
+  },
+  {
+    "id": "AUDIT-INIT-1",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin initialized User account for Sai Kiran Varma",
+    "accountAffected": "Sai Kiran Varma (Login ID: saikiran)",
+    "actionType": "CREATE",
+    "role": "USER",
+    "timestamp": "2026-10-02T09:24:11.793Z"
+  },
+  {
+    "id": "AUDIT-INIT-2",
+    "adminUser": "Admin (admin@gafoordriving.in)",
+    "action": "Admin initialized Trainer account for K. Srinivas Rao",
+    "accountAffected": "K. Srinivas Rao (Login ID: srinivas)",
+    "actionType": "CREATE",
+    "role": "TRAINER",
+    "timestamp": "2026-10-02T09:24:11.793Z"
+  }
+]

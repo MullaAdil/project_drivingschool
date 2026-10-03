@@ -3,18 +3,56 @@
    Spacious premium dark layout — detailed sections, proper sizing
    ========================================================================== */
 
-import { store } from '../store.js';
+import { store, formatReadableDate, getLocalTodayDate, DEFAULT_BOOKABLE_SLOTS, formatTime24to12, timeToMinutes } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
 import { getSupabaseCredentials, saveSupabaseCredentials, testSupabaseConnection } from '../supabase.js';
 import { renderStudentBoxAvatar, renderStudentAvatar } from '../components/studentAvatar.js';
 import { openPhotoCropModal } from '../components/photoCropModal.js';
+import api from '../api/client.js';
+import { renderAdminAccountsView } from './adminAccountsView.js';
 
 export function renderAdminView(container, showToast, subService = 'hub', onNavigate) {
+  if (subService === 'accounts' || subService === 'user-accounts' || subService === 'trainer-accounts') {
+    renderAdminAccountsView(container, showToast, onNavigate);
+    return;
+  }
+
   let searchQuery = '';
   let activePackageFilter = 'all';
   let activePayFilter = 'all';
   let activeStageFilter = 'all';
   let lastPulsedTraineeId = null;
+  let adminSlotDate = store.getTodayDateStr();
+  let adminSlotStatusFilter = 'all';
+  let adminSlotTrainerFilter = 'all';
+  let adminSlotVehicleFilter = 'all';
+  let adminSlotCourseFilter = 'all';
+  let adminSlotActiveTab = 'slots'; // 'slots' | 'duty' | 'audit'
+  let adminSlotViewMode = 'table'; // 'table' | 'cards'
+
+  function formatSlotDate(dtStr) {
+    if (!dtStr) return '';
+    const parts = dtStr.split('-');
+    if (parts.length < 3) return dtStr;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    const dObj = new Date(y, m, d);
+    return dObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  }
+
+  function formatTime12to24(timeStr) {
+    if (!timeStr) return '';
+    const clean = timeStr.trim();
+    const isPM = clean.toUpperCase().includes('PM');
+    const isAM = clean.toUpperCase().includes('AM');
+    const [hStr, mStr] = clean.replace(/[APMapm\s]/g, '').split(':');
+    let h = parseInt(hStr, 10) || 0;
+    const m = String(parseInt(mStr, 10) || 0).padStart(2, '0');
+    if (isPM && h < 12) h += 12;
+    if (isAM && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${m}`;
+  }
 
   function render() {
     const trainees = store.trainees;
@@ -1085,6 +1123,508 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
       `;
     }
 
+    // =====================================================
+    // DRIVING SLOT MANAGEMENT & DAILY DISPATCH
+    // Admin full slot management:
+    // - Create, edit, delete, activate, deactivate, cancel slots
+    // - Assign instructors & vehicles
+    // - Dynamic capacity = Available Trainers × 2
+    // - Detailed trainer & learner allocation (max 2 learners per trainer)
+    // - Move learners & cancel bookings
+    // - Instructor duty & audit logs
+    // =====================================================
+    if (subService === 'slots') {
+      const allSlotsOnDate = store.getSlotsForDate(adminSlotDate);
+      const totalDayCapacity = allSlotsOnDate.reduce((acc, s) => acc + s.totalCapacity, 0);
+      const totalBookedDay = allSlotsOnDate.reduce((acc, s) => acc + s.bookedCount, 0);
+      const totalAvailableDay = allSlotsOnDate.reduce((acc, s) => acc + s.availableSeats, 0);
+      const fullSlotsCount = allSlotsOnDate.filter(s => s.calculatedStatus === 'FULL').length;
+      const cancelledSlotsCount = allSlotsOnDate.filter(s => s.status === 'CANCELLED').length;
+      const onDutyTrainers = store.trainers.filter(tr => {
+        if (store.trainerAvailability[adminSlotDate] && store.trainerAvailability[adminSlotDate][tr.id] === false) return false;
+        return true;
+      });
+
+      // Filter slots by status, trainer, vehicle, and course
+      let filteredSlots = allSlotsOnDate.filter(slot => {
+        const sStatus = (slot.calculatedStatus || slot.status || '').toLowerCase();
+        const fStatus = adminSlotStatusFilter.toLowerCase();
+        const matchStatus = adminSlotStatusFilter === 'all' || 
+          sStatus === fStatus || 
+          (fStatus === 'closed' && sStatus === 'inactive') ||
+          (fStatus === 'available' && sStatus === 'almost full');
+        const matchTrainer = adminSlotTrainerFilter === 'all' || 
+          (slot.assignedTrainerId === adminSlotTrainerFilter) ||
+          slot.trainerAllocations.some(a => a.trainerId === adminSlotTrainerFilter);
+        const matchVehicle = adminSlotVehicleFilter === 'all' || 
+          (slot.vehicleOverride && slot.vehicleOverride.toLowerCase().includes(adminSlotVehicleFilter.toLowerCase())) ||
+          slot.trainerAllocations.some(a => a.vehicle && a.vehicle.toLowerCase().includes(adminSlotVehicleFilter.toLowerCase()));
+        const matchCourse = adminSlotCourseFilter === 'all' || 
+          (slot.course && slot.course.toLowerCase().includes(adminSlotCourseFilter.toLowerCase())) || 
+          slot.bookings.some(b => b.course && b.course.toLowerCase().includes(adminSlotCourseFilter.toLowerCase()));
+        const q = searchQuery.toLowerCase().trim();
+        const matchQuery = !q || 
+          slot.timeDisplay.toLowerCase().includes(q) || 
+          slot.bookings.some(b => b.traineeName.toLowerCase().includes(q) || b.traineeId.toLowerCase().includes(q) || (b.vehicle && b.vehicle.toLowerCase().includes(q)));
+        return matchStatus && matchTrainer && matchVehicle && matchCourse && matchQuery;
+      });
+
+      // Quick dates
+      const quickDates = [];
+      const baseDt = new Date();
+      for (let i = 0; i < 4; i++) {
+        const d = new Date(baseDt);
+        d.setDate(d.getDate() + i);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dtStr = `${y}-${m}-${day}`;
+        const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+        quickDates.push({ dateStr: dtStr, label });
+      }
+
+      html = `
+        ${topbar}
+
+        <div class="portal-page-header">
+          <div>
+            <h1 class="portal-page-title">Driving Slot Management</h1>
+            <p class="portal-page-sub">Configure driving slots, monitor real-time trainer capacity (Available Trainers × 2), and manage candidate reservations.</p>
+          </div>
+          <div style="display:flex; gap:0.65rem; align-items:center; flex-wrap:wrap;">
+            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-admin-add-slot" data-action="open-add-slot" onclick="window.openAddSlotModal ? window.openAddSlotModal() : null" style="font-weight:800; cursor:pointer;">+ Add Slot</button>
+            <button type="button" class="p-ghost-btn btn-admin-tab-switch" data-tab="duty">👨‍🏫 Instructor Duty (${onDutyTrainers.length}/${trainers.length})</button>
+            <button type="button" class="p-ghost-btn btn-admin-tab-switch" data-tab="audit">📜 Booking Audit Trail</button>
+          </div>
+        </div>
+
+        <!-- STATS STRIP -->
+        <div class="portal-stats-strip">
+          <div class="portal-stat">
+            <span class="portal-stat-value">${allSlotsOnDate.length}</span>
+            <span class="portal-stat-label">Daily Slots</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value">${totalDayCapacity}</span>
+            <span class="portal-stat-label">Total Day Capacity</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:var(--neem-green);">${totalBookedDay}</span>
+            <span class="portal-stat-label">Active Bookings</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:${totalAvailableDay > 0 ? '#ffffff' : '#f87171'};">${totalAvailableDay}</span>
+            <span class="portal-stat-label">Available Seats</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:#f59e0b;">${fullSlotsCount}</span>
+            <span class="portal-stat-label">Full Slots</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:var(--neem-green);">${onDutyTrainers.length} / ${trainers.length}</span>
+            <span class="portal-stat-label">Instructors on Duty</span>
+          </div>
+        </div>
+
+        <!-- SUB-TABS -->
+        <div style="display:flex; gap:0.5rem; padding:0 2rem; border-bottom:1px solid var(--border-light); background:rgba(255,255,255,0.01);">
+          <button type="button" class="p-tab-btn ${adminSlotActiveTab === 'slots' ? 'p-tab-active' : ''} btn-admin-tab-switch" data-tab="slots" style="padding:0.75rem 1.25rem; font-weight:700; font-size:0.875rem; background:transparent; border:none; color:${adminSlotActiveTab==='slots'?'#ffffff':'var(--slate-muted)'}; border-bottom:2px solid ${adminSlotActiveTab==='slots'?'#ffffff':'transparent'}; cursor:pointer;">
+            📅 Daily Slots &amp; Allocations (${allSlotsOnDate.length})
+          </button>
+          <button type="button" class="p-tab-btn ${adminSlotActiveTab === 'duty' ? 'p-tab-active' : ''} btn-admin-tab-switch" data-tab="duty" style="padding:0.75rem 1.25rem; font-weight:700; font-size:0.875rem; background:transparent; border:none; color:${adminSlotActiveTab==='duty'?'#ffffff':'var(--slate-muted)'}; border-bottom:2px solid ${adminSlotActiveTab==='duty'?'#ffffff':'transparent'}; cursor:pointer;">
+            👨‍🏫 Instructor Duty &amp; Dynamic Capacity
+          </button>
+          <button type="button" class="p-tab-btn ${adminSlotActiveTab === 'audit' ? 'p-tab-active' : ''} btn-admin-tab-switch" data-tab="audit" style="padding:0.75rem 1.25rem; font-weight:700; font-size:0.875rem; background:transparent; border:none; color:${adminSlotActiveTab==='audit'?'#ffffff':'var(--slate-muted)'}; border-bottom:2px solid ${adminSlotActiveTab==='audit'?'#ffffff':'transparent'}; cursor:pointer;">
+            📜 Booking History &amp; Audit Trail (${store.slotAuditLogs.length})
+          </button>
+        </div>
+
+        ${adminSlotActiveTab === 'slots' ? `
+          <!-- DATE & FILTER BAR -->
+          <div class="slot-date-nav">
+            <span style="font-size:0.875rem; font-weight:800; color:#ffffff; margin-right:0.35rem;">Training Date:</span>
+            ${quickDates.map(qd => `
+              <button type="button" class="slot-quick-date-btn ${adminSlotDate === qd.dateStr ? 'active' : ''}" data-admin-date="${qd.dateStr}">
+                📅 ${qd.label}
+              </button>
+            `).join('')}
+            <div style="display:flex; align-items:center; gap:0.45rem;">
+              <input type="date" class="mnc-input" id="inp-admin-slot-date" value="${adminSlotDate}" style="padding:0.4rem 0.65rem; font-size:0.8125rem; width:150px;" />
+            </div>
+
+            <!-- FILTERS -->
+            <div style="display:flex; align-items:center; gap:0.65rem; margin-left:auto; flex-wrap:wrap;">
+              <select class="mnc-select" id="sel-admin-slot-status" style="padding:0.4rem 0.65rem; font-size:0.8125rem;">
+                <option value="all" ${adminSlotStatusFilter==='all'?'selected':''}>All Statuses</option>
+                <option value="Available" ${adminSlotStatusFilter.toLowerCase()==='available'?'selected':''}>Available</option>
+                <option value="Full" ${adminSlotStatusFilter.toLowerCase()==='full'?'selected':''}>Full</option>
+                <option value="Maintenance" ${adminSlotStatusFilter.toLowerCase()==='maintenance'?'selected':''}>Maintenance</option>
+                <option value="Closed" ${adminSlotStatusFilter.toLowerCase()==='closed'?'selected':''}>Closed</option>
+                <option value="Cancelled" ${adminSlotStatusFilter.toLowerCase()==='cancelled'?'selected':''}>Cancelled</option>
+              </select>
+
+              <select class="mnc-select" id="sel-admin-slot-trainer" style="padding:0.4rem 0.65rem; font-size:0.8125rem;">
+                <option value="all" ${adminSlotTrainerFilter==='all'?'selected':''}>All Instructors</option>
+                ${trainers.map(tr => `
+                  <option value="${tr.id}" ${adminSlotTrainerFilter===tr.id?'selected':''}>${tr.name}</option>
+                `).join('')}
+              </select>
+
+              <select class="mnc-select" id="sel-admin-slot-vehicle" style="padding:0.4rem 0.65rem; font-size:0.8125rem;">
+                <option value="all" ${adminSlotVehicleFilter==='all'?'selected':''}>All Vehicles</option>
+                <option value="Swift" ${adminSlotVehicleFilter==='Swift'?'selected':''}>Swift Dual-Brake</option>
+                <option value="Dzire" ${adminSlotVehicleFilter==='Dzire'?'selected':''}>Dzire Dual-Brake</option>
+                <option value="Baleno" ${adminSlotVehicleFilter==='Baleno'?'selected':''}>Baleno Dual-Brake</option>
+                <option value="i20" ${adminSlotVehicleFilter==='i20'?'selected':''}>i20 Dual-Control</option>
+              </select>
+
+              <select class="mnc-select" id="sel-admin-slot-course" style="padding:0.4rem 0.65rem; font-size:0.8125rem;">
+                <option value="all" ${adminSlotCourseFilter==='all'?'selected':''}>All Courses</option>
+                <option value="Comprehensive" ${adminSlotCourseFilter==='Comprehensive'?'selected':''}>20-Day Comprehensive</option>
+                <option value="8-Track" ${adminSlotCourseFilter==='8-Track'?'selected':''}>RTO 8-Track Drills</option>
+                <option value="Refresher" ${adminSlotCourseFilter==='Refresher'?'selected':''}>VIP Express Refresher</option>
+              </select>
+
+              <input type="text" class="mnc-input" id="inp-admin-slot-search" placeholder="Search learner, vehicle…" value="${searchQuery}" style="padding:0.4rem 0.65rem; font-size:0.8125rem; width:170px;" />
+            </div>
+          </div>
+
+          <!-- SLOTS LIST & TABLE VIEW -->
+          <div class="portal-section">
+            <div class="portal-section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+              <div>
+                <span class="portal-section-title">Driving Slots — ${formatReadableDate(adminSlotDate)}</span>
+                <span class="portal-section-meta">${filteredSlots.length} slots matching filter</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <button type="button" class="btn-mnc ${adminSlotViewMode === 'table' ? 'btn-mnc-primary' : 'btn-mnc-secondary'} btn-mnc-sm btn-admin-view-mode" data-mode="table" style="font-size:0.75rem; padding:0.35rem 0.75rem;">
+                  📋 Table View
+                </button>
+                <button type="button" class="btn-mnc ${adminSlotViewMode === 'cards' ? 'btn-mnc-primary' : 'btn-mnc-secondary'} btn-mnc-sm btn-admin-view-mode" data-mode="cards" style="font-size:0.75rem; padding:0.35rem 0.75rem;">
+                  🗂 Detailed Cards
+                </button>
+              </div>
+            </div>
+
+            ${adminSlotViewMode === 'table' ? `
+              <!-- DEDICATED DRIVING SLOTS TABLE (ADMIN EXCLUSIVE) -->
+              <div class="p-table-wrap" style="background:rgba(18,20,26,0.85); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-md); overflow:hidden;">
+                <table class="p-table" style="margin:0;">
+                  <thead>
+                    <tr style="background:rgba(255,255,255,0.03); border-bottom:1px solid rgba(255,255,255,0.08);">
+                      <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Date</th>
+                      <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Time</th>
+                      <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; text-align:center;">Capacity</th>
+                      <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; text-align:center;">Booked</th>
+                      <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Trainer / Instructor</th>
+                      <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Status</th>
+                      <th style="padding:1rem 1.25rem; font-weight:800; color:var(--slate-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; text-align:right;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${filteredSlots.length === 0 ? `
+                      <tr>
+                        <td colspan="7" style="padding:2.5rem 1rem; text-align:center; color:var(--slate-muted);">
+                          No driving slots found matching filters. Click <strong style="cursor:pointer; color:var(--primary-gold);" id="btn-empty-add-slot" data-action="open-add-slot" onclick="window.openAddSlotModal ? window.openAddSlotModal() : null">+ Add Slot</strong> to create one.
+                        </td>
+                      </tr>
+                    ` : filteredSlots.map(slot => {
+                      const sStat = (slot.calculatedStatus || slot.status || '').toLowerCase();
+                      const isMaintenance = sStat === 'maintenance';
+                      const isClosed = sStat === 'closed' || sStat === 'inactive';
+                      const isCancelled = sStat === 'cancelled';
+                      const isCompleted = sStat === 'completed';
+                      const isFull = sStat === 'full';
+                      const isAlmost = sStat === 'almost full';
+
+                      const statusPillClass = isCompleted ? 'status-pill-completed' :
+                                              isMaintenance ? 'status-pill-maintenance' :
+                                              isClosed ? 'status-pill-closed' :
+                                              isCancelled ? 'status-pill-cancelled' :
+                                              isFull ? 'status-pill-full' :
+                                              isAlmost ? 'status-pill-almost' : 'status-pill-available';
+
+                      const shortDate = formatSlotDate(slot.date);
+                      const displayDate = slot.date ? slot.date.split('-').reverse().join('-') : '';
+
+                      const assignedTrainer = store.trainers.find(t => t.id === slot.assignedTrainerId || t.id === slot.trainerId);
+                      const trainerDisplay = assignedTrainer
+                        ? assignedTrainer.name
+                        : (slot.trainerName || (slot.trainerAllocations && slot.trainerAllocations.length > 0
+                            ? slot.trainerAllocations.map(a => a.trainerName).join(', ')
+                            : 'All Available Instructors'));
+                      const vehicleDisplay = slot.vehicleOverride || slot.vehicle || (assignedTrainer ? assignedTrainer.car : '');
+
+                      return `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.15s ease;">
+                          <td style="padding:1rem 1.25rem; font-weight:700; color:#ffffff; white-space:nowrap;">
+                            ${displayDate || slot.date}
+                            <div style="font-size:0.7rem; color:var(--slate-muted); font-weight:normal;">${shortDate}</div>
+                          </td>
+                          <td style="padding:1rem 1.25rem; font-family:var(--font-mono); font-weight:700; color:#ffffff; white-space:nowrap;">
+                            ${slot.name ? `<div style="font-family:var(--font-sans); font-size:0.875rem; font-weight:700; color:#ffffff; margin-bottom:0.2rem;">${slot.name}</div>` : ''}
+                            <div>
+                              ${slot.timeDisplay || `${slot.startTime} – ${slot.endTime}`}
+                              ${slot.isDefault ? '' : '<span class="p-badge p-badge-gold" style="margin-left:0.4rem; font-size:0.6rem;">Custom</span>'}
+                            </div>
+                            ${slot.location ? `<div style="font-family:var(--font-sans); font-size:0.72rem; color:var(--slate-muted); font-weight:normal; margin-top:0.15rem;">📍 ${slot.location}</div>` : ''}
+                          </td>
+                          <td style="padding:1rem 1.25rem; text-align:center; font-family:var(--font-mono); font-weight:800; color:#ffffff;">
+                            ${slot.totalCapacity}
+                          </td>
+                          <td style="padding:1rem 1.25rem; text-align:center;">
+                            <span style="font-family:var(--font-mono); font-weight:800; color:${isCompleted ? '#94a3b8' : isFull ? '#f87171' : isAlmost ? '#fbbf24' : '#4ade80'};">
+                              ${slot.bookedCount}/${slot.totalCapacity}
+                            </span>
+                            <div style="font-size:0.7rem; color:var(--slate-muted);">${isCompleted ? 'Completed' : `${slot.availableSeats} free`}</div>
+                          </td>
+                          <td style="padding:1rem 1.25rem; white-space:nowrap;">
+                            <div style="font-weight:700; color:#ffffff;">${trainerDisplay}</div>
+                            ${vehicleDisplay ? `<div style="font-size:0.72rem; color:var(--slate-muted); margin-top:0.15rem;">🚗 ${vehicleDisplay}</div>` : ''}
+                          </td>
+                          <td style="padding:1rem 1.25rem; white-space:nowrap;">
+                            <span class="slot-status-pill ${statusPillClass}">
+                              ${(slot.calculatedStatus || slot.status || 'Available').toUpperCase()}
+                            </span>
+                          </td>
+                          <td style="padding:1rem 1.25rem; text-align:right; white-space:nowrap;">
+                            <div style="display:inline-flex; align-items:center; gap:0.5rem; justify-content:flex-end;">
+                              <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-admin-edit-slot" data-slot-id="${slot.id}" style="padding:0.35rem 0.75rem; font-size:0.75rem;" title="Edit date, time, capacity, instructor, status">
+                                Edit
+                              </button>
+                              <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-admin-delete-slot" data-slot-id="${slot.id}" style="padding:0.35rem 0.75rem; font-size:0.75rem; color:#f87171; border-color:rgba(239,68,68,0.3);" title="Permanently delete slot">
+                                Delete
+                              </button>
+                              ${!isCancelled && !isClosed && !isMaintenance && !isCompleted && slot.availableSeats > 0 ? `
+                                <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm btn-admin-quick-book" data-slot-id="${slot.id}" data-start-time="${slot.startTime}" data-end-time="${slot.endTime}" data-time-display="${slot.timeDisplay}" style="padding:0.35rem 0.75rem; font-size:0.75rem;" title="Manually assign student to slot">
+                                  + Assign
+                                </button>
+                              ` : ''}
+                            </div>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : `
+              <!-- DETAILED DISPATCH CARDS -->
+              <div style="display:flex; flex-direction:column; gap:1.25rem;">
+                ${filteredSlots.map(slot => {
+                  const sStat = (slot.calculatedStatus || slot.status || '').toLowerCase();
+                  const isMaintenance = sStat === 'maintenance';
+                  const isClosed = sStat === 'closed' || sStat === 'inactive';
+                  const isCancelled = sStat === 'cancelled';
+                  const isFull = sStat === 'full';
+                  const isAlmost = sStat === 'almost full';
+
+                  const statusPillClass = isMaintenance ? 'status-pill-maintenance' :
+                                          isClosed ? 'status-pill-closed' :
+                                          isCancelled ? 'status-pill-cancelled' :
+                                          isFull ? 'status-pill-full' :
+                                          isAlmost ? 'status-pill-almost' : 'status-pill-available';
+
+                  return `
+                    <div style="background:rgba(18,20,26,0.85); border:1px solid ${isCancelled ? 'rgba(239,68,68,0.3)' : (isClosed || isMaintenance) ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.1)'}; border-radius:var(--radius-md); padding:1.4rem;">
+                      <!-- SLOT TOP HEADER -->
+                      <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid rgba(255,255,255,0.07); padding-bottom:0.95rem; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
+                        <div>
+                          <div style="display:flex; align-items:center; gap:0.65rem;">
+                            <div style="font-family:var(--font-mono); font-size:1.2rem; font-weight:800; color:#ffffff;">
+                              ${slot.name ? `<div style="font-family:var(--font-sans); font-size:1rem; font-weight:700; color:var(--primary-gold); margin-bottom:0.25rem;">${slot.name}</div>` : ''}
+                              ${slot.timeDisplay}
+                            </div>
+                            <span class="slot-status-pill ${statusPillClass}">
+                              ${slot.calculatedStatus}
+                            </span>
+                            ${slot.isDefault ? '<span class="p-badge p-badge-dim" style="font-size:0.65rem;">Standard Slot</span>' : '<span class="p-badge p-badge-gold" style="font-size:0.65rem;">Custom Slot</span>'}
+                          </div>
+                          <div style="font-size:0.75rem; color:var(--slate-muted); margin-top:0.25rem;">
+                            Date: <strong>${formatSlotDate(slot.date)}</strong> (${slot.date}) · Capacity: <strong style="color:#ffffff;">${slot.totalCapacity} Seats</strong> ${slot.capacity ? '(Admin Custom)' : '(Trainers × 2)'}
+                            ${slot.location ? ` · 📍 <strong>${slot.location}</strong>` : ''}
+                          </div>
+                        </div>
+
+                        <!-- Capacity Pill & Slot Actions -->
+                        <div style="display:flex; align-items:center; gap:0.65rem; flex-wrap:wrap;">
+                          <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-sm); padding:0.4rem 0.75rem; text-align:right;">
+                            <span style="font-size:0.875rem; font-weight:800; font-family:var(--font-mono); color:${isFull ? '#f87171' : isAlmost ? '#fbbf24' : '#4ade80'};">
+                              ${slot.bookedCount} / ${slot.totalCapacity} Booked
+                            </span>
+                            <div style="font-size:0.7rem; color:var(--slate-muted);">${slot.availableSeats} seat${slot.availableSeats !== 1 ? 's' : ''} available</div>
+                          </div>
+
+                          ${!isCancelled && !isClosed && !isMaintenance && slot.availableSeats > 0 ? `
+                            <button type="button" class="btn-mnc btn-mnc-primary btn-mnc-sm btn-admin-quick-book" data-slot-id="${slot.id}" data-start-time="${slot.startTime}" data-end-time="${slot.endTime}" data-time-display="${slot.timeDisplay}" style="font-size:0.75rem; padding:0.45rem 0.85rem;">
+                              + Assign Student
+                            </button>
+                          ` : ''}
+
+                          <button type="button" class="p-ghost-btn btn-admin-edit-slot" data-slot-id="${slot.id}" style="font-size:0.75rem; padding:0.45rem 0.75rem;">
+                            Edit
+                          </button>
+
+                          <button type="button" class="p-ghost-btn btn-admin-delete-slot" data-slot-id="${slot.id}" style="font-size:0.75rem; padding:0.45rem 0.75rem; color:#f87171; border-color:rgba(239,68,68,0.3);">
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- INSTRUCTOR & LEARNER ALLOCATION BREAKDOWN (MAX 2 LEARNERS PER INSTRUCTOR) -->
+                      <div style="margin-top:0.75rem;">
+                        <div style="font-size:0.75rem; font-weight:800; color:var(--slate-muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.75rem;">
+                          Instructor Allocations (Formula: 1 Trainer = Max 2 Learners)
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1rem;">
+                          ${slot.trainerAllocations.map(alloc => `
+                            <div style="background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06); border-radius:var(--radius-sm); padding:1rem;">
+                              <!-- Trainer Header -->
+                              <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:0.5rem; margin-bottom:0.65rem;">
+                                <div>
+                                  <strong style="font-size:0.875rem; color:#ffffff;">${alloc.trainerName}</strong>
+                                  <div style="font-size:0.72rem; color:var(--slate-muted);">${alloc.vehicle}</div>
+                                </div>
+                                <span style="font-size:0.75rem; font-family:var(--font-mono); font-weight:800; color:${alloc.status === 'FULL' ? '#f87171' : 'var(--neem-green)'};">
+                                  ${alloc.booked} / ${alloc.capacity} ${alloc.status}
+                                </span>
+                              </div>
+
+                              <!-- Assigned Learners -->
+                              <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                ${alloc.bookings.length === 0 ? `
+                                  <div style="font-size:0.75rem; color:var(--slate-muted); padding:0.45rem; background:rgba(255,255,255,0.015); border-radius:4px; text-align:center;">
+                                    No learners assigned yet (2 open seats)
+                                  </div>
+                                ` : alloc.bookings.map((bk, i) => `
+                                  <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:4px; padding:0.45rem 0.65rem;">
+                                    <div>
+                                      <div style="font-size:0.8125rem; font-weight:700; color:#ffffff;">
+                                        ${i + 1}. ${bk.traineeName} <span style="font-size:0.7rem; color:var(--slate-muted);">(${bk.traineeId})</span>
+                                      </div>
+                                      <div style="font-size:0.68rem; color:var(--slate-body);">${bk.course}</div>
+                                    </div>
+                                    <div style="display:flex; gap:0.35rem;">
+                                      <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-admin-move-learner" data-booking-id="${bk.id}" style="font-size:0.68rem; padding:0.25rem 0.5rem;" title="Move to another slot">
+                                        Move ⇄
+                                      </button>
+                                      <button type="button" class="btn-mnc btn-mnc-secondary btn-mnc-sm btn-admin-cancel-booking" data-booking-id="${bk.id}" style="font-size:0.68rem; padding:0.25rem 0.5rem; color:#f87171; border-color:rgba(239,68,68,0.3);" title="Cancel booking">
+                                        ✕
+                                      </button>
+                                    </div>
+                                  </div>
+                                `).join('')}
+
+                                ${alloc.availableSeats === 1 ? `
+                                  <div style="font-size:0.72rem; color:var(--slate-muted); padding:0.35rem 0.65rem; border:1px dashed rgba(255,255,255,0.1); border-radius:4px; text-align:center;">
+                                    + 1 Open Seat for this Instructor
+                                  </div>
+                                ` : ''}
+                              </div>
+                            </div>
+                          `).join('')}
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+          </div>
+        ` : adminSlotActiveTab === 'duty' ? `
+          <!-- INSTRUCTOR DUTY & DYNAMIC CAPACITY TAB -->
+          <div class="portal-section">
+            <div class="portal-section-header">
+              <span class="portal-section-title">Instructor Duty &amp; Availability for ${formatReadableDate(adminSlotDate)}</span>
+              <span class="portal-section-meta">Changes automatically update slot capacities (Trainers × 2)</span>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-light); border-radius:var(--radius-sm); padding:1rem 1.25rem; margin-bottom:1.5rem; font-size:0.8125rem; color:var(--slate-body); line-height:1.5;">
+              💡 <strong>Dynamic Capacity Rule:</strong> Each available instructor handles a maximum of 2 learners per slot. 
+              If 4 instructors are available, capacity = <strong>8 learners</strong>. 
+              If 1 instructor takes leave, capacity automatically drops to <strong>6 learners</strong>. No manual capacity adjustments needed.
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1.25rem;">
+              ${trainers.map(tr => {
+                const isOffDay = store.trainerAvailability[adminSlotDate] && store.trainerAvailability[adminSlotDate][tr.id] === false;
+                const activeBookingsOnDate = store.slotBookings.filter(b => b.trainerId === tr.id && b.date === adminSlotDate && b.status === 'CONFIRMED').length;
+
+                return `
+                  <div style="background:rgba(18,20,26,0.85); border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-md); padding:1.25rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.85rem;">
+                      <div>
+                        <div style="font-size:1.05rem; font-weight:800; color:#ffffff;">${tr.name}</div>
+                        <div style="font-size:0.75rem; color:var(--slate-muted);">${tr.role}</div>
+                        <div style="font-size:0.75rem; color:var(--slate-body); margin-top:0.25rem;">🚗 ${tr.car}</div>
+                      </div>
+                      <span class="p-badge ${isOffDay ? 'p-badge-dim' : 'p-badge-green'}">
+                        ${isOffDay ? 'Off Duty / Leave' : 'On Duty ✓'}
+                      </span>
+                    </div>
+
+                    <div style="font-size:0.8125rem; color:var(--slate-body); margin-bottom:1rem;">
+                      Active Candidate Bookings Today: <strong>${activeBookingsOnDate}</strong>
+                    </div>
+
+                    <div style="display:flex; gap:0.5rem;">
+                      <button type="button" class="btn-mnc ${isOffDay ? 'btn-mnc-primary' : 'btn-mnc-secondary'} btn-mnc-sm btn-admin-toggle-trainer-duty" data-trainer-id="${tr.id}" data-date="${adminSlotDate}" data-available="${isOffDay ? 'true' : 'false'}" style="width:100%;">
+                        ${isOffDay ? 'Mark On Duty' : 'Mark Off Duty (Leave)'}
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : `
+          <!-- BOOKING HISTORY & AUDIT TRAIL TAB -->
+          <div class="portal-section">
+            <div class="portal-section-header">
+              <span class="portal-section-title">Driving Slot Audit Trail &amp; History Log</span>
+              <span class="portal-section-meta">${store.slotAuditLogs.length} logged events</span>
+            </div>
+
+            <div class="p-table-wrap">
+              <table class="p-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Action</th>
+                    <th>Performed By</th>
+                    <th>Event Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${store.slotAuditLogs.slice(0, 50).map(log => `
+                    <tr>
+                      <td class="p-td-mono" style="font-size:0.78rem; white-space:nowrap;">
+                        ${log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN') : 'Recent'}
+                      </td>
+                      <td>
+                        <span class="p-badge ${log.action.includes('CANCEL') ? '' : log.action.includes('MOVE') ? 'p-badge-gold' : 'p-badge-green'}" style="${log.action.includes('CANCEL') ? 'background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3);' : ''}">
+                          ${log.action}
+                        </span>
+                      </td>
+                      <td style="font-weight:700; color:#ffffff;">${log.performedBy}</td>
+                      <td class="p-td-muted" style="font-size:0.825rem;">${log.details}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `}
+      `;
+    }
+
     container.innerHTML = `<div class="portal-shell">${html}</div>`;
     attachEvents();
     lastPulsedTraineeId = null;
@@ -1266,6 +1806,196 @@ export function renderAdminView(container, showToast, subService = 'hub', onNavi
           });
         });
       });
+    }
+
+    // ==========================================
+    // SLOT MANAGEMENT EVENT HANDLERS
+    // ==========================================
+    if (subService === 'slots') {
+      // Tab switches
+      container.querySelectorAll('.btn-admin-tab-switch').forEach(btn => {
+        btn.addEventListener('click', () => {
+          adminSlotActiveTab = btn.dataset.tab;
+          render();
+        });
+      });
+
+      // Quick date buttons
+      container.querySelectorAll('[data-admin-date]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          adminSlotDate = btn.dataset.adminDate;
+          render();
+        });
+      });
+
+      // Date input picker
+      const dateInp = container.querySelector('#inp-admin-slot-date');
+      if (dateInp) {
+        dateInp.addEventListener('change', (e) => {
+          adminSlotDate = e.target.value;
+          render();
+        });
+      }
+
+      // Filter: Status
+      const statusSel = container.querySelector('#sel-admin-slot-status');
+      if (statusSel) {
+        statusSel.addEventListener('change', (e) => {
+          adminSlotStatusFilter = e.target.value;
+          render();
+        });
+      }
+
+      // Filter: Trainer
+      const trainerSel = container.querySelector('#sel-admin-slot-trainer');
+      if (trainerSel) {
+        trainerSel.addEventListener('change', (e) => {
+          adminSlotTrainerFilter = e.target.value;
+          render();
+        });
+      }
+
+      // Filter: Vehicle
+      const vehicleSel = container.querySelector('#sel-admin-slot-vehicle');
+      if (vehicleSel) {
+        vehicleSel.addEventListener('change', (e) => {
+          adminSlotVehicleFilter = e.target.value;
+          render();
+        });
+      }
+
+      // Filter: Course
+      const courseSel = container.querySelector('#sel-admin-slot-course');
+      if (courseSel) {
+        courseSel.addEventListener('change', (e) => {
+          adminSlotCourseFilter = e.target.value;
+          render();
+        });
+      }
+
+      // Filter: Search
+      const searchSlotInp = container.querySelector('#inp-admin-slot-search');
+      if (searchSlotInp) {
+        searchSlotInp.addEventListener('input', (e) => {
+          searchQuery = e.target.value;
+          render();
+        });
+      }
+
+      // Toggle Trainer Duty
+      container.querySelectorAll('.btn-admin-toggle-trainer-duty').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const trId = btn.dataset.trainerId;
+          const dt = btn.dataset.date;
+          const makeAvail = btn.dataset.available === 'true';
+          store.setTrainerSlotAvailability(trId, dt, makeAvail);
+          const trObj = store.trainers.find(t => t.id === trId);
+          showToast(`${trObj ? trObj.name : trId} is now marked ${makeAvail ? 'On Duty ✓ (Slot Capacity Increased)' : 'Off Duty (Slot Capacity Adjusted)'}`, 'info');
+          render();
+        });
+      });
+
+      // Toggle Slot Active / Inactive
+      container.querySelectorAll('.btn-admin-toggle-active').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const slotId = btn.dataset.slotId;
+          const newStatus = btn.dataset.status;
+          store.adminUpdateSlot(slotId, { status: newStatus });
+          showToast(`Slot marked as ${newStatus}`, 'info');
+          render();
+        });
+      });
+
+      // Cancel Slot
+      container.querySelectorAll('.btn-admin-cancel-slot').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const slotId = btn.dataset.slotId;
+          if (confirm('Cancel this entire slot? Active candidate bookings in this slot will be marked as cancelled.')) {
+            store.adminUpdateSlot(slotId, { status: 'CANCELLED' });
+            showToast('Slot cancelled and candidates notified', 'warning');
+            render();
+          }
+        });
+      });
+
+      // Cancel Single Booking
+      container.querySelectorAll('.btn-admin-cancel-booking').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const bkId = btn.dataset.bookingId;
+          if (confirm('Cancel this candidate booking? Trainer seat will become available again.')) {
+            const res = store.cancelSlotBooking(bkId, 'Admin cancelled candidate booking');
+            if (res.success) {
+              showToast('Candidate booking cancelled · Seat released', 'success');
+              render();
+            } else {
+              showToast(res.message || 'Could not cancel booking', 'error');
+            }
+          }
+        });
+      });
+
+      // Move Learner
+      container.querySelectorAll('.btn-admin-move-learner').forEach(btn => {
+        btn.addEventListener('click', () => {
+          openMoveLearnerModal(btn.dataset.bookingId);
+        });
+      });
+
+      // View Mode Toggle (Table vs Cards)
+      container.querySelectorAll('.btn-admin-view-mode').forEach(btn => {
+        btn.addEventListener('click', () => {
+          adminSlotViewMode = btn.dataset.mode;
+          render();
+        });
+      });
+
+      // Quick Book / Assign Learner
+      container.querySelectorAll('.btn-admin-quick-book').forEach(btn => {
+        btn.addEventListener('click', () => {
+          openAdminBookLearnerModal(btn.dataset.slotId, btn.dataset.startTime, btn.dataset.endTime, btn.dataset.timeDisplay);
+        });
+      });
+
+      // Edit Slot
+      container.querySelectorAll('.btn-admin-edit-slot').forEach(btn => {
+        btn.addEventListener('click', () => {
+          openEditSlotModal(btn.dataset.slotId);
+        });
+      });
+
+      // Delete Slot (Confirmation dialog)
+      container.querySelectorAll('.btn-admin-delete-slot').forEach(btn => {
+        btn.addEventListener('click', () => {
+          openDeleteSlotModal(btn.dataset.slotId);
+        });
+      });
+
+      // Add Slot - Expose globally and bind directly
+      window.openAddSlotModal = openAddSlotModal;
+      const btnAddSlot = container.querySelector('#btn-admin-add-slot');
+      if (btnAddSlot) {
+        btnAddSlot.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openAddSlotModal();
+        });
+      }
+      const btnAddEmpty = container.querySelector('#btn-empty-add-slot');
+      if (btnAddEmpty) {
+        btnAddEmpty.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openAddSlotModal();
+        });
+      }
+      const btnAddCustom = container.querySelector('#btn-admin-add-custom-slot');
+      if (btnAddCustom) {
+        btnAddCustom.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openAddSlotModal();
+        });
+      }
     }
   }
 
@@ -1724,6 +2454,939 @@ CREATE POLICY "Public Full Access on Students" ON public.students FOR ALL USING 
       navigator.clipboard.writeText(sql).then(() => {
         showToast('SQL schema copied to clipboard!', 'info');
       });
+    });
+  }
+
+  // ==========================================
+  // ==========================================
+  // SLOT MANAGEMENT MODALS (ADMIN ONLY)
+  // ==========================================
+  function openAddSlotModal() {
+    let modalRoot = document.getElementById('modal-root');
+    if (!modalRoot) {
+      modalRoot = document.createElement('div');
+      modalRoot.id = 'modal-root';
+      document.body.appendChild(modalRoot);
+    }
+    modalRoot.style.position = 'relative';
+    modalRoot.style.zIndex = '99999';
+
+    const defaultDate = adminSlotDate || store.getTodayDateStr();
+    
+    // Choose an initial default time slot that doesn't conflict with existing default slots
+    let defaultStart = '07:00';
+    let defaultEnd = '08:00';
+    try {
+      const existingSlots = store.getSlotsForDate ? store.getSlotsForDate(defaultDate) : [];
+      const candidateTimes = [
+        { start: '07:00', end: '08:00' },
+        { start: '16:30', end: '17:30' },
+        { start: '17:30', end: '18:30' },
+        { start: '11:45', end: '12:45' },
+        { start: '06:30', end: '07:30' }
+      ];
+      for (const c of candidateTimes) {
+        const c12 = formatTime24to12(c.start);
+        const match = existingSlots.some(s => s.startTime === c12 || s.startTime === c.start);
+        if (!match) {
+          defaultStart = c.start;
+          defaultEnd = c.end;
+          break;
+        }
+      }
+    } catch (_) {}
+
+    const trainers = store.trainers || [];
+    const fleetVehicles = Array.from(new Set(trainers.map(tr => tr.car).filter(Boolean)));
+    if (fleetVehicles.length === 0) {
+      fleetVehicles.push(
+        'Maruti Suzuki Swift Dual-Ctrl #AP-04-ED-4041',
+        'Hyundai Grand i10 Dual-Ctrl #AP-04-AB-2020',
+        'Tata Punch Dual-Ctrl #AP-04-CT-7072',
+        'Maruti WagonR Dual-Ctrl #AP-04-KL-8088'
+      );
+    }
+
+    modalRoot.innerHTML = `
+      <div class="mnc-modal-overlay" style="z-index: 99999; position: fixed; inset: 0; background: rgba(4,5,8,0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); display: flex; align-items: center; justify-content: center; padding: 1.5rem;">
+        <div class="p-modal" style="max-width: 520px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; background: #0f1117; border: 1px solid rgba(255,255,255,0.12); border-radius: var(--radius-lg); box-shadow: 0 25px 60px rgba(0,0,0,0.95);">
+          
+          <!-- FIXED HEADER -->
+          <div class="p-modal-header" style="padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div class="p-modal-title" id="modal-add-slot-title" style="font-size: 1.25rem; font-weight: 800; color: #ffffff;">Add New Slot</div>
+              <div class="p-modal-sub" style="font-size: 0.8rem; color: var(--slate-muted); margin-top: 0.2rem;">Configure a practical driving slot with instructor and capacity</div>
+            </div>
+            <button type="button" id="btn-close-add-slot" class="p-modal-close" title="Close" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 1rem; width: 34px; height: 34px; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center;">✕</button>
+          </div>
+
+          <!-- FORM WITH SCROLLABLE BODY AND FIXED FOOTER -->
+          <form id="form-add-slot" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;" novalidate>
+            <div class="p-modal-body" style="padding: 1.5rem; overflow-y: auto; flex: 1;">
+              <!-- Global error banner for API / conflict issues -->
+              <div id="slot-modal-alert" class="modal-alert-error" style="display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; padding: 0.75rem 1rem; border-radius: var(--radius-md); font-size: 0.85rem; font-weight: 500; margin-bottom: 1.15rem; align-items: flex-start; gap: 0.5rem;"></div>
+
+              <!-- 1. Date * -->
+              <div class="p-form-row" style="margin-bottom: 1.15rem;">
+                <label class="p-label" for="inp-slot-date" style="font-size: 0.825rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.35rem; display: block;">
+                  Date <span style="color: #ef4444;">*</span>
+                </label>
+                <input type="date" class="mnc-input p-input" id="inp-slot-date" name="slotDate" value="${defaultDate}" required style="width: 100%;" />
+                <div class="field-error-msg" id="err-slotDate" style="display: none; color: #f87171; font-size: 0.75rem; margin-top: 0.25rem;"></div>
+              </div>
+
+              <!-- 2. Time Slot * -->
+              <div class="p-form-row" style="margin-bottom: 1.15rem;">
+                <label class="p-label" for="inp-slot-time-select" style="font-size: 0.825rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.35rem; display: block;">
+                  Time Slot <span style="color: #ef4444;">*</span>
+                </label>
+                <select class="mnc-select p-input" id="inp-slot-time-select" name="timeSlotSelect" style="width: 100%;">
+                  <option value="06:00 - 07:00">06:00 AM - 07:00 AM</option>
+                  <option value="07:00 - 08:00" ${defaultStart === '07:00' ? 'selected' : ''}>07:00 AM - 08:00 AM</option>
+                  <option value="08:00 - 09:00" ${defaultStart === '08:00' ? 'selected' : ''}>08:00 AM - 09:00 AM</option>
+                  <option value="09:00 - 10:00" ${defaultStart === '09:00' ? 'selected' : ''}>09:00 AM - 10:00 AM</option>
+                  <option value="10:00 - 11:00" ${defaultStart === '10:00' ? 'selected' : ''}>10:00 AM - 11:00 AM</option>
+                  <option value="11:00 - 12:00" ${defaultStart === '11:00' ? 'selected' : ''}>11:00 AM - 12:00 PM</option>
+                  <option value="12:00 - 13:00" ${defaultStart === '12:00' ? 'selected' : ''}>12:00 PM - 01:00 PM</option>
+                  <option value="14:00 - 15:00" ${defaultStart === '14:00' ? 'selected' : ''}>02:00 PM - 03:00 PM</option>
+                  <option value="15:00 - 16:00" ${defaultStart === '15:00' ? 'selected' : ''}>03:00 PM - 04:00 PM</option>
+                  <option value="16:00 - 17:00" ${defaultStart === '16:00' ? 'selected' : ''}>04:00 PM - 05:00 PM</option>
+                  <option value="17:00 - 18:00" ${defaultStart === '17:00' ? 'selected' : ''}>05:00 PM - 06:00 PM</option>
+                  <option value="custom">Custom Time...</option>
+                </select>
+                <div class="field-error-msg" id="err-timeSlot" style="display: none; color: #f87171; font-size: 0.75rem; margin-top: 0.25rem;"></div>
+              </div>
+
+              <!-- Custom Start & End Time Inputs (shown when custom is selected) -->
+              <div id="custom-time-inputs-row" style="display: none; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.15rem;">
+                <div class="p-form-row">
+                  <label class="p-label" for="inp-slot-start" style="font-size: 0.825rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.35rem; display: block;">
+                    Start Time <span style="color: #ef4444;">*</span>
+                  </label>
+                  <input type="time" class="mnc-input p-input" id="inp-slot-start" name="startTime" value="${defaultStart}" required style="width: 100%;" />
+                  <div class="field-error-msg" id="err-startTime" style="display: none; color: #f87171; font-size: 0.75rem; margin-top: 0.25rem;"></div>
+                </div>
+                <div class="p-form-row">
+                  <label class="p-label" for="inp-slot-end" style="font-size: 0.825rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.35rem; display: block;">
+                    End Time <span style="color: #ef4444;">*</span>
+                  </label>
+                  <input type="time" class="mnc-input p-input" id="inp-slot-end" name="endTime" value="${defaultEnd}" required style="width: 100%;" />
+                  <div class="field-error-msg" id="err-endTime" style="display: none; color: #f87171; font-size: 0.75rem; margin-top: 0.25rem;"></div>
+                </div>
+              </div>
+
+              <!-- 3. Capacity * -->
+              <div class="p-form-row" style="margin-bottom: 1.15rem;">
+                <label class="p-label" for="inp-slot-capacity" style="font-size: 0.825rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.35rem; display: block;">
+                  Capacity <span style="color: #ef4444;">*</span>
+                </label>
+                <select class="mnc-select p-input" id="inp-slot-capacity" name="capacity" required style="width: 100%;">
+                  <option value="1">1</option>
+                  <option value="2" selected>2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                </select>
+                <div class="field-error-msg" id="err-capacity" style="display: none; color: #f87171; font-size: 0.75rem; margin-top: 0.25rem;"></div>
+              </div>
+
+              <!-- 4. Trainer Name * -->
+              <div class="p-form-row" style="margin-bottom: 1.15rem;">
+                <label class="p-label" for="inp-slot-trainer" style="font-size: 0.825rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.35rem; display: block;">
+                  Trainer Name <span style="color: #ef4444;">*</span>
+                </label>
+                <select class="mnc-select p-input" id="inp-slot-trainer" name="trainerId" required style="width: 100%;">
+                  ${trainers.map((tr, idx) => `
+                    <option value="${tr.id}" data-car="${tr.car || ''}" ${idx === 0 ? 'selected' : ''}>${tr.name} (${tr.trainerCode || tr.id})</option>
+                  `).join('')}
+                </select>
+                <div class="field-error-msg" id="err-trainerId" style="display: none; color: #f87171; font-size: 0.75rem; margin-top: 0.25rem;"></div>
+              </div>
+
+              <!-- 5. Status * -->
+              <div class="p-form-row" style="margin-bottom: 1.15rem;">
+                <label class="p-label" for="inp-slot-status" style="font-size: 0.825rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.35rem; display: block;">
+                  Status <span style="color: #ef4444;">*</span>
+                </label>
+                <select class="mnc-select p-input" id="inp-slot-status" name="status" style="width: 100%;">
+                  <option value="Available" selected>Available</option>
+                  <option value="Almost Full">Almost Full</option>
+                  <option value="Full">Full</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+                <div class="field-error-msg" id="err-status" style="display: none; color: #f87171; font-size: 0.75rem; margin-top: 0.25rem;"></div>
+              </div>
+
+              <!-- Hidden defaults for vehicle and course -->
+              <input type="hidden" id="inp-slot-vehicle" name="vehicle" value="${fleetVehicles[0] || 'Maruti Suzuki Swift Dual-Ctrl'}" />
+              <input type="hidden" id="inp-slot-course" name="course" value="20-Day Comprehensive Licensing Package" />
+              <input type="hidden" id="inp-slot-location" name="location" value="Pulivendula RTO Track Ground" />
+              <input type="hidden" id="inp-slot-name" name="name" value="" />
+              <input type="hidden" id="inp-slot-desc" name="description" value="" />
+            </div>
+
+            <!-- PINNED MODAL FOOTER (ALWAYS VISIBLE AT BOTTOM) -->
+            <div class="p-modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); background: #13151b; display: flex; justify-content: flex-end; gap: 0.75rem; flex-shrink: 0; margin-top: 0;">
+              <button type="button" class="p-ghost-btn" id="btn-cancel-add-slot" style="padding: 0.65rem 1.25rem; cursor: pointer;">Cancel</button>
+              <button type="submit" class="btn-mnc btn-mnc-primary" id="btn-submit-add-slot" style="padding: 0.65rem 1.5rem; font-weight: 800; cursor: pointer; background: var(--primary-gold); color: #000; border: none; border-radius: var(--radius-sm); box-shadow: 0 4px 14px rgba(243, 209, 130, 0.3);">
+                Add Slot
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    const close = () => { 
+      modalRoot.innerHTML = '';
+      document.removeEventListener('keydown', handleEsc);
+    };
+
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', handleEsc);
+
+    modalRoot.querySelector('#btn-close-add-slot').addEventListener('click', close);
+    modalRoot.querySelector('#btn-cancel-add-slot').addEventListener('click', close);
+
+    const overlay = modalRoot.querySelector('.mnc-modal-overlay');
+    if (overlay) {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) close();
+      });
+    }
+
+    const form = modalRoot.querySelector('#form-add-slot');
+    const btnSubmit = modalRoot.querySelector('#btn-submit-add-slot');
+    const alertBox = modalRoot.querySelector('#slot-modal-alert');
+
+    // Auto-sync vehicle when trainer changes
+    const selTrainer = form.querySelector('#inp-slot-trainer');
+    const selVehicle = form.querySelector('#inp-slot-vehicle');
+    if (selTrainer && selVehicle) {
+      selTrainer.addEventListener('change', () => {
+        const selectedOpt = selTrainer.options[selTrainer.selectedIndex];
+        const car = selectedOpt ? selectedOpt.dataset.car : '';
+        if (car) {
+          selVehicle.value = car;
+        }
+      });
+    }
+
+    // Auto-sync start and end time when Time Slot dropdown changes
+    const selTimeSlot = form.querySelector('#inp-slot-time-select');
+    const inpStart = form.querySelector('#inp-slot-start');
+    const inpEnd = form.querySelector('#inp-slot-end');
+    const customTimeRow = form.querySelector('#custom-time-inputs-row');
+    if (selTimeSlot) {
+      selTimeSlot.addEventListener('change', () => {
+        if (selTimeSlot.value === 'custom') {
+          if (customTimeRow) customTimeRow.style.display = 'grid';
+        } else {
+          const parts = selTimeSlot.value.split(' - ');
+          if (parts.length === 2) {
+            if (inpStart) inpStart.value = parts[0].trim();
+            if (inpEnd) inpEnd.value = parts[1].trim();
+          }
+          if (customTimeRow) customTimeRow.style.display = 'none';
+        }
+      });
+    }
+
+    // Inline field validation error helper
+    const clearErrors = () => {
+      if (alertBox) { alertBox.style.display = 'none'; alertBox.innerHTML = ''; }
+      modalRoot.querySelectorAll('.field-error-msg').forEach(el => {
+        el.style.display = 'none';
+        el.innerHTML = '';
+      });
+      modalRoot.querySelectorAll('.p-input').forEach(el => {
+        el.classList.remove('is-invalid');
+      });
+    };
+
+    const showFieldError = (fieldName, message) => {
+      const errEl = modalRoot.querySelector(`#err-${fieldName}`);
+      const inpEl = modalRoot.querySelector(`[name="${fieldName}"]`);
+      if (errEl) {
+        errEl.innerHTML = `⚠️ ${message}`;
+        errEl.style.display = 'flex';
+      }
+      if (inpEl) {
+        inpEl.classList.add('is-invalid');
+      }
+    };
+
+    const showGlobalError = (message) => {
+      if (alertBox) {
+        alertBox.innerHTML = `<span>⚠️</span> <div>${message}</div>`;
+        alertBox.style.display = 'flex';
+        alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    };
+
+    // Live validation clean-up on user typing / changing values
+    const fieldInputs = form.querySelectorAll('input, select, textarea');
+    fieldInputs.forEach(input => {
+      input.addEventListener('input', () => {
+        input.classList.remove('is-invalid');
+        const errEl = modalRoot.querySelector(`#err-${input.name}`);
+        if (errEl) {
+          errEl.style.display = 'none';
+          errEl.innerHTML = '';
+        }
+        if (alertBox) alertBox.style.display = 'none';
+      });
+      input.addEventListener('change', () => {
+        input.classList.remove('is-invalid');
+        const errEl = modalRoot.querySelector(`#err-${input.name}`);
+        if (errEl) {
+          errEl.style.display = 'none';
+          errEl.innerHTML = '';
+        }
+      });
+    });
+
+    // Form submission handler with complete API lifecycle
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearErrors();
+
+      const f = form.elements;
+      const name = (f['name']?.value || '').trim();
+      const date = (f['slotDate']?.value || '').trim();
+      const startTime = (f['startTime']?.value || '').trim();
+      const endTime = (f['endTime']?.value || '').trim();
+      const capacityVal = (f['capacity']?.value || '').trim();
+      const status = f['status']?.value || 'Available';
+      const location = (f['location']?.value || '').trim();
+      const trainerId = f['trainerId']?.value || null;
+      const vehicle = (f['vehicle']?.value || '').trim();
+      const course = f['course']?.value || '20-Day Comprehensive Licensing Package';
+      const description = (f['description']?.value || '').trim();
+
+      // ==========================================
+      // FRONTEND VALIDATION
+      // ==========================================
+      let hasError = false;
+      let firstInvalidEl = null;
+
+      const markInvalid = (fieldName, message) => {
+        showFieldError(fieldName, message);
+        hasError = true;
+        if (!firstInvalidEl) {
+          firstInvalidEl = modalRoot.querySelector(`[name="${fieldName}"]`);
+        }
+      };
+
+      // 1. Date validation
+      if (!date) {
+        markInvalid('slotDate', 'Training date is required.');
+      } else if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        markInvalid('slotDate', 'Date must be a valid calendar date in YYYY-MM-DD format.');
+      }
+
+      // 2. Start time validation
+      if (!startTime) {
+        markInvalid('startTime', 'Start time is required.');
+      }
+
+      // 3. End time validation
+      if (!endTime) {
+        markInvalid('endTime', 'End time is required.');
+      }
+
+      // 4. Chronological sequence check
+      if (startTime && endTime) {
+        const startMin = timeToMinutes(startTime);
+        const endMin = timeToMinutes(endTime);
+
+        if (startMin >= endMin) {
+          markInvalid('endTime', 'End time must be after start time.');
+        } else if (endMin - startMin < 30) {
+          markInvalid('endTime', 'Slot duration must be at least 30 minutes.');
+        } else if (endMin - startMin > 240) {
+          markInvalid('endTime', 'Slot duration cannot exceed 4 hours.');
+        }
+      }
+
+      // 5. Capacity validation
+      let capacity = null;
+      if (capacityVal === '') {
+        markInvalid('capacity', 'Slot capacity is required.');
+      } else {
+        capacity = parseInt(capacityVal, 10);
+        if (isNaN(capacity) || capacity < 1) {
+          markInvalid('capacity', 'Capacity must be greater than 0.');
+        } else if (capacity > 50) {
+          markInvalid('capacity', 'Capacity cannot exceed 50 learners per slot.');
+        }
+      }
+
+      // 6. Trainer validation
+      if (!trainerId) {
+        markInvalid('trainerId', 'Please select a Trainer / Instructor.');
+      }
+
+      // 7. Vehicle validation
+      if (!vehicle) {
+        markInvalid('vehicle', 'Please select a Vehicle.');
+      }
+
+      // 8. Course validation
+      if (!course) {
+        markInvalid('course', 'Please select a Course.');
+      }
+
+      if (hasError) {
+        if (firstInvalidEl) firstInvalidEl.focus();
+        return;
+      }
+
+      // ==========================================
+      // LOADING STATE
+      // ==========================================
+      btnSubmit.disabled = true;
+      btnSubmit.innerHTML = `<span class="btn-loading-spinner"></span> Creating...`;
+
+      // ==========================================
+      // API REQUEST & ERROR HANDLING
+      // ==========================================
+      try {
+        const selectedTrainer = trainers.find(t => t.id === trainerId);
+        const slotPayload = {
+          name: name || `${formatTime24to12(startTime)} Practical Driving Session`,
+          title: name || `${formatTime24to12(startTime)} Practical Driving Session`,
+          date,
+          startTime: formatTime24to12(startTime),
+          endTime: formatTime24to12(endTime),
+          capacity,
+          status,
+          location: location || 'Pulivendula RTO Track Ground',
+          branch: location || 'Pulivendula RTO Track Ground',
+          trainerId,
+          assignedTrainerId: trainerId,
+          trainerName: selectedTrainer ? selectedTrainer.name : '',
+          vehicle,
+          vehicleOverride: vehicle,
+          courseId: course,
+          course,
+          description,
+          notes: description
+        };
+
+        const res = await api.post('/slots', slotPayload);
+
+        if (res && res.success && res.slot) {
+          // Immediately update store memory and localStorage
+          store.adminCreateCustomSlot(res.slot);
+
+          // Success notification
+          showToast('Slot created successfully.', 'success');
+
+          // Align active date and close modal
+          adminSlotDate = date;
+          close();
+
+          // Instantly refresh UI without page reload
+          render();
+        } else {
+          throw new Error(res.message || 'Unable to create slot. Please try again.');
+        }
+      } catch (err) {
+        console.error('Add Slot Error:', err);
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = `+ Create Slot`;
+
+        if (err.status === 409 || (err.message && err.message.toLowerCase().includes('already exists'))) {
+          showGlobalError('A slot already exists for this date and time period.');
+          showFieldError('startTime', 'A slot already exists for this date and time period.');
+        } else if (err.status === 401 || err.status === 403) {
+          showGlobalError(`Authentication Error (HTTP ${err.status || 403}): Only authorized administrators can create driving slots.`);
+        } else if (err.errors && Object.keys(err.errors).length > 0) {
+          Object.entries(err.errors).forEach(([field, msg]) => {
+            const mappedField = field === 'date' ? 'slotDate' : field;
+            showFieldError(mappedField, msg);
+          });
+          showGlobalError('Please fix the highlighted field validation errors.');
+        } else if (err.fieldErrors && Object.keys(err.fieldErrors).length > 0) {
+          Object.entries(err.fieldErrors).forEach(([field, msg]) => {
+            const mappedField = field === 'date' ? 'slotDate' : field;
+            showFieldError(mappedField, msg);
+          });
+          showGlobalError('Please fix the highlighted field validation errors.');
+        } else {
+          showGlobalError(err.message || 'Unable to create slot. Please try again.');
+        }
+      }
+    });
+  }
+
+  function openAddCustomSlotModal() {
+    openAddSlotModal();
+  }
+
+  function openEditSlotModal(slotId) {
+    const modalRoot = document.getElementById('modal-root');
+    const trainers = store.trainers || [];
+    const slot = store.slots.find(s => s.id === slotId) ||
+                 store.getSlotsForDate(adminSlotDate).find(s => s.id === slotId) || {
+      id: slotId,
+      name: '',
+      date: adminSlotDate,
+      startTime: slotId.replace('slot-', ''),
+      endTime: '',
+      status: 'Available',
+      capacity: null,
+      assignedTrainerId: null,
+      location: '',
+      description: '',
+      course: '20-Day Comprehensive Licensing Package'
+    };
+
+    const currentStatus = slot.status || slot.calculatedStatus || 'Available';
+    const rawStart24 = formatTime12to24(slot.startTime) || '08:00';
+    const rawEnd24 = formatTime12to24(slot.endTime) || '09:00';
+
+    modalRoot.innerHTML = `
+      <div class="mnc-modal-overlay">
+        <div class="p-modal" style="max-width:580px; width: 100%;">
+          <div class="p-modal-header">
+            <div>
+              <div class="p-modal-title">Edit Driving Slot</div>
+              <div class="p-modal-sub">Slot ID: ${slot.id} · ${formatReadableDate(slot.date || adminSlotDate)}</div>
+            </div>
+            <button type="button" id="btn-close-edit-slot" class="p-modal-close">✕</button>
+          </div>
+          <form id="form-edit-slot" class="p-modal-body" style="padding: 1.5rem;" novalidate>
+            <div id="edit-slot-alert" class="modal-alert-error" style="display: none;"></div>
+
+            <div class="p-form-row" style="margin-bottom:1rem;">
+              <label class="p-label">Slot Name / Title</label>
+              <input type="text" class="mnc-input p-input" name="name" value="${slot.name || ''}" placeholder="e.g. Morning Highway Session" style="width: 100%;" />
+            </div>
+
+            <div class="p-form-row" style="margin-bottom:1rem;">
+              <label class="p-label">Training Date *</label>
+              <input type="date" class="mnc-input p-input" name="slotDate" value="${slot.date || adminSlotDate}" required style="width: 100%;" />
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+              <div class="p-form-row">
+                <label class="p-label">Start Time *</label>
+                <input type="time" class="mnc-input p-input" name="startTime" value="${rawStart24}" required style="width: 100%;" />
+              </div>
+              <div class="p-form-row">
+                <label class="p-label">End Time *</label>
+                <input type="time" class="mnc-input p-input" name="endTime" value="${rawEnd24}" required style="width: 100%;" />
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+              <div class="p-form-row">
+                <label class="p-label">Maximum Capacity</label>
+                <input type="number" class="mnc-input p-input" name="capacity" min="1" max="50" value="${slot.capacity !== null && slot.capacity !== undefined ? slot.capacity : ''}" placeholder="e.g. 2" style="width: 100%;" />
+              </div>
+              <div class="p-form-row">
+                <label class="p-label">Slot Status *</label>
+                <select class="mnc-select p-input" name="status" style="width: 100%;">
+                  <option value="Available" ${currentStatus.toLowerCase() === 'available' ? 'selected' : ''}>Available</option>
+                  <option value="Almost Full" ${currentStatus.toLowerCase() === 'almost full' ? 'selected' : ''}>Almost Full</option>
+                  <option value="Full" ${currentStatus.toLowerCase() === 'full' ? 'selected' : ''}>Full</option>
+                  <option value="Completed" ${currentStatus.toLowerCase() === 'completed' ? 'selected' : ''}>Completed</option>
+                  <option value="Cancelled" ${currentStatus.toLowerCase() === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                  <option value="Maintenance" ${currentStatus.toLowerCase() === 'maintenance' ? 'selected' : ''}>Maintenance</option>
+                  <option value="Closed" ${currentStatus.toLowerCase() === 'closed' || currentStatus.toLowerCase() === 'inactive' ? 'selected' : ''}>Closed</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="p-form-row" style="margin-bottom:1rem;">
+              <label class="p-label">Location / Branch</label>
+              <input type="text" class="mnc-input p-input" name="location" value="${slot.location || ''}" placeholder="e.g. Pulivendula RTO Track Ground" style="width: 100%;" />
+            </div>
+
+            <div class="p-form-row" style="margin-bottom:1rem;">
+              <label class="p-label">Assigned Instructor</label>
+              <select class="mnc-select p-input" name="trainerId" style="width: 100%;">
+                <option value="" ${!slot.assignedTrainerId ? 'selected' : ''}>All Available Instructors (Dynamic)</option>
+                ${trainers.map(tr => `
+                  <option value="${tr.id}" ${slot.assignedTrainerId === tr.id ? 'selected' : ''}>${tr.name} (${tr.car})</option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div class="p-form-row" style="margin-bottom:1.5rem;">
+              <label class="p-label">Description / Notes</label>
+              <textarea class="mnc-input p-input" name="description" rows="2" placeholder="Optional notes..." style="width: 100%;">${slot.description || ''}</textarea>
+            </div>
+
+            <div class="p-modal-footer">
+              <button type="button" class="p-ghost-btn" id="btn-cancel-edit-slot">Cancel</button>
+              <button type="submit" class="btn-mnc btn-mnc-primary" id="btn-submit-edit-slot">Save Changes →</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    const close = () => { modalRoot.innerHTML = ''; };
+    modalRoot.querySelector('#btn-close-edit-slot').addEventListener('click', close);
+    modalRoot.querySelector('#btn-cancel-edit-slot').addEventListener('click', close);
+
+    modalRoot.querySelector('#form-edit-slot').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const f = e.target.elements;
+      const name = (f['name']?.value || '').trim();
+      const date = f['slotDate'].value;
+      const startTime = f['startTime'].value;
+      const endTime = f['endTime'].value;
+      const capacity = f['capacity'].value ? parseInt(f['capacity'].value, 10) : null;
+      const status = f['status'].value;
+      const location = (f['location']?.value || '').trim();
+      const trainerId = f['trainerId'].value || null;
+      const description = (f['description']?.value || '').trim();
+
+      const startMin = timeToMinutes(startTime);
+      const endMin = timeToMinutes(endTime);
+      if (startMin >= endMin) {
+        showToast('Start time must be before end time', 'error');
+        return;
+      }
+
+      const res = store.adminUpdateSlot(slotId, { 
+        name, 
+        date, 
+        startTime, 
+        endTime, 
+        capacity, 
+        status, 
+        location, 
+        trainerId, 
+        description 
+      });
+
+      if (res && res.success) {
+        showToast('Slot updated successfully', 'success');
+        adminSlotDate = date;
+        close();
+        render();
+      } else {
+        showToast((res && res.message) || 'Failed to update slot', 'error');
+      }
+    });
+  }
+
+  function openDeleteSlotModal(slotId) {
+    const modalRoot = document.getElementById('modal-root');
+    const slot = store.slots.find(s => s.id === slotId) ||
+                 store.getSlotsForDate(adminSlotDate).find(s => s.id === slotId) || {
+      id: slotId,
+      date: adminSlotDate,
+      startTime: '',
+      endTime: '',
+      timeDisplay: 'Selected Slot'
+    };
+
+    const activeBookings = store.slotBookings.filter(b => 
+      (b.slotId === slot.id || (b.date === slot.date && b.startTime === slot.startTime)) && 
+      b.status === 'CONFIRMED'
+    );
+
+    const hasBookings = activeBookings.length > 0;
+
+    modalRoot.innerHTML = `
+      <div class="mnc-modal-overlay">
+        <div class="p-modal" style="max-width:500px;">
+          <div class="p-modal-header">
+            <div>
+              <div class="p-modal-title" style="color:#f87171;">Delete Driving Slot?</div>
+              <div class="p-modal-sub">Permanently remove this slot from the schedule</div>
+            </div>
+            <button type="button" id="btn-close-delete-slot" class="p-modal-close">✕</button>
+          </div>
+          <div class="p-modal-body">
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-sm); padding:1rem 1.25rem; margin-bottom:1rem;">
+              <div style="font-size:1.15rem; font-weight:800; color:#ffffff;">
+                ${formatReadableDate(slot.date)}
+              </div>
+              <div style="font-size:1rem; font-family:var(--font-mono); color:var(--primary-gold); margin-top:0.35rem; font-weight:700;">
+                ${slot.timeDisplay || `${slot.startTime} - ${slot.endTime}`}
+              </div>
+              <div style="font-size:0.75rem; color:var(--slate-muted); margin-top:0.35rem;">
+                Capacity: <strong>${slot.totalCapacity || slot.capacity || 8}</strong> · Status: <strong>${slot.calculatedStatus || slot.status || 'Available'}</strong>
+              </div>
+            </div>
+
+            ${hasBookings ? `
+              <div style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35); border-radius:var(--radius-sm); padding:1rem; margin-bottom:1.25rem;">
+                <div style="font-weight:800; font-size:0.9rem; color:#f87171; display:flex; align-items:center; gap:0.4rem; margin-bottom:0.4rem;">
+                  <span>⚠️</span> Active Bookings Warning
+                </div>
+                <div style="font-size:0.875rem; color:#fca5a5; line-height:1.5;">
+                  This slot has <strong>${activeBookings.length} student${activeBookings.length > 1 ? 's' : ''} assigned</strong>. Deleting this slot will affect their bookings.
+                </div>
+                <div style="margin-top:0.65rem; font-size:0.78rem; color:var(--slate-body); max-height:80px; overflow-y:auto;">
+                  Students: ${activeBookings.map(b => `${b.traineeName} (${b.traineeId})`).join(', ')}
+                </div>
+              </div>
+
+              <label style="display:flex; align-items:flex-start; gap:0.65rem; font-size:0.8125rem; color:#ffffff; cursor:pointer; margin-bottom:1.25rem; user-select:none;">
+                <input type="checkbox" id="chk-confirm-delete-slot" style="margin-top:0.2rem; cursor:pointer; width:16px; height:16px;" />
+                <span>I understand and explicitly confirm permanent deletion of this driving slot and cancellation of all ${activeBookings.length} student booking(s).</span>
+              </label>
+            ` : `
+              <p style="font-size:0.875rem; color:var(--slate-body); line-height:1.5; margin-bottom:1.25rem;">
+                Are you sure you want to permanently delete this driving slot? This action cannot be undone.
+              </p>
+            `}
+
+            <div class="p-modal-footer">
+              <button type="button" class="p-ghost-btn" id="btn-cancel-delete-slot">Cancel</button>
+              <button type="button" class="btn-mnc" id="btn-confirm-delete-slot" ${hasBookings ? 'disabled' : ''} style="background:#dc2626; color:#ffffff; border-color:#ef4444; ${hasBookings ? 'opacity:0.5; cursor:not-allowed;' : ''}">
+                Delete Slot
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const close = () => { modalRoot.innerHTML = ''; };
+    modalRoot.querySelector('#btn-close-delete-slot').addEventListener('click', close);
+    modalRoot.querySelector('#btn-cancel-delete-slot').addEventListener('click', close);
+
+    const chkConfirm = modalRoot.querySelector('#chk-confirm-delete-slot');
+    const btnConfirm = modalRoot.querySelector('#btn-confirm-delete-slot');
+
+    if (chkConfirm) {
+      chkConfirm.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          btnConfirm.removeAttribute('disabled');
+          btnConfirm.style.opacity = '1';
+          btnConfirm.style.cursor = 'pointer';
+        } else {
+          btnConfirm.setAttribute('disabled', 'true');
+          btnConfirm.style.opacity = '0.5';
+          btnConfirm.style.cursor = 'not-allowed';
+        }
+      });
+    }
+
+    btnConfirm.addEventListener('click', () => {
+      const res = store.adminDeleteSlot(slotId, true);
+      if (res.success) {
+        showToast(res.message || 'Driving slot permanently deleted', 'success');
+        close();
+        render();
+      } else {
+        showToast(res.message || 'Could not delete slot', 'error');
+      }
+    });
+  }
+
+  function openMoveLearnerModal(bookingId) {
+    const modalRoot = document.getElementById('modal-root');
+    const booking = store.slotBookings.find(b => b.id === bookingId);
+    if (!booking) {
+      showToast('Booking not found', 'error');
+      return;
+    }
+
+    const availableSlotsToday = store.getSlotsForDate(booking.date || adminSlotDate).filter(s => s.status !== 'CANCELLED' && s.status !== 'INACTIVE' && s.availableSeats > 0 && s.startTime !== booking.startTime);
+
+    modalRoot.innerHTML = `
+      <div class="mnc-modal-overlay">
+        <div class="p-modal" style="max-width:540px;">
+          <div class="p-modal-header">
+            <div>
+              <div class="p-modal-title">Move Learner Reservation</div>
+              <div class="p-modal-sub">Transfer candidate to another slot without losing booking history</div>
+            </div>
+            <button type="button" id="btn-close-move-modal" class="p-modal-close">✕</button>
+          </div>
+          <form id="form-move-learner" class="p-modal-body">
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-sm); padding:1rem; margin-bottom:1.25rem;">
+              <div style="font-size:0.75rem; color:var(--slate-muted); text-transform:uppercase; font-weight:800; margin-bottom:0.35rem;">Current Reservation</div>
+              <div style="font-size:1.05rem; font-weight:800; color:#ffffff; margin-bottom:0.25rem;">${booking.traineeName} <span style="font-size:0.8rem; color:var(--slate-muted);">(${booking.traineeId})</span></div>
+              <div style="font-size:0.8125rem; color:var(--slate-body);">
+                Date: <strong>${formatReadableDate(booking.date)}</strong> · Time: <strong>${booking.startTime} - ${booking.endTime}</strong>
+              </div>
+              <div style="font-size:0.8125rem; color:var(--slate-body); margin-top:0.2rem;">
+                Trainer: <strong>${booking.trainerName || 'Assigned Instructor'}</strong> · Vehicle: <strong>${booking.vehicleName || 'Swift Dual-Brake'}</strong>
+              </div>
+            </div>
+
+            <div class="p-form-row" style="margin-bottom:1rem;">
+              <label class="p-label">Target Date *</label>
+              <input type="date" class="mnc-input p-input" id="inp-move-target-date" name="targetDate" value="${booking.date || adminSlotDate}" required />
+            </div>
+
+            <div class="p-form-row" style="margin-bottom:1.25rem;">
+              <label class="p-label">Target Driving Slot *</label>
+              <select class="mnc-select p-input" id="sel-move-target-slot" name="targetSlot" required>
+                ${availableSlotsToday.length === 0 ? '<option value="">No other slots with open seats on this date</option>' : ''}
+                ${availableSlotsToday.map(s => `
+                  <option value="${s.id}|${s.startTime}|${s.endTime}">
+                    ${s.timeDisplay} (${s.availableSeats} seat${s.availableSeats !== 1 ? 's' : ''} free · ${s.availableTrainersCount} trainers)
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div class="p-modal-footer">
+              <button type="button" class="p-ghost-btn" id="btn-cancel-move-modal">Cancel</button>
+              <button type="submit" class="btn-mnc btn-mnc-primary">Move Learner Now →</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    const close = () => { modalRoot.innerHTML = ''; };
+    modalRoot.querySelector('#btn-close-move-modal').addEventListener('click', close);
+    modalRoot.querySelector('#btn-cancel-move-modal').addEventListener('click', close);
+
+    const dateInput = modalRoot.querySelector('#inp-move-target-date');
+    const slotSelect = modalRoot.querySelector('#sel-move-target-slot');
+
+    dateInput.addEventListener('change', () => {
+      const dt = dateInput.value;
+      const slots = store.getSlotsForDate(dt).filter(s => s.status !== 'CANCELLED' && s.status !== 'INACTIVE' && s.availableSeats > 0 && !(dt === booking.date && s.startTime === booking.startTime));
+      if (slots.length === 0) {
+        slotSelect.innerHTML = '<option value="">No available slots on this date</option>';
+      } else {
+        slotSelect.innerHTML = slots.map(s => `
+          <option value="${s.id}|${s.startTime}|${s.endTime}">
+            ${s.timeDisplay} (${s.availableSeats} seat${s.availableSeats !== 1 ? 's' : ''} free · ${s.availableTrainersCount} trainers)
+          </option>
+        `).join('');
+      }
+    });
+
+    modalRoot.querySelector('#form-move-learner').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const val = slotSelect.value;
+      if (!val) {
+        showToast('Please select a valid target slot', 'error');
+        return;
+      }
+      const [tSlotId, tStartTime, tEndTime] = val.split('|');
+      const targetDate = dateInput.value;
+
+      const res = store.moveSlotBooking(bookingId, tSlotId, targetDate, tStartTime, tEndTime);
+      if (res.success) {
+        showToast(`Learner moved to ${tStartTime} - ${tEndTime} (${targetDate})`, 'success');
+        close();
+        render();
+      } else {
+        showToast(res.message || 'Failed to move booking', 'error');
+      }
+    });
+  }
+
+  function openAdminBookLearnerModal(slotId, startTime, endTime, timeDisplay) {
+    const modalRoot = document.getElementById('modal-root');
+    const activeTrainees = store.trainees.filter(t => t.status !== 'Completed');
+    const onDutyTrainers = store.trainers.filter(tr => {
+      const isOffDay = store.trainerAvailability[adminSlotDate] && store.trainerAvailability[adminSlotDate][tr.id] === false;
+      return !isOffDay;
+    });
+
+    modalRoot.innerHTML = `
+      <div class="mnc-modal-overlay">
+        <div class="p-modal" style="max-width:540px;">
+          <div class="p-modal-header">
+            <div>
+              <div class="p-modal-title">Manual Student Allocation</div>
+              <div class="p-modal-sub">${timeDisplay} · ${formatReadableDate(adminSlotDate)}</div>
+            </div>
+            <button type="button" id="btn-close-admin-book" class="p-modal-close">✕</button>
+          </div>
+          <form id="form-admin-book" class="p-modal-body">
+            <div class="p-form-row" style="margin-bottom:1rem;">
+              <label class="p-label">Select Candidate / Learner *</label>
+              <select class="mnc-select p-input" name="traineeId" required>
+                ${activeTrainees.map(t => `
+                  <option value="${t.id}">${t.name} (${t.studentCode || t.id}) — Day ${t.currentDay} (${t.package})</option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div class="p-form-row" style="margin-bottom:1rem;">
+              <label class="p-label">Assigned Instructor Preference</label>
+              <select class="mnc-select p-input" name="trainerId">
+                <option value="">⚡ Auto-assign to available instructor (Next open capacity)</option>
+                ${onDutyTrainers.map(tr => `
+                  <option value="${tr.id}">${tr.name} (${tr.car})</option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-sm); padding:0.85rem 1rem; font-size:0.8rem; color:var(--slate-muted); line-height:1.45; margin-bottom:1.25rem;">
+              ✓ <strong>Enforced Business Rules:</strong> Prevents exceeding max 2 candidates per trainer, double-booking candidate across overlapping hours, and conflicting vehicle sessions.
+            </div>
+
+            <div class="p-modal-footer">
+              <button type="button" class="p-ghost-btn" id="btn-cancel-admin-book">Cancel</button>
+              <button type="submit" class="btn-mnc btn-mnc-primary">Confirm Reservation →</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    const close = () => { modalRoot.innerHTML = ''; };
+    modalRoot.querySelector('#btn-close-admin-book').addEventListener('click', close);
+    modalRoot.querySelector('#btn-cancel-admin-book').addEventListener('click', close);
+
+    modalRoot.querySelector('#form-admin-book').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target.elements;
+      const traineeId = f['traineeId'].value;
+      const trainerId = f['trainerId'].value || null;
+      const t = store.trainees.find(x => x.id === traineeId);
+
+      const res = await store.bookSlot({
+        slotId,
+        date: adminSlotDate,
+        startTime,
+        endTime,
+        timeDisplay,
+        traineeId,
+        traineeName: t ? t.name : traineeId,
+        preferredTrainerId: trainerId,
+        course: t ? t.package : '20-Day Comprehensive Licensing Package',
+        bookedBy: 'Admin'
+      });
+
+      if (res && res.success) {
+        showToast(`Student assigned to slot! Instructor: ${res.booking ? res.booking.trainerName : 'Assigned'}`, 'success');
+        close();
+        render();
+      } else {
+        showToast((res && res.message) || 'Failed to assign student to slot', 'error');
+      }
+    });
+  }
+
+  window.openAddSlotModal = openAddSlotModal;
+
+  // Global document-level click listener for any + Add Slot button
+  if (!window._adminAddSlotListenerAttached) {
+    window._adminAddSlotListenerAttached = true;
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('#btn-admin-add-slot, #btn-empty-add-slot, [data-action="open-add-slot"]');
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window.openAddSlotModal === 'function') {
+          window.openAddSlotModal();
+        }
+      }
     });
   }
 

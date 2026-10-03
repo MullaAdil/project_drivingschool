@@ -1,0 +1,704 @@
+/* ==========================================================================
+   STUDENT PORTAL — PRACTICAL DRIVING SLOT BOOKING (TARGET SCREENSHOT 2)
+   Mobile-First, Dark Navy & Deep Carbon Obsidian Canvas, Purple Primary Accent (#8B5CF6),
+   Large Rounded Cards, Horizontal Dynamic Date Selector, Vertical Time Slots,
+   Fixed Mobile Bottom Navigation, Dark Glass Calendar Date Picker.
+   ========================================================================== */
+
+:root {
+  --sb-bg: #0B0F19;
+  --sb-card-bg: #121827;
+  --sb-card-hover: #182033;
+  --sb-card-border: rgba(255, 255, 255, 0.08);
+  --sb-card-radius: 18px;
+  --sb-purple-primary: #8B5CF6;
+  --sb-purple-dark: #6D28D9;
+  --sb-purple-gradient: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
+  --sb-purple-glow: 0 4px 20px rgba(139, 92, 246, 0.45);
+  --sb-green-available: #22c55e;
+  --sb-green-badge-bg: rgba(34, 197, 94, 0.14);
+  --sb-green-badge-border: rgba(34, 197, 94, 0.3);
+  --sb-text-title: #ffffff;
+  --sb-text-sub: #94a3b8;
+  --sb-text-dim: #64748b;
+}
+
+/* Outer layout wrapper */
+.sb-page-wrapper {
+  background: var(--sb-bg);
+  min-height: 100vh;
+  color: var(--sb-text-title);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Centered container with max-width for mobile/tablet/desktop */
+.sb-container {
+  max-width: 580px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 7.5rem 1.25rem;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+/* Header bar */
+.sb-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0 1rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sb-brand-area {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.sb-brand-name {
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  line-height: 1.15;
+}
+.sb-brand-sub {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sb-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.sb-notification-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+}
+.sb-notification-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.sb-notification-dot {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sb-purple-primary);
+  box-shadow: 0 0 6px var(--sb-purple-primary);
+}
+
+.sb-student-badge-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.25rem 0.65rem 0.25rem 0.3rem;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sb-student-badge-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.sb-role-tag {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--sb-purple-primary);
+  background: rgba(139, 92, 246, 0.15);
+  padding: 0.15rem 0.45rem;
+  border-radius: 12px;
+}
+
+/* Page Title Section */
+.sb-title-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.sb-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sb-title-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: var(--sb-purple-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sb-page-heading {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.sb-page-subheading {
+  font-size: 0.835rem;
+  color: var(--sb-text-sub);
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* SECTION 1: SELECT DATE */
+.sb-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.sb-section-label {
+  font-size: 0.825rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #cbd5e1;
+  text-transform: uppercase;
+}
+
+.sb-calendar-toggle-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sb-purple-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.sb-calendar-toggle-btn:hover {
+  background: rgba(139, 92, 246, 0.18);
+  border-color: rgba(139, 92, 246, 0.4);
+  transform: scale(1.05);
+}
+
+/* Horizontal scrollable date strip */
+.sb-date-scroll {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 0.35rem 0.15rem 0.75rem 0.15rem;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.sb-date-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.sb-date-card {
+  flex: 0 0 74px;
+  height: 98px;
+  border-radius: 18px;
+  background: #111625;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  scroll-snap-align: start;
+  user-select: none;
+}
+
+.sb-date-card:hover {
+  background: #171f33;
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-2px);
+}
+
+.sb-date-card.selected {
+  background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.45) !important;
+  transform: translateY(-2px);
+}
+
+.sb-date-card-day {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+.sb-date-card.selected .sb-date-card-day {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.sb-date-card-num {
+  font-size: 1.45rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.sb-date-card-month {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+}
+.sb-date-card.selected .sb-date-card-month {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* SECTION 2: SELECT TIME SLOT */
+.sb-avail-count-pill {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #a78bfa;
+}
+
+.sb-slots-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.sb-slot-card {
+  background: #111625;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 1.15rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  user-select: none;
+}
+
+.sb-slot-card.available {
+  cursor: pointer;
+}
+.sb-slot-card.available:hover {
+  background: #161e31;
+  border-color: rgba(139, 92, 246, 0.35);
+  transform: translateY(-1px);
+}
+
+.sb-slot-card.selected {
+  background: rgba(139, 92, 246, 0.12) !important;
+  border: 1.5px solid #8B5CF6 !important;
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.25) !important;
+  transform: translateY(-1px);
+}
+
+.sb-slot-card.unavailable {
+  opacity: 0.45;
+  background: rgba(15, 19, 31, 0.6);
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+.sb-slot-card-left {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.sb-slot-clock-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.sb-slot-card.selected .sb-slot-clock-icon {
+  background: rgba(139, 92, 246, 0.25);
+  color: #c4b5fd;
+}
+
+.sb-slot-time-text {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.sb-slot-subtext {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+
+.sb-slot-card-right {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+/* Badges */
+.sb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.sb-badge-available {
+  background: var(--sb-green-badge-bg);
+  color: var(--sb-green-available);
+  border: 1px solid var(--sb-green-badge-border);
+}
+.sb-badge-available::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sb-green-available);
+  box-shadow: 0 0 6px var(--sb-green-available);
+}
+
+.sb-badge-booked {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.25);
+}
+
+.sb-badge-maintenance {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.sb-badge-closed {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.sb-badge-my-booking {
+  background: rgba(139, 92, 246, 0.2);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+}
+
+.sb-selected-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--sb-purple-primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+}
+
+/* CONFIRM BUTTON */
+.sb-confirm-btn-wrap {
+  margin-top: 0.5rem;
+}
+
+.sb-confirm-btn {
+  width: 100%;
+  padding: 1.05rem 1.5rem;
+  border-radius: 16px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  border: none;
+}
+
+.sb-confirm-btn:not(:disabled) {
+  background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
+  color: #ffffff;
+  box-shadow: 0 6px 24px rgba(139, 92, 246, 0.45);
+}
+.sb-confirm-btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(139, 92, 246, 0.6);
+}
+.sb-confirm-btn:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.sb-confirm-btn:disabled {
+  background: #171d2b;
+  color: #475569;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* FIXED BOTTOM NAVIGATION */
+.sb-bottom-nav-wrap {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.sb-bottom-nav {
+  pointer-events: auto;
+  max-width: 580px;
+  margin: 0 auto;
+  background: rgba(11, 15, 25, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0.55rem 0.5rem calc(0.55rem + env(safe-area-inset-bottom, 0px)) 0.5rem;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.7);
+}
+
+.sb-bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.4rem 0.8rem;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: all 0.15s ease;
+  border-radius: 12px;
+}
+
+.sb-bottom-nav-item:hover {
+  color: #cbd5e1;
+}
+
+.sb-bottom-nav-item.active {
+  color: var(--sb-purple-primary);
+}
+.sb-bottom-nav-item.active svg {
+  stroke: var(--sb-purple-primary);
+}
+
+/* CALENDAR MODAL / BOTTOM SHEET */
+.sb-calendar-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: sbFadeIn 0.2s ease-out;
+}
+
+@keyframes sbFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sb-calendar-card {
+  width: 100%;
+  max-width: 380px;
+  background: #111625;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 22px;
+  padding: 1.5rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(139, 92, 246, 0.2);
+  animation: sbSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sbSlideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.sb-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.sb-cal-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.sb-cal-nav-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sb-cal-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sb-cal-grid-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.sb-cal-grid-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+  text-align: center;
+}
+
+.sb-cal-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #cbd5e1;
+  border: none;
+  background: transparent;
+  transition: all 0.15s;
+}
+
+.sb-cal-day:hover:not(.disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.sb-cal-day.selected {
+  background: #7C3AED !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(124, 58, 237, 0.6);
+  font-weight: 900;
+}
+
+.sb-cal-day.today:not(.selected) {
+  border: 1.5px solid var(--sb-purple-primary);
+  color: #ffffff;
+}
+
+.sb-cal-day.disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.sb-cal-footer {
+  margin-top: 1.25rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* My Active Bookings Card */
+.sb-my-bookings-card {
+  background: #111625;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 1.25rem;
+  margin-top: 0.5rem;
+}
+
+.sb-my-bookings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+}
+
+.sb-my-booking-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  margin-bottom: 0.5rem;
+}
+
+.sb-cancel-btn {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sb-cancel-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+}

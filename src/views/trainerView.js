@@ -7,21 +7,34 @@
    - Service 03: Safety Vehicle Inspection & Dual-Brake Log
    ========================================================================== */
 
-import { store } from '../store.js';
+import { store, formatReadableDate, getLocalTodayDate } from '../store.js';
 import { renderBrandLogo } from '../components/brandLogo.js';
 import { renderStudentBoxAvatar, renderStudentAvatar } from '../components/studentAvatar.js';
 
 export function renderTrainerView(container, showToast, subService = 'schedule', onNavigate) {
+  let selectedDate = store.getTodayDateStr();
+
   function render() {
     const trainer      = store.trainers[0];
-    const schedule     = store.schedule;
     const allTrainees  = store.trainees;
     const myTrainees   = allTrainees.filter(t => t.assignedTrainerId === trainer.id);
 
-    const presentCount = schedule.filter(s => s.attendance === 'present').length;
-    const absentCount  = schedule.filter(s => s.attendance === 'absent').length;
-    const lateCount    = schedule.filter(s => s.attendance === 'late').length;
-    const totalCount   = schedule.length;
+    // Active slots for selected date assigned to this trainer
+    const daySlots = store.getSlotsForDate(selectedDate);
+    const myAssignedSessions = [];
+    daySlots.forEach(slot => {
+      const myAlloc = slot.trainerAllocations.find(a => a.trainerId === trainer.id);
+      if (myAlloc) {
+        myAssignedSessions.push({
+          slot,
+          alloc: myAlloc,
+          bookings: myAlloc.bookings
+        });
+      }
+    });
+
+    const presentCount = store.slotBookings.filter(b => b.trainerId === trainer.id && b.date === selectedDate && b.status === 'CONFIRMED' && b.attendance === 'present').length;
+    const totalCount   = myAssignedSessions.reduce((acc, s) => acc + s.bookings.length, 0);
     const totalKm      = myTrainees.reduce((a, t) => a + (t.currentDay * 8), 0);
 
     const currentSub = subService || 'schedule';
@@ -32,129 +45,175 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
 
     // =========================================================
     // SERVICE 01: DAILY SCHEDULE & ONE-TAP ATTENDANCE
+    // Trainer sees ONLY their own assigned sessions and candidates (Max 2 per slot)
     // =========================================================
-    if (currentSub === 'schedule') {
+    if (currentSub === 'schedule' || currentSub === 'slots') {
+      // Generate next 4 quick dates
+      const quickDates = [];
+      const baseDt = new Date();
+      for (let i = 0; i < 4; i++) {
+        const d = new Date(baseDt);
+        d.setDate(d.getDate() + i);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dtStr = `${y}-${m}-${day}`;
+        const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+        quickDates.push({ dateStr: dtStr, label });
+      }
+
       contentHtml = `
         <div class="portal-page-header">
           <div>
-            <h1 class="portal-page-title">Daily Attendance Register</h1>
-            <p class="portal-page-sub">Mark student attendance, write driving notes, and track 20-day course progress for ${new Date().toLocaleDateString('en-IN', {weekday:'long', year:'numeric', month:'long', day:'numeric'})}.</p>
+            <h1 class="portal-page-title">My Driving Slots &amp; Attendance Register</h1>
+            <p class="portal-page-sub">Instructor ${trainer.name} · View assigned driving sessions, mark candidate attendance, and record training debriefs.</p>
           </div>
           <div class="portal-page-header-meta">
-            <span class="p-badge p-badge-dim">Training Car: ${trainer.car}</span>
-            <span class="p-badge p-badge-dim">Shift: 07:30 AM – 05:30 PM</span>
-            <span class="p-badge p-badge-green">★ 4.96 / 5.0</span>
+            <span class="p-badge p-badge-dim">Assigned Car: ${trainer.car.split('Dual-Ctrl')[0]}</span>
+            <span class="p-badge p-badge-dim">Max 2 Learners / Slot</span>
+            <span class="p-badge p-badge-green">★ ${trainer.rating} / 5.0</span>
           </div>
         </div>
 
+        <!-- DATE SELECTOR STRIP -->
+        <div class="slot-date-nav">
+          <span style="font-size:0.875rem; font-weight:800; color:#ffffff; margin-right:0.35rem;">Roster Date:</span>
+          ${quickDates.map(qd => `
+            <button type="button" class="slot-quick-date-btn ${selectedDate === qd.dateStr ? 'active' : ''}" data-trainer-date="${qd.dateStr}">
+              📅 ${qd.label}
+            </button>
+          `).join('')}
+          <div style="display:flex; align-items:center; gap:0.45rem; margin-left:auto;">
+            <label style="font-size:0.75rem; color:var(--slate-muted); font-weight:700;">Custom Date:</label>
+            <input type="date" class="mnc-input" id="inp-trainer-custom-date" value="${selectedDate}" style="padding:0.4rem 0.65rem; font-size:0.8125rem; width:150px;" />
+          </div>
+        </div>
+
+        <!-- STATS STRIP -->
         <div class="portal-stats-strip">
           <div class="portal-stat">
-            <span class="portal-stat-value">${totalCount}</span>
-            <span class="portal-stat-label">Today's Classes</span>
+            <span class="portal-stat-value">${myAssignedSessions.length}</span>
+            <span class="portal-stat-label">Active Slots Today</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value" style="color:var(--neem-green);">${totalCount}</span>
+            <span class="portal-stat-label">Booked Learners</span>
+          </div>
+          <div class="portal-stat-div"></div>
+          <div class="portal-stat">
+            <span class="portal-stat-value">${myAssignedSessions.length * 2}</span>
+            <span class="portal-stat-label">Total Seat Capacity</span>
           </div>
           <div class="portal-stat-div"></div>
           <div class="portal-stat">
             <span class="portal-stat-value" style="color:var(--neem-green);">${presentCount}</span>
-            <span class="portal-stat-label">Present Today</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value" style="color:#f87171;">${absentCount}</span>
-            <span class="portal-stat-label">Absent</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value" style="color:var(--primary-gold);">${lateCount}</span>
-            <span class="portal-stat-label">Late Arrivals</span>
+            <span class="portal-stat-label">Marked Present</span>
           </div>
           <div class="portal-stat-div"></div>
           <div class="portal-stat">
             <span class="portal-stat-value">${myTrainees.length}</span>
-            <span class="portal-stat-label">Total Students</span>
-          </div>
-          <div class="portal-stat-div"></div>
-          <div class="portal-stat">
-            <span class="portal-stat-value">${totalKm.toLocaleString('en-IN')} km</span>
-            <span class="portal-stat-label">Total km Logged</span>
+            <span class="portal-stat-label">Assigned Students</span>
           </div>
         </div>
 
+        <!-- PERMISSIONS ADVISORY -->
+        <div style="padding:0.75rem 2rem; background:rgba(255,255,255,0.02); border-bottom:1px solid var(--border-light); font-size:0.75rem; color:var(--slate-muted); display:flex; align-items:center; justify-content:space-between;">
+          <span>🔒 Instructor Access: You see only your assigned training slots. Maximum 2 candidates per slot. Master scheduling &amp; allocations are managed by Administration.</span>
+          <span class="p-badge p-badge-dim" style="font-size:0.65rem;">Date: ${formatReadableDate(selectedDate)}</span>
+        </div>
+
+        <!-- ASSIGNED SLOTS LIST -->
         <div class="portal-section">
           <div class="portal-section-header">
-            <span class="portal-section-title">Today's Practical Driving Classes — Mark Attendance</span>
-            <span class="portal-section-meta">${totalCount} scheduled slots · ${presentCount} confirmed present</span>
+            <span class="portal-section-title">My Assigned Road Sessions (${formatReadableDate(selectedDate)})</span>
+            <span class="portal-section-meta">${myAssignedSessions.length} slots · ${totalCount} assigned learners</span>
           </div>
-          <div class="p-table-wrap">
-            <table class="p-table">
-              <thead>
-                <tr>
-                  <th>Time Slot</th>
-                  <th>Student Name</th>
-                  <th>Day &amp; Progress</th>
-                  <th>Today's Driving Lesson</th>
-                  <th>Training Car</th>
-                  <th>Attendance</th>
-                  <th style="text-align:right;">Driving Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${schedule.map(slot => {
-                  const trainee = allTrainees.find(t => t.id === slot.traineeId);
-                  const pct = trainee ? Math.min(100, Math.round((trainee.currentDay/20)*100)) : 0;
-                  return `
-                    <tr class="${slot.attendance==='late'?'p-row-today':''}">
-                      <td>
-                        <div class="p-td-mono" style="font-size:0.9rem;">${slot.time}</div>
-                        <div class="p-td-sub">${slot.duration || '60 min'}</div>
-                      </td>
-                      <td>
-                        <div style="display:flex; align-items:center; gap:0.65rem;">
-                          ${trainee ? renderStudentAvatar(trainee, 36) : ''}
-                          <div>
-                            <div class="p-td-name">${slot.studentName}</div>
-                            <div class="p-td-sub">${slot.traineeId}</div>
-                            <div class="p-td-sub">${trainee ? (trainee.phone || '') : ''}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="p-progress-wrap" style="margin-bottom:0.35rem;">
-                          <div class="p-progress-track">
-                            <div class="p-progress-fill" style="width:${pct}%;"></div>
-                          </div>
-                          <span class="p-progress-label">${pct}%</span>
-                        </div>
-                        <div class="p-td-sub">Day ${slot.day} of 20 · ${slot.day * 8} km</div>
-                      </td>
-                      <td>
-                        <div style="font-size:0.875rem; font-weight:700; color:#ffffff;">${slot.topic}</div>
-                        <div class="p-td-sub">8 km Daily Practical Lesson</div>
-                      </td>
-                      <td>
-                        <div style="font-size:0.825rem; font-weight:600; color:var(--slate-body);">${slot.car || trainer.car}</div>
-                        <span class="p-badge p-badge-dim" style="font-size:0.6rem; margin-top:0.25rem;">Dual-Control Car</span>
-                      </td>
-                      <td>
-                        <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
-                          <button type="button" class="btn-attendance ${slot.attendance==='present'?'present':''}" data-slot-id="${slot.id}" data-status="present" style="padding:0.35rem 0.65rem; border-radius:4px; font-size:0.75rem; font-weight:700; cursor:pointer; background:${slot.attendance==='present'?'#ffffff':'rgba(255,255,255,0.04)'}; border:1px solid ${slot.attendance==='present'?'#ffffff':'var(--border-light)'}; color:${slot.attendance==='present'?'#000000':'var(--slate-body)'};">
-                            ✓ Present
-                          </button>
-                          <button type="button" class="btn-attendance ${slot.attendance==='late'?'late':''}" data-slot-id="${slot.id}" data-status="late" style="padding:0.35rem 0.65rem; border-radius:4px; font-size:0.75rem; font-weight:700; cursor:pointer; background:${slot.attendance==='late'?'rgba(255,255,255,0.12)':'rgba(255,255,255,0.04)'}; border:1px solid ${slot.attendance==='late'?'rgba(255,255,255,0.3)':'var(--border-light)'}; color:${slot.attendance==='late'?'#ffffff':'var(--slate-body)'};">
-                            ⏱ Late
-                          </button>
-                          <button type="button" class="btn-attendance" data-slot-id="${slot.id}" data-status="absent" style="padding:0.35rem 0.65rem; border-radius:4px; font-size:0.75rem; font-weight:700; cursor:pointer; background:${slot.attendance==='absent'?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.03)'}; border:1px solid ${slot.attendance==='absent'?'rgba(255,255,255,0.2)':'var(--border-light)'}; color:${slot.attendance==='absent'?'#a1a1aa':'var(--slate-muted)'};">
-                            ✕ Absent
-                          </button>
-                        </div>
-                      </td>
-                      <td style="text-align:right;">
-                        <button type="button" class="p-link-btn btn-session-debrief" data-student="${slot.studentName}" data-topic="${slot.topic}">Driving Notes →</button>
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
+
+          <div style="display:flex; flex-direction:column; gap:1.25rem;">
+            ${myAssignedSessions.map(({ slot, alloc, bookings }) => {
+              const isFull = alloc.status === 'FULL';
+              const isAlmost = bookings.length === 1;
+              return `
+                <div style="background:rgba(18,20,26,0.85); border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-md); padding:1.25rem 1.5rem;">
+                  <!-- Slot Header -->
+                  <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.07); padding-bottom:0.85rem; margin-bottom:1rem; flex-wrap:wrap; gap:0.65rem;">
+                    <div>
+                      <div style="font-size:1.1rem; font-weight:800; color:#ffffff; font-family:var(--font-mono);">${slot.timeDisplay}</div>
+                      <div style="font-size:0.75rem; color:var(--slate-muted); margin-top:0.2rem;">
+                        🚗 Training Vehicle: <strong style="color:var(--slate-body);">${alloc.vehicle}</strong>
+                      </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:0.75rem;">
+                      <div style="text-align:right;">
+                        <span style="font-size:0.8125rem; font-weight:800; color:${isFull ? '#f87171' : '#ffffff'}; font-family:var(--font-mono);">
+                          Capacity: ${alloc.booked}/${alloc.capacity}
+                        </span>
+                        <div style="font-size:0.7rem; color:var(--slate-muted);">${alloc.availableSeats} seat${alloc.availableSeats !== 1 ? 's' : ''} available</div>
+                      </div>
+                      <span class="slot-status-pill ${isFull ? 'status-pill-full' : isAlmost ? 'status-pill-almost' : 'status-pill-available'}">
+                        ${alloc.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Assigned Learners (Max 2) -->
+                  <div>
+                    <div style="font-size:0.75rem; font-weight:800; color:var(--slate-muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.75rem;">
+                      Assigned Learners (${bookings.length} / 2 Maximum)
+                    </div>
+
+                    ${bookings.length === 0 ? `
+                      <div style="padding:1.25rem; border-radius:4px; background:rgba(255,255,255,0.02); border:1px dashed rgba(255,255,255,0.1); text-align:center; font-size:0.825rem; color:var(--slate-muted);">
+                        No candidates booked yet for this session (2 seats open).
+                      </div>
+                    ` : `
+                      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:1rem;">
+                        ${bookings.map((bk, idx) => {
+                          const trainee = allTrainees.find(t => t.id === bk.traineeId) || { name: bk.traineeName, id: bk.traineeId, currentDay: 7, phone: '+91 98480 00000' };
+                          const attStatus = bk.attendance || 'scheduled';
+                          return `
+                            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-sm); padding:1rem; display:flex; flex-direction:column; justify-content:space-between;">
+                              <div>
+                                <div style="display:flex; align-items:center; gap:0.65rem; margin-bottom:0.65rem;">
+                                  <div style="width:24px; height:24px; border-radius:50%; background:rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:800; color:#ffffff;">
+                                    ${idx + 1}
+                                  </div>
+                                  <div>
+                                    <div style="font-size:0.95rem; font-weight:800; color:#ffffff;">${bk.traineeName}</div>
+                                    <div style="font-size:0.75rem; color:var(--slate-muted);">${bk.traineeId} · ${trainee.phone || ''}</div>
+                                  </div>
+                                </div>
+                                <div style="font-size:0.75rem; color:var(--slate-body); margin-bottom:0.85rem;">
+                                  Course Day ${trainee.currentDay || 1} of 20 · ${bk.course}
+                                </div>
+                              </div>
+
+                              <div style="display:flex; align-items:center; justify-content:space-between; gap:0.4rem; padding-top:0.65rem; border-top:1px solid rgba(255,255,255,0.05); flex-wrap:wrap;">
+                                <div style="display:flex; gap:0.25rem;">
+                                  <button type="button" class="btn-attendance-action ${attStatus === 'present' ? 'active-present' : ''}" data-booking-id="${bk.id}" data-status="present" style="padding:0.3rem 0.55rem; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer; background:${attStatus==='present'?'#ffffff':'rgba(255,255,255,0.04)'}; color:${attStatus==='present'?'#000000':'var(--slate-body)'}; border:1px solid ${attStatus==='present'?'#ffffff':'var(--border-light)'};">
+                                    ✓ Present
+                                  </button>
+                                  <button type="button" class="btn-attendance-action ${attStatus === 'late' ? 'active-late' : ''}" data-booking-id="${bk.id}" data-status="late" style="padding:0.3rem 0.55rem; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer; background:${attStatus==='late'?'rgba(255,255,255,0.15)':'rgba(255,255,255,0.04)'}; color:#ffffff; border:1px solid ${attStatus==='late'?'#ffffff':'var(--border-light)'};">
+                                    ⏱ Late
+                                  </button>
+                                  <button type="button" class="btn-attendance-action ${attStatus === 'absent' ? 'active-absent' : ''}" data-booking-id="${bk.id}" data-status="absent" style="padding:0.3rem 0.55rem; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer; background:${attStatus==='absent'?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.04)'}; color:${attStatus==='absent'?'#f87171':'var(--slate-muted)'}; border:1px solid ${attStatus==='absent'?'rgba(239,68,68,0.4)':'var(--border-light)'};">
+                                    ✕ Absent
+                                  </button>
+                                </div>
+                                <button type="button" class="p-link-btn btn-session-debrief" data-student="${bk.traineeName}" data-topic="Day ${trainee.currentDay}: On-road Practice" style="font-size:0.75rem;">
+                                  Notes →
+                                </button>
+                              </div>
+                            </div>
+                          `;
+                        }).join('')}
+                      </div>
+                    `}
+                  </div>
+                </div>
+              `;
+            }).join('')}
           </div>
         </div>
       `;
@@ -344,15 +403,50 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
       });
     });
 
-    // Attendance buttons
+    // Quick Date Buttons for Trainer Roster
+    container.querySelectorAll('[data-trainer-date]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedDate = btn.dataset.trainerDate;
+        render();
+      });
+    });
+
+    const inpTrainerDate = container.querySelector('#inp-trainer-custom-date');
+    if (inpTrainerDate) {
+      inpTrainerDate.addEventListener('change', (e) => {
+        if (e.target.value) {
+          selectedDate = e.target.value;
+          render();
+        }
+      });
+    }
+
+    // Attendance buttons for slot bookings
+    container.querySelectorAll('.btn-attendance-action').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bookingId = btn.dataset.bookingId;
+        const status = btn.dataset.status;
+        const booking = store.slotBookings.find(b => b.id === bookingId);
+        if (booking) {
+          booking.attendance = status;
+          store.saveState();
+          showToast(`${booking.traineeName} marked ${status.toUpperCase()}`, 'success');
+          render();
+        }
+      });
+    });
+
+    // Legacy attendance buttons
     container.querySelectorAll('.btn-attendance').forEach(btn => {
       btn.addEventListener('click', () => {
         const slotId = btn.dataset.slotId;
         const status = btn.dataset.status;
         const slot   = store.schedule.find(s => s.id === slotId);
-        store.updateAttendance(slotId, status);
-        showToast(`${slot.studentName} marked ${status.toUpperCase()}`, 'success');
-        render();
+        if (slot) {
+          store.updateAttendance(slotId, status);
+          showToast(`${slot.studentName} marked ${status.toUpperCase()}`, 'success');
+          render();
+        }
       });
     });
 

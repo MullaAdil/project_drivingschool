@@ -711,6 +711,63 @@
   box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
+.form-input.is-invalid, .form-select.is-invalid, .form-textarea.is-invalid {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2 !important;
+}
+
+.form-input.is-invalid:focus, .form-select.is-invalid:focus, .form-textarea.is-invalid:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
+}
+
+.field-error-msg {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #dc2626;
+  font-size: 0.775rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+  line-height: 1.3;
+}
+
+.form-helper-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.modal-alert-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  color: #991b1b;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 1.25rem;
+  line-height: 1.4;
+}
+
+.btn-loading-spinner {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  border-top-color: #ffffff;
+  animation: btnSpin 0.65s linear infinite;
+  vertical-align: middle;
+  margin-right: 0.45rem;
+}
+
+@keyframes btnSpin {
+  to { transform: rotate(360deg); }
+}
+
 /* --- Toast Notifications --- */
 .toast-container {
   position: fixed;
@@ -769,4 +826,337 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ==========================================================================
+   DRIVING SLOT MANAGEMENT & BOOKING STYLES (OBSIDIAN & GOLD LUXURY)
+   ========================================================================== */
+
+.slot-date-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.015);
+  flex-wrap: wrap;
+}
+
+.slot-quick-date-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--slate-body);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.slot-quick-date-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.slot-quick-date-btn.active {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.2);
+}
+
+.slot-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.25rem;
+  padding: 1.5rem 2rem;
+}
+
+@media (max-width: 768px) {
+  .slot-card-grid {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
+  .slot-date-nav {
+    padding: 1rem;
+  }
+}
+
+.slot-card {
+  background: rgba(18, 20, 26, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  padding: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.slot-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+}
+
+.slot-card.status-full {
+  opacity: 0.72;
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.slot-card.status-booked {
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.slot-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.slot-time-title {
+  font-family: var(--font-mono, monospace);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.slot-duration-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--slate-muted);
+  margin-top: 0.2rem;
+}
+
+.slot-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.status-pill-available {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.status-pill-almost {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.status-pill-full {
+  background: rgba(220, 38, 38, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+}
+
+.status-pill-maintenance {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.status-pill-closed {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.status-pill-cancelled {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.status-pill-inactive {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--slate-muted);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.status-pill-confirmed {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
+.status-pill-completed {
+  background: rgba(34, 197, 94, 0.22);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.6);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.completed-ride-row {
+  background: rgba(34, 197, 94, 0.06) !important;
+  border-left: 4px solid #22c55e !important;
+  transition: background 0.15s ease;
+}
+
+.completed-ride-row:hover {
+  background: rgba(34, 197, 94, 0.1) !important;
+}
+
+.action-badge-completed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.18);
+  border: 1px solid rgba(74, 222, 128, 0.45);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.15);
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+}
+
+.action-badge-booked {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  padding: 0.35rem 0.8rem;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+}
+
+.action-badge-full {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  padding: 0.35rem 0.8rem;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+}
+
+.slot-capacity-strip {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.95rem;
+  margin-bottom: 1rem;
+}
+
+.slot-capacity-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  margin-bottom: 0.45rem;
+}
+
+.slot-capacity-seats {
+  color: #ffffff;
+  font-family: var(--font-mono, monospace);
+}
+
+.slot-capacity-progress {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.slot-capacity-fill {
+  height: 100%;
+  background: #ffffff;
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+
+.slot-trainer-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 1.15rem;
+}
+
+.slot-trainer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.slot-trainer-name {
+  color: var(--slate-body);
+  font-weight: 600;
+}
+
+.slot-trainer-capacity {
+  font-family: var(--font-mono, monospace);
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.slot-action-btn-wrap {
+  margin-top: auto;
+}
+
+.slot-audit-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.25rem 2rem;
+}
+
+.slot-audit-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.85rem 1.15rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+}
+
+.slot-audit-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #ffffff;
 }

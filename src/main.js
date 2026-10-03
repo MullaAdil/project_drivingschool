@@ -13,6 +13,7 @@ import { store } from './store.js';
 import { renderHomeWebsiteView } from './views/homeWebsiteView.js';
 import { renderLoginView } from './views/loginView.js';
 import { renderAdminView } from './views/adminView.js';
+import { renderAdminLoginView } from './views/adminLoginView.js';
 import { renderTraineeDetailView } from './views/traineeDetailView.js';
 import { renderTrainerDetailView } from './views/trainerDetailView.js';
 import { renderTrainerView } from './views/trainerView.js';
@@ -24,11 +25,106 @@ const appRoot = document.getElementById('app');
 
 // State Route Definition
 let currentRoute = {
-  service: 'home', // 'home' | 'admin' | 'trainee-profile' | 'trainer-profile' | 'trainer' | 'trainee' | 'login'
+  service: 'home', // 'home' | 'admin-login' | 'admin' | 'trainee-profile' | 'trainer-profile' | 'trainer' | 'trainee' | 'login'
   subService: 'hub', // for admin: 'hub' | 'trainees' | 'new-student' | 'billing' | 'trainers' | 'fleet' | 'rto-scheduler'
   traineeId: 'APX-9021',
   trainerId: 'TRN-1'
 };
+
+let pendingAdminSubService = 'hub';
+
+export function syncHashWithRoute(route) {
+  if (typeof window === 'undefined') return;
+  let hash = '#/';
+  if (route.service === 'home') {
+    hash = '#/';
+  } else if (route.service === 'admin-login') {
+    hash = '#/admin/login';
+  } else if (route.service === 'admin') {
+    hash = `#/admin/${route.subService || 'hub'}`;
+  } else if (route.service === 'login') {
+    hash = '#/login';
+  } else if (route.service === 'trainer') {
+    hash = `#/trainer/${route.subService || 'schedule'}`;
+  } else if (route.service === 'trainee') {
+    hash = `#/trainee/${route.subService || 'curriculum'}`;
+  } else if (route.service === 'trainee-profile') {
+    hash = `#/student/${route.traineeId || ''}`;
+  } else if (route.service === 'trainer-profile') {
+    hash = `#/instructor/${route.trainerId || ''}`;
+  }
+
+  if (window.location.hash !== hash) {
+    window.history.replaceState(null, '', hash);
+  }
+}
+
+export function parseRouteFromUrl() {
+  if (typeof window === 'undefined') return { service: 'home', subService: 'hub' };
+  const raw = window.location.hash.toLowerCase().replace(/^#\/?/, '') || window.location.pathname.toLowerCase().replace(/^\//, '');
+  const clean = raw.replace(/^\//, '');
+
+  if (!clean || clean === 'home') {
+    return { service: 'home', subService: 'hub' };
+  }
+
+  if (clean === 'admin/login' || clean === 'admin-login') {
+    return { service: 'admin-login', subService: 'hub' };
+  }
+
+  if (clean.startsWith('admin')) {
+    const parts = clean.split('/').filter(Boolean);
+    const sub = parts[1] || 'hub';
+    const subAliases = {
+      'dashboard': 'hub',
+      'overview': 'hub',
+      'slots': 'slots',
+      'slot-manager': 'slots',
+      'students': 'trainees',
+      'trainees': 'trainees',
+      'register': 'new-student',
+      'new-student': 'new-student',
+      'payments': 'billing',
+      'billing': 'billing',
+      'instructors': 'trainers',
+      'trainers': 'trainers',
+      'fleet': 'fleet',
+      'rto-tests': 'rto-scheduler',
+      'rto-scheduler': 'rto-scheduler',
+      'accounts': 'accounts',
+      'user-accounts': 'accounts',
+      'trainer-accounts': 'accounts'
+    };
+    const resolvedSub = subAliases[sub] || sub;
+
+    // Route Protection: If unauthenticated, redirect to admin-login
+    if (!store.isAdminAuthenticated()) {
+      pendingAdminSubService = resolvedSub;
+      return { service: 'admin-login', subService: 'hub' };
+    }
+    return { service: 'admin', subService: resolvedSub };
+  }
+
+  if (clean.startsWith('login')) return { service: 'login', subService: 'hub' };
+
+  if (clean.startsWith('trainer')) {
+    if (!store.isTrainerAuthenticated()) {
+      return { service: 'login', subService: 'hub' };
+    }
+    const parts = clean.split('/').filter(Boolean);
+    return { service: 'trainer', subService: parts[1] || 'schedule' };
+  }
+
+  if (clean.startsWith('trainee')) {
+    if (!store.isUserAuthenticated()) {
+      return { service: 'login', subService: 'hub' };
+    }
+    const parts = clean.split('/').filter(Boolean);
+    return { service: 'trainee', subService: parts[1] || 'curriculum' };
+  }
+
+  return { service: 'home', subService: 'hub' };
+}
 
 // Global Toast Manager
 export function showToast(message, type = 'info') {
@@ -95,12 +191,29 @@ function toggleSidebar() {
 }
 
 export function navigateTo(service, subService = 'hub', targetId = null) {
+  // ROUTE PROTECTION: Role-based navigation guard
+  if ((service === 'admin' || service === 'trainee-profile' || service === 'trainer-profile') && !store.isAdminAuthenticated()) {
+    pendingAdminSubService = subService || 'hub';
+    service = 'admin-login';
+    subService = 'hub';
+  } else if (service === 'trainer' && !store.isTrainerAuthenticated()) {
+    showToast('Instructor login required to access portal.', 'info');
+    service = 'login';
+    subService = 'hub';
+  } else if (service === 'trainee' && !store.isUserAuthenticated()) {
+    showToast('Student login required to access portal.', 'info');
+    service = 'login';
+    subService = 'hub';
+  }
+
   currentRoute = {
     service,
     subService,
     traineeId: service === 'trainee-profile' ? (targetId || currentRoute.traineeId) : currentRoute.traineeId,
     trainerId: service === 'trainer-profile' ? (targetId || currentRoute.trainerId) : currentRoute.trainerId
   };
+
+  syncHashWithRoute(currentRoute);
   render();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -177,6 +290,11 @@ function renderSidebar(role, currentSub) {
               <span>Office Overview</span>
             </button>
 
+            <button type="button" class="console-sidebar-item ${currentSub === 'slots' ? 'active' : ''}" data-console-nav="slots" title="Driving Slot Management &amp; Dispatch">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <span>Driving Slot Manager</span>
+            </button>
+
             <button type="button" class="console-sidebar-item ${currentSub === 'trainees' ? 'active' : ''}" data-console-nav="trainees" title="Students Directory">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
               <span>Students Directory</span>
@@ -205,6 +323,11 @@ function renderSidebar(role, currentSub) {
             <button type="button" class="console-sidebar-item ${currentSub === 'rto-scheduler' ? 'active' : ''}" data-console-nav="rto-scheduler" title="Driving Tests (RTO)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
               <span>Driving Tests (RTO)</span>
+            </button>
+
+            <button type="button" class="console-sidebar-item ${currentSub === 'accounts' ? 'active' : ''}" data-console-nav="accounts" title="User &amp; Trainer Accounts">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              <span>User &amp; Trainer Accounts</span>
             </button>
           </nav>
         </div>
@@ -252,9 +375,9 @@ function renderSidebar(role, currentSub) {
           <nav class="console-sidebar-nav">
             <div class="console-sidebar-section-title">Daily Operations</div>
 
-            <button type="button" class="console-sidebar-item ${currentSub === 'schedule' ? 'active' : ''}" data-console-nav="schedule" title="Daily Attendance Register">
+            <button type="button" class="console-sidebar-item ${currentSub === 'schedule' || currentSub === 'slots' ? 'active' : ''}" data-console-nav="schedule" title="Daily Attendance &amp; Assigned Slots">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><polyline points="9 16 12 19 16 14"></polyline></svg>
-              <span>Daily Attendance Register</span>
+              <span>My Assigned Slots</span>
             </button>
 
             <button type="button" class="console-sidebar-item ${currentSub === 'candidates' ? 'active' : ''}" data-console-nav="candidates" title="Assigned Students">
@@ -316,6 +439,11 @@ function renderSidebar(role, currentSub) {
         <nav class="console-sidebar-nav">
           <div class="console-sidebar-section-title">My Driving Course</div>
 
+          <button type="button" class="console-sidebar-item item-highlight ${currentSub === 'slots' ? 'active' : ''}" data-console-nav="slots" title="Book Practical Driving Slot">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span>Book Driving Slot</span>
+          </button>
+
           <button type="button" class="console-sidebar-item ${currentSub === 'curriculum' ? 'active' : ''}" data-console-nav="curriculum" title="20-Day Driving Course">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
             <span>20-Day Driving Course</span>
@@ -357,19 +485,23 @@ function getSubTitle(service, subService) {
   const titles = {
     'admin': {
       'hub': 'Administrative Office Overview',
+      'slots': 'Driving Slot Management & Daily Dispatch',
       'trainees': 'Students Directory & Records',
       'new-student': 'Register New Student',
       'billing': 'Course Fee Payments & Receipts',
       'trainers': 'Driving Instructors Roster',
       'fleet': 'Training Cars (Dual-Control)',
-      'rto-scheduler': 'Government Driving License (DL) Tests'
+      'rto-scheduler': 'Government Driving License (DL) Tests',
+      'accounts': 'User & Trainer Accounts Management'
     },
     'trainer': {
-      'schedule': 'Daily Attendance Register',
+      'schedule': 'My Assigned Driving Slots & Attendance',
+      'slots': 'My Assigned Driving Slots & Attendance',
       'candidates': 'Assigned Students Roster',
       'vehicle': 'Daily Car Safety Check'
     },
     'trainee': {
+      'slots': 'Book Practical Driving Slot',
       'curriculum': '20-Day Practical Driving Course',
       'billing': 'Course Fee Payment & Receipts',
       'profile': 'Student Profile & Learner License (LLR)'
@@ -467,26 +599,47 @@ function render() {
     return;
   }
 
+  // 1.5 ADMIN AUTHENTICATION GATEWAY
+  if (service === 'admin-login') {
+    appRoot.innerHTML = '';
+    renderAdminLoginView(appRoot, () => {
+      const destSub = pendingAdminSubService || 'slots';
+      pendingAdminSubService = 'hub';
+      showToast('Admin authenticated successfully', 'success');
+      navigateTo('admin', destSub);
+    }, () => {
+      navigateTo('home');
+    });
+    return;
+  }
+
   // 2. LOGIN VIEW
   if (service === 'login') {
     appRoot.innerHTML = '';
     renderLoginView(appRoot, (role, entity) => {
-      store.setRole(role);
-      if (role === 'trainee' && entity) {
-        store.setCurrentTrainee(entity.id);
-        showToast(`Welcome back, ${entity.name}! (Code: ${entity.studentCode || entity.id})`, 'success');
-        navigateTo('trainee', 'curriculum', entity.id);
+      const normalizedRole = (role === 'trainee' || role === 'user') ? 'trainee' : role;
+      store.setRole(normalizedRole);
+      if (normalizedRole === 'trainee' && entity) {
+        const studentId = entity.targetId || entity.id;
+        if (studentId) store.setCurrentTrainee(studentId);
+        showToast(`Welcome back, ${entity.name}!`, 'success');
+        navigateTo('trainee', 'curriculum', studentId);
         return;
       }
-      if (role === 'trainer' && entity) {
-        showToast(`Welcome back, Instructor ${entity.name}! (Code: ${entity.trainerCode || entity.id})`, 'success');
-        navigateTo('trainer', 'schedule', entity.id);
+      if (normalizedRole === 'trainer' && entity) {
+        showToast(`Welcome back, Instructor ${entity.name}!`, 'success');
+        navigateTo('trainer', 'schedule', entity.targetId || entity.id);
         return;
       }
-      showToast(`Signed in as ${role.toUpperCase()}`, 'success');
-      if (role === 'admin') {
-        navigateTo('admin', 'hub');
-      } else if (role === 'trainer') {
+      if (normalizedRole === 'admin') {
+        showToast(`Welcome back, Administrator!`, 'success');
+        navigateTo('admin', 'slots');
+        return;
+      }
+      showToast(`Signed in as ${normalizedRole.toUpperCase()}`, 'success');
+      if (normalizedRole === 'admin') {
+        navigateTo('admin', 'slots');
+      } else if (normalizedRole === 'trainer') {
         navigateTo('trainer', 'schedule');
       } else {
         navigateTo('trainee', 'curriculum');
@@ -499,6 +652,13 @@ function render() {
 
   // 3. ADMIN OPERATIONS CONSOLE — TOP NAV BAR LAYOUT
   if (service === 'admin') {
+    // ROUTE PROTECTION: Unauthenticated access redirected to Admin Login
+    if (!store.isAdminAuthenticated()) {
+      pendingAdminSubService = subService || 'hub';
+      navigateTo('admin-login');
+      return;
+    }
+
     const activeSub = subService || 'hub';
 
     appRoot.innerHTML = `
@@ -514,18 +674,20 @@ function render() {
 
           <nav class="admin-topnav-links">
             <button type="button" class="admin-nav-btn ${activeSub === 'hub' ? 'active' : ''}" data-console-nav="hub">Overview</button>
+            <button type="button" class="admin-nav-btn ${activeSub === 'slots' ? 'active' : ''}" data-console-nav="slots" style="color:var(--primary-gold); font-weight:800;">⚡ Slot Manager</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'trainees' ? 'active' : ''}" data-console-nav="trainees">Students</button>
             <button type="button" class="admin-nav-btn item-highlight ${activeSub === 'new-student' ? 'active' : ''}" data-console-nav="new-student">+ Register</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'billing' ? 'active' : ''}" data-console-nav="billing">Payments</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'trainers' ? 'active' : ''}" data-console-nav="trainers">Instructors</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'fleet' ? 'active' : ''}" data-console-nav="fleet">Fleet</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'rto-scheduler' ? 'active' : ''}" data-console-nav="rto-scheduler">RTO Tests</button>
+            <button type="button" class="admin-nav-btn ${activeSub === 'accounts' ? 'active' : ''}" data-console-nav="accounts">User &amp; Trainer Accounts</button>
           </nav>
 
           <div class="admin-topnav-actions">
             <span class="admin-topnav-badge"><span class="admin-topnav-dot"></span>Pulivendula · AP-04</span>
             <button type="button" class="admin-topnav-btn-subtle" id="btn-admin-home">← Website</button>
-            <button type="button" class="admin-topnav-btn-signout" id="btn-admin-signout">Sign Out</button>
+            <button type="button" class="admin-topnav-btn-signout" id="btn-admin-signout" title="Logout from Admin Portal">🚪 Logout</button>
           </div>
         </header>
 
@@ -539,7 +701,11 @@ function render() {
     });
     document.getElementById('admin-brand-home')?.addEventListener('click', () => navigateTo('home'));
     document.getElementById('btn-admin-home')?.addEventListener('click', () => navigateTo('home'));
-    document.getElementById('btn-admin-signout')?.addEventListener('click', () => navigateTo('login'));
+    document.getElementById('btn-admin-signout')?.addEventListener('click', () => {
+      store.logoutAdmin();
+      showToast('Admin logged out successfully', 'info');
+      navigateTo('admin-login');
+    });
 
     const subCanvas = document.getElementById('admin-sub-canvas');
     renderAdminView(subCanvas, showToast, activeSub, (navTarget, targetId) => {
@@ -556,6 +722,12 @@ function render() {
 
   // 4a. STUDENT PROFILE — TOP NAV LAYOUT
   if (service === 'trainee-profile') {
+    if (!store.isAdminAuthenticated()) {
+      pendingAdminSubService = 'trainees';
+      navigateTo('admin-login');
+      return;
+    }
+
     const student = store.trainees.find(t => t.id === traineeId) || store.trainees[0];
 
     appRoot.innerHTML = `
@@ -571,18 +743,20 @@ function render() {
 
           <nav class="admin-topnav-links">
             <button type="button" class="admin-nav-btn" data-console-nav-admin="hub">Overview</button>
+            <button type="button" class="admin-nav-btn" data-console-nav-admin="slots">Slot Manager</button>
             <button type="button" class="admin-nav-btn active" data-console-nav-admin="trainees">Students</button>
             <button type="button" class="admin-nav-btn item-highlight" data-console-nav-admin="new-student">+ Register</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="billing">Payments</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="trainers">Instructors</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="fleet">Fleet</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="rto-scheduler">RTO Tests</button>
+            <button type="button" class="admin-nav-btn" data-console-nav-admin="accounts">User &amp; Trainer Accounts</button>
           </nav>
 
           <div class="admin-topnav-actions">
             <span class="admin-topnav-badge"><span class="admin-topnav-dot"></span>Pulivendula · AP-04</span>
             <button type="button" class="admin-topnav-btn-subtle" id="btn-admin-home">← Website</button>
-            <button type="button" class="admin-topnav-btn-signout" id="btn-admin-signout">Sign Out</button>
+            <button type="button" class="admin-topnav-btn-signout" id="btn-admin-signout" title="Logout from Admin Portal">🚪 Logout</button>
           </div>
         </header>
 
@@ -595,7 +769,11 @@ function render() {
     });
     document.getElementById('admin-brand-home')?.addEventListener('click', () => navigateTo('home'));
     document.getElementById('btn-admin-home')?.addEventListener('click', () => navigateTo('home'));
-    document.getElementById('btn-admin-signout')?.addEventListener('click', () => navigateTo('login'));
+    document.getElementById('btn-admin-signout')?.addEventListener('click', () => {
+      store.logoutAdmin();
+      showToast('Admin logged out successfully', 'info');
+      navigateTo('admin-login');
+    });
 
     const canvas = document.getElementById('profile-canvas');
     renderTraineeDetailView(canvas, traineeId, showToast, (navTarget) => {
@@ -606,6 +784,12 @@ function render() {
 
   // 4b. INSTRUCTOR PROFILE — TOP NAV LAYOUT
   if (service === 'trainer-profile') {
+    if (!store.isAdminAuthenticated()) {
+      pendingAdminSubService = 'trainers';
+      navigateTo('admin-login');
+      return;
+    }
+
     const trainer = store.trainers.find(tr => tr.id === trainerId) || store.trainers[0];
 
     appRoot.innerHTML = `
@@ -621,18 +805,20 @@ function render() {
 
           <nav class="admin-topnav-links">
             <button type="button" class="admin-nav-btn" data-console-nav-admin="hub">Overview</button>
+            <button type="button" class="admin-nav-btn" data-console-nav-admin="slots">Slot Manager</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="trainees">Students</button>
             <button type="button" class="admin-nav-btn item-highlight" data-console-nav-admin="new-student">+ Register</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="billing">Payments</button>
             <button type="button" class="admin-nav-btn active" data-console-nav-admin="trainers">Instructors</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="fleet">Fleet</button>
             <button type="button" class="admin-nav-btn" data-console-nav-admin="rto-scheduler">RTO Tests</button>
+            <button type="button" class="admin-nav-btn" data-console-nav-admin="accounts">User &amp; Trainer Accounts</button>
           </nav>
 
           <div class="admin-topnav-actions">
             <span class="admin-topnav-badge"><span class="admin-topnav-dot"></span>Pulivendula · AP-04</span>
             <button type="button" class="admin-topnav-btn-subtle" id="btn-admin-home">← Website</button>
-            <button type="button" class="admin-topnav-btn-signout" id="btn-admin-signout">Sign Out</button>
+            <button type="button" class="admin-topnav-btn-signout" id="btn-admin-signout" title="Logout from Admin Portal">🚪 Logout</button>
           </div>
         </header>
 
@@ -645,7 +831,11 @@ function render() {
     });
     document.getElementById('admin-brand-home')?.addEventListener('click', () => navigateTo('home'));
     document.getElementById('btn-admin-home')?.addEventListener('click', () => navigateTo('home'));
-    document.getElementById('btn-admin-signout')?.addEventListener('click', () => navigateTo('login'));
+    document.getElementById('btn-admin-signout')?.addEventListener('click', () => {
+      store.logoutAdmin();
+      showToast('Admin logged out successfully', 'info');
+      navigateTo('admin-login');
+    });
 
     const canvas = document.getElementById('trainer-profile-canvas');
     renderTrainerDetailView(canvas, trainerId, showToast, (navTarget, targetSubId) => {
@@ -660,6 +850,11 @@ function render() {
 
   // 5. INSTRUCTOR PORTAL — TOP NAV BAR LAYOUT
   if (service === 'trainer') {
+    if (!store.isTrainerAuthenticated()) {
+      showToast('Unauthorized. Instructor credentials required.', 'error');
+      navigateTo('login');
+      return;
+    }
     const activeSub = subService || 'schedule';
 
     appRoot.innerHTML = `
@@ -674,7 +869,7 @@ function render() {
           </div>
 
           <nav class="admin-topnav-links">
-            <button type="button" class="admin-nav-btn ${activeSub === 'schedule' ? 'active' : ''}" data-portal-nav="schedule">Attendance</button>
+            <button type="button" class="admin-nav-btn ${activeSub === 'schedule' || activeSub === 'slots' ? 'active' : ''}" data-portal-nav="schedule">My Driving Slots</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'candidates' ? 'active' : ''}" data-portal-nav="candidates">My Students</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'vehicle' ? 'active' : ''}" data-portal-nav="vehicle">Vehicle Check</button>
           </nav>
@@ -695,7 +890,11 @@ function render() {
     });
     document.getElementById('portal-brand-home')?.addEventListener('click', () => navigateTo('home'));
     document.getElementById('btn-portal-home')?.addEventListener('click', () => navigateTo('home'));
-    document.getElementById('btn-portal-signout')?.addEventListener('click', () => navigateTo('login'));
+    document.getElementById('btn-portal-signout')?.addEventListener('click', () => {
+      store.logoutAll();
+      showToast('Instructor signed out.', 'info');
+      navigateTo('login');
+    });
 
     const canvas = document.getElementById('trainer-canvas');
     renderTrainerView(canvas, showToast, activeSub, (targetSub) => {
@@ -706,6 +905,11 @@ function render() {
 
   // 6. STUDENT PORTAL — TOP NAV BAR LAYOUT
   if (service === 'trainee') {
+    if (!store.isUserAuthenticated()) {
+      showToast('Unauthorized. Student credentials required.', 'error');
+      navigateTo('login');
+      return;
+    }
     const activeSub = subService || 'curriculum';
 
     const currentTrainee = store.getCurrentTrainee();
@@ -722,6 +926,7 @@ function render() {
           </div>
 
           <nav class="admin-topnav-links">
+            <button type="button" class="admin-nav-btn ${activeSub === 'slots' ? 'active' : ''}" data-portal-nav="slots" style="color:var(--primary-gold); font-weight:800;">⚡ Book Driving Slot</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'curriculum' ? 'active' : ''}" data-portal-nav="curriculum">My Course</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'billing' ? 'active' : ''}" data-portal-nav="billing">Fees &amp; Receipts</button>
             <button type="button" class="admin-nav-btn ${activeSub === 'profile' ? 'active' : ''}" data-portal-nav="profile">My Profile</button>
@@ -750,11 +955,19 @@ function render() {
     document.getElementById('btn-topbar-student-profile')?.addEventListener('click', () => navigateTo('trainee', 'profile'));
     document.getElementById('portal-brand-home')?.addEventListener('click', () => navigateTo('home'));
     document.getElementById('btn-portal-home')?.addEventListener('click', () => navigateTo('home'));
-    document.getElementById('btn-portal-signout')?.addEventListener('click', () => navigateTo('login'));
+    document.getElementById('btn-portal-signout')?.addEventListener('click', () => {
+      store.logoutAll();
+      showToast('Student signed out.', 'info');
+      navigateTo('login');
+    });
 
     const canvas = document.getElementById('trainee-canvas');
     renderTraineeView(canvas, showToast, activeSub, (targetSub) => {
-      navigateTo('trainee', targetSub);
+      if (targetSub === 'home') {
+        navigateTo('home');
+      } else {
+        navigateTo('trainee', targetSub);
+      }
     });
     return;
   }
@@ -772,7 +985,14 @@ function attachGlobalHeaderEvents() {
     btn.addEventListener('click', () => {
       const target = btn.dataset.nav;
       if (target === 'home') navigateTo('home');
-      else if (target === 'admin') navigateTo('admin', 'hub');
+      else if (target === 'admin') {
+        if (store.isAdminAuthenticated()) {
+          navigateTo('admin', 'hub');
+        } else {
+          pendingAdminSubService = 'hub';
+          navigateTo('admin-login');
+        }
+      }
       else if (target === 'trainer') navigateTo('trainer', 'schedule');
       else if (target === 'trainee') navigateTo('trainee', 'curriculum');
     });
@@ -786,6 +1006,18 @@ function attachGlobalHeaderEvents() {
   }
 }
 
-// Initial start on the Public MNC Showcase Landing Page
-navigateTo('home');
+// Browser navigation protection: back / forward button handling
+window.addEventListener('hashchange', () => {
+  const target = parseRouteFromUrl();
+  navigateTo(target.service, target.subService);
+});
+
+window.addEventListener('popstate', () => {
+  const target = parseRouteFromUrl();
+  navigateTo(target.service, target.subService);
+});
+
+// Initial application entry point: checks URL path/hash, protecting admin routes immediately
+const initialTarget = parseRouteFromUrl();
+navigateTo(initialTarget.service, initialTarget.subService);
 
