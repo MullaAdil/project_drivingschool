@@ -3,16 +3,17 @@
    GAFOOR DRIVING SCHOOL — PULIVENDULA, ANDHRA PRADESH
 
    Features:
-   - "Road-Only" navigation view: clean dark terrain, wide asphalt highway corridor,
-     high-contrast center dashed divider, outer white shoulders, no map clutter
-   - Movement tracking from start until the 8.0 km ride ends
-   - Real-time meter-by-meter distance count, speed telemetry, and duration clock
+   - Live GPS Geolocation: Anchors map and road corridor directly at the user's
+     actual live coordinates with real-time movement tracking
+   - "Road-Only" navigation view: clean dark terrain, wide multi-layer asphalt highway,
+     high-contrast center dashed divider, outer white shoulders, zero clutter
+   - Real-time meter-by-meter movement tracking from start until the 8.0 km ride ends
    - 16 Milestone checkpoints at exact 500m intervals (500m, 1000m ... 8000m)
    - Real-time countdown to next 500m milestone target
    - Web Audio chime & celebration toast on every 500m checkpoint passed
    - Dynamic real-time glowing path drawn directly on the road behind the vehicle
    - Directional navigation puck with forward headlights rotating with road curves
-   - Device GPS hardware watch + smooth road-locked movement tracking
+   - Real device GPS hardware watch (`watchPosition`) + smooth road tracking
    - Minimalist floating HUD island & luxury dark obsidian/gold completion screen
    ========================================================================== */
 
@@ -24,7 +25,7 @@ let activeWatchId = null;
 let movementTrackerInterval = null;
 let durationTimer = null;
 
-// Helper: Haversine distance in meters
+// Helper: Haversine distance in meters between two lat/lng points
 export function haversineMeters(p1, p2) {
   const R = 6371000;
   const dLat = (p2[0] - p1[0]) * Math.PI / 180;
@@ -90,7 +91,6 @@ function getPointAtMeters(roadCoords, distanceMeters, totalCourseMeters = 8000) 
     return { lat: 14.4230, lng: 78.2285, bearing: 0 };
   }
 
-  // Calculate segment lengths
   const segmentDists = [0];
   let accumulated = 0;
   for (let i = 0; i < roadCoords.length - 1; i++) {
@@ -123,30 +123,38 @@ function getPointAtMeters(roadCoords, distanceMeters, totalCourseMeters = 8000) 
   return { lat, lng, bearing };
 }
 
-// Build 16 Checkpoints at exact 500m intervals along the road corridor
-function buildRoadCorridor(basePath, startPoint, endPoint) {
-  const rawPoints = basePath && basePath.length >= 2 ? basePath : [
-    [startPoint?.lat || 14.4230, startPoint?.lng || 78.2285],
-    [14.4255, 78.2315],
-    [14.4290, 78.2360],
-    [14.4330, 78.2395],
-    [14.4380, 78.2430],
-    [14.4410, 78.2480],
-    [14.4360, 78.2520],
-    [14.4310, 78.2550],
-    [14.4260, 78.2510],
-    [14.4210, 78.2450],
-    [14.4170, 78.2400],
-    [14.4140, 78.2340],
-    [14.4180, 78.2290],
-    [14.4210, 78.2260],
-    [14.4230, 78.2285],
-    [endPoint?.lat || 14.4312, endPoint?.lng || 78.2361]
-  ];
+// Build 8.0 km road corridor anchored directly at the origin (Live GPS or depot)
+function buildRoadCorridorFromOrigin(originLat, originLng, existingRoute = null) {
+  let rawPoints = null;
+
+  if (existingRoute && existingRoute.length >= 2) {
+    rawPoints = existingRoute;
+  } else {
+    // Generate realistic 8.0 km road driving loop starting from the user's actual live coordinates
+    const deltaOffsets = [
+      [0, 0],
+      [0.0022, 0.0028],
+      [0.0055, 0.0068],
+      [0.0092, 0.0102],
+      [0.0135, 0.0138],
+      [0.0168, 0.0182],
+      [0.0125, 0.0218],
+      [0.0078, 0.0245],
+      [0.0032, 0.0212],
+      [-0.0018, 0.0158],
+      [-0.0055, 0.0108],
+      [-0.0082, 0.0052],
+      [-0.0048, 0.0006],
+      [-0.0018, -0.0022],
+      [0.0000, 0.0000],
+      [0.0035, 0.0045]
+    ];
+    rawPoints = deltaOffsets.map(([dLat, dLng]) => [originLat + dLat, originLng + dLng]);
+  }
 
   // 16 Checkpoints at exact 500m intervals (500m, 1000m ... 8000m)
   const checkpointLabels = [
-    { title: 'Cockpit ABC Drill', place: 'Depot Exit Corridor' },
+    { title: 'Cockpit ABC Drill', place: 'Starting Sector' },
     { title: 'Steering Centering Check', place: 'Bakarapuram Avenue' },
     { title: 'Smooth Upshift Gear 2', place: 'Residential Link' },
     { title: 'Pedestrian Yield Zone', place: 'Town North Bypass' },
@@ -168,7 +176,7 @@ function buildRoadCorridor(basePath, startPoint, endPoint) {
   for (let i = 1; i <= 16; i++) {
     const targetMeters = i * 500;
     const pt = getPointAtMeters(rawPoints, targetMeters, 8000);
-    const meta = checkpointLabels[i - 1] || { title: `Checkpoint ${i}`, place: 'Pulivendula Sector' };
+    const meta = checkpointLabels[i - 1] || { title: `Checkpoint ${i}`, place: 'Course Sector' };
 
     checkpoints.push({
       id: i,
@@ -206,26 +214,28 @@ export function openLiveRideMapModal({
   const dayNumber = session?.dayNumber || currentStudent.currentDay || 1;
   const objective = session?.objective || 'Practical Road Driving Lesson';
 
-  const { rawPoints: allRoadCoords, checkpoints } = buildRoadCorridor(
-    session?.route?.path,
-    session?.route?.startPoint,
-    session?.route?.endPoint
-  );
+  // Fallback origin: Pulivendula Depot
+  const DEFAULT_LAT = session?.route?.startPoint?.lat || 14.4230;
+  const DEFAULT_LNG = session?.route?.startPoint?.lng || 78.2285;
 
-  // Real-Time Movement State (Tracks continuously until 8.0 km ride ends)
+  // Real-Time Movement State
   let totalDistanceMeters = 0;
   let currentSpeedKmh = 0;
   let secondsElapsed = 0;
   let isTrackingPaused = false;
   let isRideCompleted = false;
+  let hasRealGpsMovement = false;
 
   let lastGpsPoint = null;
   let lastGpsTimestamp = null;
 
   // Leaflet handles
+  let mapInstance = null;
   let carMarker = null;
   let livePolyline = null;
   let traveledCoords = [];
+  let allRoadCoords = [];
+  let checkpoints = [];
 
   modalRoot.innerHTML = `
     <div class="mnc-modal-overlay" id="live-ride-overlay" style="padding:0; align-items:stretch; justify-content:stretch; z-index:9999;">
@@ -262,11 +272,13 @@ export function openLiveRideMapModal({
           z-index: 1000;
         ">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
-            <!-- Left: Session Title -->
+            <!-- Left: Session Title & GPS Status -->
             <div>
               <div style="display: flex; align-items: center; gap: 0.45rem;">
-                <span id="gps-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; box-shadow: 0 0 10px #22c55e;"></span>
-                <span id="gps-status-text" style="font-size: 0.68rem; font-weight: 800; color: #22c55e; letter-spacing: 0.05em; text-transform: uppercase;">ROAD MOVEMENT TRACKING ACTIVE</span>
+                <span id="gps-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; display: inline-block; box-shadow: 0 0 10px #f59e0b;"></span>
+                <span id="gps-status-text" style="font-size: 0.68rem; font-weight: 800; color: #f59e0b; letter-spacing: 0.05em; text-transform: uppercase;">
+                  ACQUIRING LIVE GPS LOCATION...
+                </span>
               </div>
               <h2 style="font-size: 1.05rem; font-weight: 800; color: #ffffff; margin: 0.15rem 0 0 0; letter-spacing: -0.01em;">
                 Day ${dayNumber} · ${objective}
@@ -282,7 +294,7 @@ export function openLiveRideMapModal({
               <div style="text-align: center;">
                 <div style="font-size: 0.58rem; color: #71717a; text-transform: uppercase; font-weight: 700;">Speed</div>
                 <div style="font-size: 1.5rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono); line-height: 1.1;">
-                  <span id="hud-speed">30</span> <span style="font-size: 0.68rem; color: #71717a;">km/h</span>
+                  <span id="hud-speed">0</span> <span style="font-size: 0.68rem; color: #71717a;">km/h</span>
                 </div>
               </div>
 
@@ -589,8 +601,128 @@ export function openLiveRideMapModal({
 
   modalRoot.querySelector('#btn-close-live-ride').addEventListener('click', closeModal);
 
-  // Initialize Map
-  setTimeout(() => {
+  // =========================================================
+  // MOVEMENT TELEMETRY HANDLER
+  // =========================================================
+  function recordMovementStep(latitude, longitude, bearing = 0, speedKmh = 30, deltaMeters = 0) {
+    if (isRideCompleted || isTrackingPaused) return;
+
+    totalDistanceMeters = Math.min(8000, totalDistanceMeters + deltaMeters);
+    const distKm = (totalDistanceMeters / 1000).toFixed(2);
+
+    // 1. Update Odometer & Speed HUD
+    const distKmElem = document.getElementById('hud-distance-km');
+    if (distKmElem) distKmElem.textContent = distKm;
+
+    const speedElem = document.getElementById('hud-speed');
+    if (speedElem) speedElem.textContent = Math.round(speedKmh);
+
+    // 2. Extend real-time traveled path on the road
+    traveledCoords.push([latitude, longitude]);
+    if (livePolyline) livePolyline.setLatLngs(traveledCoords);
+
+    // 3. Move vehicle marker & rotate heading
+    if (carMarker) carMarker.setLatLng([latitude, longitude]);
+    const rotNode = document.getElementById('car-rotation-node');
+    if (rotNode) rotNode.style.transform = `rotate(${bearing}deg)`;
+
+    // 4. LOCKED CAMERA: Keep car centered at zoom 18 (NO zoom jumps)
+    if (mapInstance) {
+      mapInstance.setView([latitude, longitude], 18, { animate: false });
+    }
+
+    // 5. Update 3px Progress Line
+    const progressPct = Math.min(100, (totalDistanceMeters / 8000) * 100);
+    const fillElem = document.getElementById('hud-progress-fill');
+    if (fillElem) fillElem.style.width = `${progressPct.toFixed(1)}%`;
+
+    // 6. Checkpoint Progress (Every 500m)
+    let clearedCount = 0;
+    checkpoints.forEach(cp => {
+      if (totalDistanceMeters >= cp.distanceMeters) {
+        clearedCount++;
+        if (!cp.cleared) {
+          cp.cleared = true;
+          triggerCheckpointReached(cp);
+        }
+      }
+    });
+
+    const cpCountElem = document.getElementById('hud-checkpoints-cleared');
+    if (cpCountElem) cpCountElem.textContent = clearedCount;
+
+    // 7. Next 500m Target Countdown
+    const nextCp = checkpoints.find(c => !c.cleared);
+    const nextDistElem = document.getElementById('hud-next-checkpoint-dist');
+    const cpNameElem = document.getElementById('hud-current-cp-name');
+    if (nextDistElem) {
+      if (nextCp) {
+        const remMeters = Math.max(0, Math.round(nextCp.distanceMeters - totalDistanceMeters));
+        nextDistElem.textContent = `${remMeters}m`;
+        if (cpNameElem) cpNameElem.textContent = `Next Checkpoint: ${nextCp.label} (${nextCp.title}) · ${remMeters}m remaining`;
+      } else {
+        nextDistElem.textContent = '8.0 km ✓';
+        if (cpNameElem) cpNameElem.textContent = 'All 16 checkpoints completed!';
+      }
+    }
+
+    // 8. 8.0 km Course Finished
+    if (totalDistanceMeters >= 8000) {
+      finishRide();
+    }
+  }
+
+  function triggerCheckpointReached(cp) {
+    playMilestoneChime();
+
+    // Update road marker beacon to glowing green checkmark
+    const node = document.getElementById(`road-cp-${cp.id}`);
+    const icon = document.getElementById(`cp-icon-${cp.id}`);
+    if (node) {
+      node.style.borderColor = '#22c55e';
+      node.style.color = '#ffffff';
+      node.style.background = 'rgba(22, 101, 52, 0.9)';
+      node.style.boxShadow = '0 0 16px rgba(34, 197, 94, 0.8)';
+      if (icon) icon.textContent = '✓';
+    }
+
+    // Toast celebration banner
+    const banner = document.getElementById('checkpoint-toast-banner');
+    const text = document.getElementById('checkpoint-toast-text');
+    if (banner && text) {
+      text.textContent = `Checkpoint ${cp.id}/16 (${cp.label}) Cleared · ${cp.title} (+500m)`;
+      banner.style.opacity = '1';
+      banner.style.transform = 'translateX(-50%) translateY(0)';
+      setTimeout(() => {
+        banner.style.opacity = '0';
+        banner.style.transform = 'translateX(-50%) translateY(-20px)';
+      }, 2400);
+    }
+  }
+
+  function finishRide() {
+    if (isRideCompleted) return;
+    isRideCompleted = true;
+
+    if (movementTrackerInterval) clearInterval(movementTrackerInterval);
+    if (activeWatchId !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(activeWatchId);
+      activeWatchId = null;
+    }
+
+    const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+    const secs = String(secondsElapsed % 60).padStart(2, '0');
+    const durElem = document.getElementById('finish-modal-duration');
+    if (durElem) durElem.textContent = `${mins}:${secs}`;
+
+    const ceremony = document.getElementById('finish-ride-ceremony');
+    if (ceremony) ceremony.style.display = 'flex';
+  }
+
+  // =========================================================
+  // INITIALIZE MAP & ROAD CORRIDOR AT LIVE COORDINATES
+  // =========================================================
+  function initRoadWithLiveCoordinates(originLat, originLng, accuracy = null) {
     try {
       const mapContainer = document.getElementById('live-ride-leaflet-map');
       if (!mapContainer) return;
@@ -600,8 +732,25 @@ export function openLiveRideMapModal({
         activeLiveMap = null;
       }
 
+      // Build road corridor and 16 checkpoints starting right at the user's live position
+      const corridor = buildRoadCorridorFromOrigin(originLat, originLng, session?.route?.path);
+      allRoadCoords = corridor.rawPoints;
+      checkpoints = corridor.checkpoints;
+
+      // Update status dot & label
+      const statusDot = document.getElementById('gps-status-dot');
+      const statusText = document.getElementById('gps-status-text');
+      if (statusDot && statusText) {
+        statusDot.style.background = '#22c55e';
+        statusDot.style.boxShadow = '0 0 10px #22c55e';
+        statusText.style.color = '#22c55e';
+        statusText.textContent = accuracy 
+          ? `LIVE GPS ACTIVE (±${Math.round(accuracy)}m) · ROAD TRACKING`
+          : 'LIVE ROAD MOVEMENT TRACKING ACTIVE';
+      }
+
       // Edge-to-edge locked driving camera (fixed zoom 18, zero zoom jumps)
-      const map = L.map(mapContainer, {
+      mapInstance = L.map(mapContainer, {
         zoomControl: false,
         scrollWheelZoom: false,
         doubleClickZoom: false,
@@ -610,7 +759,7 @@ export function openLiveRideMapModal({
         keyboard: false,
         attributionControl: false
       });
-      activeLiveMap = map;
+      activeLiveMap = mapInstance;
 
       // Dark background tile layer with muted road-focused styling
       const roadTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png', {
@@ -622,22 +771,23 @@ export function openLiveRideMapModal({
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           subdomains: ['a', 'b', 'c']
-        }).addTo(map);
+        }).addTo(mapInstance);
       });
-      roadTileLayer.addTo(map);
+      roadTileLayer.addTo(mapInstance);
 
-      // Inject CSS rule so the background tiles are deeply muted to make the ROAD highway the sole focus
-      const tilePane = map.getPane('tilePane');
+      // Deeply mute background tiles to make the ROAD highway the sole focus
+      const tilePane = mapInstance.getPane('tilePane');
       if (tilePane) {
         tilePane.style.filter = 'brightness(0.22) contrast(1.25) grayscale(0.85)';
         tilePane.style.opacity = '0.5';
       }
 
-      const initialPt = getPointAtMeters(allRoadCoords, 0, 8000);
-      const startPos = [initialPt.lat, initialPt.lng];
+      const startPos = [originLat, originLng];
+      lastGpsPoint = { lat: originLat, lng: originLng };
+      lastGpsTimestamp = Date.now();
 
-      // Lock camera directly on start road position at zoom 18
-      map.setView(startPos, 18);
+      // Lock camera directly on live origin position at zoom 18
+      mapInstance.setView(startPos, 18);
 
       // =========================================================
       // DEDICATED DRIVING ROAD HIGHWAY VISUAL CORRIDOR
@@ -649,7 +799,7 @@ export function openLiveRideMapModal({
         opacity: 0.98,
         lineCap: 'round',
         lineJoin: 'round'
-      }).addTo(map);
+      }).addTo(mapInstance);
 
       // 2. Road Curb Stones & Shoulder Margin
       L.polyline(allRoadCoords, {
@@ -658,7 +808,7 @@ export function openLiveRideMapModal({
         opacity: 1,
         lineCap: 'round',
         lineJoin: 'round'
-      }).addTo(map);
+      }).addTo(mapInstance);
 
       // 3. Dark Asphalt Road Pavement
       L.polyline(allRoadCoords, {
@@ -667,7 +817,7 @@ export function openLiveRideMapModal({
         opacity: 1,
         lineCap: 'round',
         lineJoin: 'round'
-      }).addTo(map);
+      }).addTo(mapInstance);
 
       // 4. Solid White Shoulder Boundary Edge Lines
       L.polyline(allRoadCoords, {
@@ -676,7 +826,7 @@ export function openLiveRideMapModal({
         opacity: 1,
         lineCap: 'round',
         lineJoin: 'round'
-      }).addTo(map);
+      }).addTo(mapInstance);
 
       // 5. Inner Asphalt Driving Surface
       L.polyline(allRoadCoords, {
@@ -685,7 +835,7 @@ export function openLiveRideMapModal({
         opacity: 1,
         lineCap: 'round',
         lineJoin: 'round'
-      }).addTo(map);
+      }).addTo(mapInstance);
 
       // 6. Center Dashed Highway Divider Line (Yellow)
       L.polyline(allRoadCoords, {
@@ -694,7 +844,7 @@ export function openLiveRideMapModal({
         opacity: 0.95,
         dashArray: '12, 16',
         lineCap: 'butt'
-      }).addTo(map);
+      }).addTo(mapInstance);
 
       // 7. Dynamic Traveled Path Polyline (Draws neon green directly on the road as movement occurs)
       traveledCoords = [startPos];
@@ -704,7 +854,7 @@ export function openLiveRideMapModal({
         opacity: 0.85,
         lineCap: 'round',
         lineJoin: 'round'
-      }).addTo(map);
+      }).addTo(mapInstance);
 
       // 8. Road Start Marker (0.0 km)
       const startIcon = L.divIcon({
@@ -712,14 +862,14 @@ export function openLiveRideMapModal({
         html: `
           <div style="transform:translate(-50%, -100%); display:flex; flex-direction:column; align-items:center;">
             <div style="background:#16a34a; color:#ffffff; font-weight:900; font-size:10px; padding:3px 10px; border-radius:9999px; white-space:nowrap; border:1.5px solid #ffffff; box-shadow:0 4px 14px rgba(0,0,0,0.6);">
-              🏁 START (0.0 km)
+              🏁 START · LIVE GPS (0.0 km)
             </div>
             <div style="width:2px; height:8px; background:#16a34a;"></div>
           </div>
         `,
         iconSize: [0, 0]
       });
-      L.marker(startPos, { icon: startIcon }).addTo(map);
+      L.marker(startPos, { icon: startIcon }).addTo(mapInstance);
 
       // 9. 16 Checkpoint Milestone Markers along the road (500m intervals)
       checkpoints.forEach(cp => {
@@ -749,7 +899,7 @@ export function openLiveRideMapModal({
           `,
           iconSize: [0, 0]
         });
-        L.marker([cp.lat, cp.lng], { icon: cpIcon }).addTo(map);
+        L.marker([cp.lat, cp.lng], { icon: cpIcon }).addTo(mapInstance);
       });
 
       // 10. Finish Marker (8.0 km Goal)
@@ -766,7 +916,7 @@ export function openLiveRideMapModal({
         `,
         iconSize: [0, 0]
       });
-      L.marker([finishPt.lat, finishPt.lng], { icon: finishIcon }).addTo(map);
+      L.marker([finishPt.lat, finishPt.lng], { icon: finishIcon }).addTo(mapInstance);
 
       // 11. Sleek Navigation Puck (Vehicle Marker with forward headlights)
       const puckIcon = L.divIcon({
@@ -836,180 +986,52 @@ export function openLiveRideMapModal({
         iconSize: [0, 0]
       });
 
-      carMarker = L.marker(startPos, { icon: puckIcon }).addTo(map);
+      carMarker = L.marker(startPos, { icon: puckIcon }).addTo(mapInstance);
 
-      map.invalidateSize();
-      setTimeout(() => map.invalidateSize(), 200);
+      mapInstance.invalidateSize();
+      setTimeout(() => mapInstance?.invalidateSize(), 200);
 
-      // Duration Clock
-      durationTimer = setInterval(() => {
-        if (isRideCompleted || isTrackingPaused) return;
-        secondsElapsed++;
-        const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
-        const secs = String(secondsElapsed % 60).padStart(2, '0');
-        const timeElem = document.getElementById('hud-elapsed-time');
-        if (timeElem) timeElem.textContent = `${mins}:${secs}`;
-      }, 1000);
-
-      // =========================================================
-      // MOVEMENT TELEMETRY ENGINE (CONTINUOUS TRACKING UNTIL RIDE ENDS)
-      // =========================================================
-      function recordMovementStep(latitude, longitude, bearing = 0, speedKmh = 30, deltaMeters = 0) {
-        if (isRideCompleted || isTrackingPaused) return;
-
-        totalDistanceMeters = Math.min(8000, totalDistanceMeters + deltaMeters);
-        const distKm = (totalDistanceMeters / 1000).toFixed(2);
-
-        // 1. Update Odometer & Speed HUD
-        const distKmElem = document.getElementById('hud-distance-km');
-        if (distKmElem) distKmElem.textContent = distKm;
-
-        const speedElem = document.getElementById('hud-speed');
-        if (speedElem) speedElem.textContent = Math.round(speedKmh);
-
-        // 2. Extend real-time traveled path on the road
-        traveledCoords.push([latitude, longitude]);
-        if (livePolyline) livePolyline.setLatLngs(traveledCoords);
-
-        // 3. Move vehicle marker & rotate heading
-        if (carMarker) carMarker.setLatLng([latitude, longitude]);
-        const rotNode = document.getElementById('car-rotation-node');
-        if (rotNode) rotNode.style.transform = `rotate(${bearing}deg)`;
-
-        // 4. LOCKED CAMERA: Keep car centered at zoom 18 (NO zoom jumps)
-        if (map) {
-          map.setView([latitude, longitude], 18, { animate: false });
-        }
-
-        // 5. Update 3px Progress Line
-        const progressPct = Math.min(100, (totalDistanceMeters / 8000) * 100);
-        const fillElem = document.getElementById('hud-progress-fill');
-        if (fillElem) fillElem.style.width = `${progressPct.toFixed(1)}%`;
-
-        // 6. Checkpoint Progress (Every 500m)
-        let clearedCount = 0;
-        checkpoints.forEach(cp => {
-          if (totalDistanceMeters >= cp.distanceMeters) {
-            clearedCount++;
-            if (!cp.cleared) {
-              cp.cleared = true;
-              triggerCheckpointReached(cp);
-            }
-          }
-        });
-
-        const cpCountElem = document.getElementById('hud-checkpoints-cleared');
-        if (cpCountElem) cpCountElem.textContent = clearedCount;
-
-        // 7. Next 500m Target Countdown
-        const nextCp = checkpoints.find(c => !c.cleared);
-        const nextDistElem = document.getElementById('hud-next-checkpoint-dist');
-        const cpNameElem = document.getElementById('hud-current-cp-name');
-        if (nextDistElem) {
-          if (nextCp) {
-            const remMeters = Math.max(0, Math.round(nextCp.distanceMeters - totalDistanceMeters));
-            nextDistElem.textContent = `${remMeters}m`;
-            if (cpNameElem) cpNameElem.textContent = `Next Checkpoint: ${nextCp.label} (${nextCp.title}) · ${remMeters}m remaining`;
-          } else {
-            nextDistElem.textContent = '8.0 km ✓';
-            if (cpNameElem) cpNameElem.textContent = 'All 16 checkpoints completed!';
-          }
-        }
-
-        // 8. 8.0 km Course Finished
-        if (totalDistanceMeters >= 8000) {
-          finishRide();
-        }
-      }
-
-      function triggerCheckpointReached(cp) {
-        playMilestoneChime();
-
-        // Update road marker beacon to glowing green checkmark
-        const node = document.getElementById(`road-cp-${cp.id}`);
-        const icon = document.getElementById(`cp-icon-${cp.id}`);
-        if (node) {
-          node.style.borderColor = '#22c55e';
-          node.style.color = '#ffffff';
-          node.style.background = 'rgba(22, 101, 52, 0.9)';
-          node.style.boxShadow = '0 0 16px rgba(34, 197, 94, 0.8)';
-          if (icon) icon.textContent = '✓';
-        }
-
-        // Toast celebration banner
-        const banner = document.getElementById('checkpoint-toast-banner');
-        const text = document.getElementById('checkpoint-toast-text');
-        if (banner && text) {
-          text.textContent = `Checkpoint ${cp.id}/16 (${cp.label}) Cleared · ${cp.title} (+500m)`;
-          banner.style.opacity = '1';
-          banner.style.transform = 'translateX(-50%) translateY(0)';
-          setTimeout(() => {
-            banner.style.opacity = '0';
-            banner.style.transform = 'translateX(-50%) translateY(-20px)';
-          }, 2400);
-        }
-      }
-
-      function finishRide() {
-        if (isRideCompleted) return;
-        isRideCompleted = true;
-
-        if (movementTrackerInterval) clearInterval(movementTrackerInterval);
-        if (activeWatchId !== null && navigator.geolocation) {
-          navigator.geolocation.clearWatch(activeWatchId);
-          activeWatchId = null;
-        }
-
-        const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
-        const secs = String(secondsElapsed % 60).padStart(2, '0');
-        const durElem = document.getElementById('finish-modal-duration');
-        if (durElem) durElem.textContent = `${mins}:${secs}`;
-
-        const ceremony = document.getElementById('finish-ride-ceremony');
-        if (ceremony) ceremony.style.display = 'flex';
+      // Duration Timer
+      if (!durationTimer) {
+        durationTimer = setInterval(() => {
+          if (isRideCompleted || isTrackingPaused) return;
+          secondsElapsed++;
+          const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+          const secs = String(secondsElapsed % 60).padStart(2, '0');
+          const timeElem = document.getElementById('hud-elapsed-time');
+          if (timeElem) timeElem.textContent = `${mins}:${secs}`;
+        }, 1000);
       }
 
       // =========================================================
-      // CONTINUOUS MOVEMENT TRACKER ENGINE
-      // Runs continuously until the 8.0 km ride ends
+      // LIVE GPS HARDWARE WATCH (Tracks real device movement outdoors)
       // =========================================================
-      let motionTick = 0;
-      movementTrackerInterval = setInterval(() => {
-        if (isRideCompleted || isTrackingPaused) return;
-
-        motionTick++;
-        // Realistic driving learner speed ~28 to 34 km/h (~8.3 meters/sec)
-        const dynamicSpeed = 30 + Math.round(Math.sin(motionTick / 8) * 3);
-        // At 200ms interval: delta ≈ speed * (1000/3600) * 0.2 ≈ 1.67 meters per tick
-        const tickDeltaMeters = (dynamicSpeed * 1000 / 3600) * 0.2;
-
-        const nextMeters = totalDistanceMeters + tickDeltaMeters;
-        const pt = getPointAtMeters(allRoadCoords, nextMeters, 8000);
-
-        recordMovementStep(pt.lat, pt.lng, pt.bearing, dynamicSpeed, tickDeltaMeters);
-      }, 200);
-
-      // Real GPS Hardware Watch (Syncs physical device coordinates if driving outdoors)
-      if (navigator.geolocation) {
+      if (navigator.geolocation && activeWatchId === null) {
         activeWatchId = navigator.geolocation.watchPosition(
           (position) => {
-            const { latitude, longitude, speed } = position.coords;
+            const { latitude, longitude, speed, heading, accuracy: fixAcc } = position.coords;
             const now = Date.now();
-            const statusDot = document.getElementById('gps-status-dot');
-            const statusText = document.getElementById('gps-status-text');
 
-            if (statusDot && statusText) {
-              statusDot.style.background = '#22c55e';
-              statusText.textContent = 'GPS HARDWARE ACTIVE · ROAD TRACKING';
+            const dot = document.getElementById('gps-status-dot');
+            const txt = document.getElementById('gps-status-text');
+            if (dot && txt) {
+              dot.style.background = '#22c55e';
+              dot.style.boxShadow = '0 0 10px #22c55e';
+              txt.style.color = '#22c55e';
+              txt.textContent = `LIVE GPS ACTIVE (±${Math.round(fixAcc || 5)}m) · ROAD TRACKING`;
             }
 
             if (lastGpsPoint) {
-              const d = haversineMeters([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
-              if (d >= 2.0) { // real vehicle movement detected
+              const delta = haversineMeters([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
+              if (delta >= 1.0) { // Actual movement detected by physical GPS sensor!
+                hasRealGpsMovement = true;
                 const dSec = (now - lastGpsTimestamp) / 1000;
-                const spd = speed ? (speed * 3.6) : (dSec > 0 ? (d / dSec) * 3.6 : 30);
-                const bearing = calculateBearing([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
-                recordMovementStep(latitude, longitude, bearing, spd, d);
+                const spd = (speed != null && speed > 0) ? (speed * 3.6) : (dSec > 0 ? (delta / dSec) * 3.6 : 28);
+                const brng = (heading != null && !isNaN(heading)) 
+                  ? heading 
+                  : calculateBearing([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
+
+                recordMovementStep(latitude, longitude, brng, spd, delta);
                 lastGpsPoint = { lat: latitude, lng: longitude };
                 lastGpsTimestamp = now;
               }
@@ -1019,67 +1041,144 @@ export function openLiveRideMapModal({
             }
           },
           (err) => {
-            console.warn('GPS hardware fallback to road track:', err);
+            console.warn('GPS hardware watch status:', err.message);
           },
           {
             enableHighAccuracy: true,
             maximumAge: 1000,
-            timeout: 20000
+            timeout: 15000
           }
         );
       }
 
-      // Pause / Resume
-      const btnPauseResume = modalRoot.querySelector('#btn-pause-resume-tracking');
-      const iconSpan = modalRoot.querySelector('#pause-resume-icon');
-      const textSpan = modalRoot.querySelector('#pause-resume-text');
+      // =========================================================
+      // ROAD MOVEMENT SIMULATION / FALLBACK ENGINE
+      // If stationary or testing indoors, tracks smooth movement along the road
+      // =========================================================
+      let motionTick = 0;
+      if (movementTrackerInterval) clearInterval(movementTrackerInterval);
+      movementTrackerInterval = setInterval(() => {
+        if (isRideCompleted || isTrackingPaused) return;
 
-      btnPauseResume?.addEventListener('click', () => {
-        isTrackingPaused = !isTrackingPaused;
-        if (isTrackingPaused) {
-          iconSpan.textContent = '▶';
-          textSpan.textContent = 'Resume';
-          const speedElem = document.getElementById('hud-speed');
-          if (speedElem) speedElem.textContent = '0';
-        } else {
-          iconSpan.textContent = '⏸';
-          textSpan.textContent = 'Pause';
-        }
-      });
+        // If real GPS physical movement is already driving the updates, skip simulated motion
+        if (hasRealGpsMovement) return;
 
-      // Re-sync GPS
-      modalRoot.querySelector('#btn-reacquire-gps')?.addEventListener('click', () => {
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              const statusDot = document.getElementById('gps-status-dot');
-              const statusText = document.getElementById('gps-status-text');
-              if (statusDot && statusText) {
-                statusDot.style.background = '#22c55e';
-                statusText.textContent = `GPS Fix Acquired (±${Math.round(pos.coords.accuracy)}m)`;
-              }
-            },
-            () => {}
-          );
-        }
-      });
+        motionTick++;
+        const dynamicSpeed = 28 + Math.round(Math.sin(motionTick / 8) * 4);
+        // At 250ms interval: delta ≈ speed * (1000/3600) * 0.25 ≈ 2.0 meters per tick
+        const tickDeltaMeters = (dynamicSpeed * 1000 / 3600) * 0.25;
 
-      // Save & Complete Ride Handler
-      const handleSaveRide = () => {
-        store.completeSession(currentStudent.id, dayNumber, {
-          instructorNotes: `Day ${dayNumber} practical 8.0 km driving course completed under Instructor ${currentTrainer.name}. Checkpoints verified.`
-        });
-        if (onRideCompleted) onRideCompleted();
-        closeModal();
-      };
+        const nextMeters = totalDistanceMeters + tickDeltaMeters;
+        const pt = getPointAtMeters(allRoadCoords, nextMeters, 8000);
 
-      modalRoot.querySelector('#btn-complete-direct')?.addEventListener('click', handleSaveRide);
-      modalRoot.querySelector('#btn-save-completed-ride')?.addEventListener('click', handleSaveRide);
+        recordMovementStep(pt.lat, pt.lng, pt.bearing, dynamicSpeed, tickDeltaMeters);
+      }, 250);
 
     } catch (err) {
       console.error('Failed to initialize Road-Only Tracking Map:', err);
     }
-  }, 100);
+  }
+
+  // =========================================================
+  // REQUEST USER LIVE GPS LOCATION IMMEDIATELY
+  // =========================================================
+  let locationInitialized = false;
+
+  const handleLiveLocationFound = (lat, lng, accuracy) => {
+    if (locationInitialized) return;
+    locationInitialized = true;
+    initRoadWithLiveCoordinates(lat, lng, accuracy);
+  };
+
+  const handleLocationFallback = () => {
+    if (locationInitialized) return;
+    locationInitialized = true;
+    initRoadWithLiveCoordinates(DEFAULT_LAT, DEFAULT_LNG, null);
+  };
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        handleLiveLocationFound(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+      },
+      (err) => {
+        console.warn('Live location permission or timeout, falling back:', err.message);
+        handleLocationFallback();
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 6000,
+        maximumAge: 0
+      }
+    );
+
+    // Timeout safety fallback so user never gets stuck waiting
+    setTimeout(() => {
+      if (!locationInitialized) {
+        handleLocationFallback();
+      }
+    }, 4000);
+  } else {
+    handleLocationFallback();
+  }
+
+  // Pause / Resume
+  const btnPauseResume = modalRoot.querySelector('#btn-pause-resume-tracking');
+  const iconSpan = modalRoot.querySelector('#pause-resume-icon');
+  const textSpan = modalRoot.querySelector('#pause-resume-text');
+
+  btnPauseResume?.addEventListener('click', () => {
+    isTrackingPaused = !isTrackingPaused;
+    if (isTrackingPaused) {
+      iconSpan.textContent = '▶';
+      textSpan.textContent = 'Resume';
+      const speedElem = document.getElementById('hud-speed');
+      if (speedElem) speedElem.textContent = '0';
+    } else {
+      iconSpan.textContent = '⏸';
+      textSpan.textContent = 'Pause';
+    }
+  });
+
+  // Re-sync GPS
+  modalRoot.querySelector('#btn-reacquire-gps')?.addEventListener('click', () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          lastGpsPoint = { lat: latitude, lng: longitude };
+          lastGpsTimestamp = Date.now();
+          hasRealGpsMovement = true;
+
+          if (carMarker) carMarker.setLatLng([latitude, longitude]);
+          if (mapInstance) mapInstance.setView([latitude, longitude], 18, { animate: false });
+
+          const statusDot = document.getElementById('gps-status-dot');
+          const statusText = document.getElementById('gps-status-text');
+          if (statusDot && statusText) {
+            statusDot.style.background = '#22c55e';
+            statusText.textContent = `GPS Fix Acquired (±${Math.round(accuracy)}m)`;
+          }
+        },
+        (err) => {
+          alert('GPS location could not be refreshed: ' + err.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+  });
+
+  // Save & Complete Ride Handler
+  const handleSaveRide = () => {
+    store.completeSession(currentStudent.id, dayNumber, {
+      instructorNotes: `Day ${dayNumber} practical 8.0 km driving course completed under Instructor ${currentTrainer.name}. Checkpoints verified.`
+    });
+    if (onRideCompleted) onRideCompleted();
+    closeModal();
+  };
+
+  modalRoot.querySelector('#btn-complete-direct')?.addEventListener('click', handleSaveRide);
+  modalRoot.querySelector('#btn-save-completed-ride')?.addEventListener('click', handleSaveRide);
 }
 
 export const openLiveRideTrackingModal = openLiveRideMapModal;
