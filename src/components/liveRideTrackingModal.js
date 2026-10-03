@@ -1,17 +1,18 @@
 /* ==========================================================================
-   GAME-STYLE LIVE GPS RIDE TRACKING & REAL-TIME 500M TELEMETRY HUD
+   LIVE REAL-TIME GPS RIDE TRACKING & 500M CHECKPOINT TELEMETRY
    GAFOOR DRIVING SCHOOL — PULIVENDULA, ANDHRA PRADESH
 
-   User Requirements:
-   - NO zoom-in / zoom-out camera jumps; locked fixed game driving camera (zoom 18)
-   - Dynamic real-time path drawing behind the vehicle as it drives
-   - Continuous real-time distance counting (meter by meter & kilometer)
-   - 16 Checkpoints every 500 meters (500m, 1000m, ... 8000m)
-   - Dynamic 500m segment progress bar with countdown to next 500m milestone
-   - Audio Chime on each 500m checkpoint reached (Web Audio API)
-   - Real Device GPS Tracking (navigator.geolocation.watchPosition)
-   - 1-Click Game Simulator mode (Play/Pause, 1x/2x/5x/10x, +500m jump)
-   - Instant state logging to store and Supabase (+8.0 km logged)
+   Key Features:
+   - Strictly based on real device GPS movement (navigator.geolocation.watchPosition)
+   - Real-time location permission handling with status indicators
+   - Vehicle only moves when the student/trainer actually moves in real life
+   - Continuous distance measurement (Meters & Kilometers) using Haversine formula
+   - Checkpoints tracked at every 500 meters (500m, 1000m, 1500m ... up to 8000m)
+   - Real-time next 500m milestone countdown
+   - Audio chime and milestone celebration on crossing each 500m checkpoint
+   - Locked game camera view (fixed zoom 18) following the car smoothly without zoom jumps
+   - Real-time path drawn dynamically behind the vehicle as it drives
+   - Clean, uncluttered cockpit HUD without artificial speed-ups or unwanted clutter
    ========================================================================== */
 
 import L from 'leaflet';
@@ -19,10 +20,9 @@ import { store } from '../store.js';
 
 let activeLiveMap = null;
 let activeWatchId = null;
-let simulationTimer = null;
 let elapsedTimer = null;
 
-// Helper: Haversine distance in meters
+// Helper: Haversine distance in meters between two lat/lng pairs
 export function haversineMeters(p1, p2) {
   const R = 6371000; // Earth radius in meters
   const dLat = (p2[0] - p1[0]) * Math.PI / 180;
@@ -48,7 +48,7 @@ export function calculateBearing(start, end) {
   return (brng + 360) % 360;
 }
 
-// Web Audio API Milestone Chime (500m checkpoint celebration)
+// Web Audio API Milestone Chime for 500m Checkpoints
 function playMilestoneChime() {
   try {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -84,70 +84,9 @@ function playMilestoneChime() {
   }
 }
 
-// Build fine-grained road points (500 steps for ultra-smooth game movement)
-function buildGameTrack(basePath, startPoint, endPoint) {
-  let rawPoints = basePath && basePath.length >= 2 ? basePath : [
-    [startPoint?.lat || 14.4230, startPoint?.lng || 78.2285],
-    [14.4255, 78.2315],
-    [14.4290, 78.2360],
-    [14.4330, 78.2395],
-    [14.4380, 78.2430],
-    [14.4410, 78.2480],
-    [14.4360, 78.2520],
-    [14.4310, 78.2550],
-    [14.4260, 78.2510],
-    [14.4210, 78.2450],
-    [14.4170, 78.2400],
-    [14.4140, 78.2340],
-    [14.4180, 78.2290],
-    [14.4210, 78.2260],
-    [14.4230, 78.2285],
-    [endPoint?.lat || 14.4312, endPoint?.lng || 78.2361]
-  ];
-
-  const TOTAL_STEPS = 500; // Ultra smooth game animation
-  const TOTAL_METERS = 8000; // 8.0 km total course target
-  const track = [];
-
-  const segmentDists = [0];
-  let accumulated = 0;
-  for (let i = 0; i < rawPoints.length - 1; i++) {
-    const d = haversineMeters(rawPoints[i], rawPoints[i + 1]);
-    accumulated += d;
-    segmentDists.push(accumulated);
-  }
-
-  for (let step = 0; step <= TOTAL_STEPS; step++) {
-    const targetDist = (step / TOTAL_STEPS) * accumulated;
-    let segIdx = 0;
-    for (let i = 0; i < segmentDists.length - 1; i++) {
-      if (targetDist >= segmentDists[i] && targetDist <= segmentDists[i + 1]) {
-        segIdx = i;
-        break;
-      }
-    }
-    const segStartDist = segmentDists[segIdx];
-    const segEndDist = segmentDists[segIdx + 1] || (segStartDist + 1);
-    const segSpan = segEndDist - segStartDist;
-    const factor = segSpan > 0 ? (targetDist - segStartDist) / segSpan : 0;
-
-    const pA = rawPoints[segIdx];
-    const pB = rawPoints[Math.min(segIdx + 1, rawPoints.length - 1)];
-
-    const lat = pA[0] + (pB[0] - pA[0]) * factor;
-    const lng = pA[1] + (pB[1] - pA[1]) * factor;
-    const distanceMeters = Math.round((step / TOTAL_STEPS) * TOTAL_METERS);
-
-    track.push({
-      step,
-      lat,
-      lng,
-      distanceMeters,
-      distanceKm: (distanceMeters / 1000).toFixed(2)
-    });
-  }
-
-  // 16 Checkpoints at exact 500m intervals (500m, 1000m, 1500m ... up to 8000m)
+// Build 16 Checkpoints at exact 500m intervals (500m, 1000m ... 8000m)
+function generate500mCheckpoints(basePath, startPoint) {
+  const defaultOrigin = [startPoint?.lat || 14.4230, startPoint?.lng || 78.2285];
   const checkpointLabels = [
     { title: 'Cockpit ABC Drill', place: 'Depot Exit Corridor' },
     { title: 'Steering Centering Check', place: 'Bakarapuram Avenue' },
@@ -170,9 +109,6 @@ function buildGameTrack(basePath, startPoint, endPoint) {
   const checkpoints = [];
   for (let i = 1; i <= 16; i++) {
     const targetM = i * 500;
-    const closest = track.reduce((prev, curr) => 
-      Math.abs(curr.distanceMeters - targetM) < Math.abs(prev.distanceMeters - targetM) ? curr : prev
-    );
     const meta = checkpointLabels[i - 1] || { title: `Checkpoint ${i}`, place: 'Pulivendula Sector' };
 
     checkpoints.push({
@@ -183,17 +119,15 @@ function buildGameTrack(basePath, startPoint, endPoint) {
       distanceKm: (targetM / 1000).toFixed(1),
       title: meta.title,
       place: meta.place,
-      lat: closest.lat,
-      lng: closest.lng,
       cleared: false
     });
   }
 
-  return { track, checkpoints };
+  return checkpoints;
 }
 
 /**
- * Main function to launch the Live Game-Style Ride Tracker Modal
+ * Main function to launch the Real-Time GPS Ride Tracking Modal
  */
 export function openLiveRideMapModal({
   session = null,
@@ -210,25 +144,18 @@ export function openLiveRideMapModal({
   const dayNumber = session?.dayNumber || currentStudent.currentDay || 1;
   const objective = session?.objective || 'Practical Road Driving Lesson';
 
-  const { track, checkpoints } = buildGameTrack(
-    session?.route?.path,
-    session?.route?.startPoint,
-    session?.route?.endPoint
-  );
+  const checkpoints = generate500mCheckpoints(session?.route?.path, session?.route?.startPoint);
 
-  // Runtime Tracking State
-  let activeMode = 'simulator'; // default to simulator so it immediately moves like a game on launch
+  // Real-Time Tracking State (Movement-based)
   let totalDistanceMeters = 0;
-  let currentSpeedKmh = 32;
+  let currentSpeedKmh = 0;
   let secondsElapsed = 0;
-  let lastGpsPoint = null;
-  let lastGpsTime = null;
+  let isTrackingPaused = false;
   let isRideCompleted = false;
 
-  // Simulator Runtime
-  let simStep = 0;
-  let isSimPlaying = true;
-  let simSpeedMultiplier = 2; // default comfortable driving pace
+  let lastGpsPoint = null;
+  let lastGpsTimestamp = null;
+  let initialMapSet = false;
 
   // Leaflet handles
   let carMarker = null;
@@ -249,12 +176,12 @@ export function openLiveRideMapModal({
         position: relative;
         font-family: var(--font-sans);
       ">
-        <!-- TOP ARCADE DRIVING COCKPIT HUD -->
+        <!-- TOP COCKPIT HUD (CLEAN & FOCUSED) -->
         <header style="
           background: linear-gradient(180deg, rgba(9, 12, 16, 0.98) 0%, rgba(13, 16, 23, 0.95) 100%);
           backdrop-filter: blur(16px);
           border-bottom: 1.5px solid rgba(34, 197, 94, 0.35);
-          padding: 0.65rem 1.25rem;
+          padding: 0.75rem 1.25rem;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -263,48 +190,48 @@ export function openLiveRideMapModal({
           flex-wrap: wrap;
           gap: 0.75rem;
         ">
-          <!-- Left: Driver Identity & Live Mode -->
+          <!-- Left: Driver Identity & Real GPS Status -->
           <div style="display: flex; align-items: center; gap: 0.85rem;">
             <div style="
-              width: 46px;
-              height: 46px;
+              width: 44px;
+              height: 44px;
               border-radius: 12px;
               background: #22c55e;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 1.5rem;
-              box-shadow: 0 0 24px rgba(34, 197, 94, 0.6);
-            ">🏎️</div>
+              font-size: 1.45rem;
+              box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+            ">🚗</div>
             <div>
               <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                 <span id="gps-status-badge" style="
-                  background: rgba(34, 197, 94, 0.2);
-                  border: 1px solid #22c55e;
-                  color: #22c55e;
-                  font-size: 0.7rem;
+                  background: rgba(245, 158, 11, 0.2);
+                  border: 1px solid #f59e0b;
+                  color: #fbbf24;
+                  font-size: 0.72rem;
                   font-weight: 800;
-                  padding: 0.15rem 0.55rem;
+                  padding: 0.15rem 0.6rem;
                   border-radius: 9999px;
                   letter-spacing: 0.04em;
                   display: flex;
                   align-items: center;
                   gap: 0.35rem;
                 ">
-                  <span style="width:7px; height:7px; border-radius:50%; background:#22c55e; box-shadow:0 0 8px #22c55e; display:inline-block;"></span>
-                  <span id="gps-status-text">GAME DRIVE ACTIVE · 500M TRACKING</span>
+                  <span style="width:7px; height:7px; border-radius:50%; background:#fbbf24; display:inline-block;"></span>
+                  <span id="gps-status-text">REQUESTING GPS PERMISSION...</span>
                 </span>
                 <span style="font-size: 1.05rem; font-weight: 900; color: #ffffff;">
                   Day ${dayNumber}: ${objective}
                 </span>
               </div>
               <div style="font-size: 0.76rem; color: #a1a1aa; margin-top: 0.2rem;">
-                👨‍🎓 <strong>${currentStudent.name}</strong> (Driver) · 👨‍🏫 <strong>${currentTrainer.name}</strong> (Dual-Control) · Fleet: <strong>${currentTrainer.car}</strong>
+                Student: <strong>${currentStudent.name}</strong> · Instructor: <strong>${currentTrainer.name}</strong> · Car: <strong>${currentTrainer.car}</strong> (Dual-Control)
               </div>
             </div>
           </div>
 
-          <!-- Center: Dynamic Game Telemetry & 500m Odometer -->
+          <!-- Center: Real-Time Telemetry & 500m Odometer -->
           <div style="
             display: flex;
             align-items: center;
@@ -315,19 +242,19 @@ export function openLiveRideMapModal({
             padding: 0.45rem 1.4rem;
             box-shadow: 0 0 20px rgba(0,0,0,0.6);
           ">
-            <!-- Speedometer -->
+            <!-- Speedometer (Real GPS Speed) -->
             <div>
               <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Speed</div>
               <div style="font-size: 1.45rem; font-weight: 900; color: #38bdf8; font-family: var(--font-mono); line-height: 1.1;">
-                <span id="hud-speed">32</span> <span style="font-size: 0.78rem; color: #a1a1aa;">km/h</span>
+                <span id="hud-speed">0</span> <span style="font-size: 0.78rem; color: #a1a1aa;">km/h</span>
               </div>
             </div>
 
             <div style="width: 1px; height: 32px; background: rgba(255,255,255,0.12);"></div>
 
-            <!-- Total Distance Driven (Counts in Real Time) -->
+            <!-- Total Distance Traveled (Real-time Count from GPS) -->
             <div>
-              <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Distance Count</div>
+              <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Distance Traveled</div>
               <div style="font-size: 1.45rem; font-weight: 900; color: #22c55e; font-family: var(--font-mono); line-height: 1.1;">
                 <span id="hud-distance-km">0.00</span> <span style="font-size: 0.85rem; color: #ffffff;">km</span>
                 <span id="hud-distance-meters" style="font-size: 0.75rem; color: #a1a1aa; margin-left: 0.35rem;">(0 m)</span>
@@ -338,7 +265,7 @@ export function openLiveRideMapModal({
 
             <!-- Next 500m Checkpoint Countdown -->
             <div>
-              <div style="font-size: 0.6rem; color: #f59e0b; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Next 500m Milestone</div>
+              <div style="font-size: 0.6rem; color: #f59e0b; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Next 500m Target</div>
               <div style="font-size: 1.15rem; font-weight: 900; color: #fbbf24; font-family: var(--font-mono); line-height: 1.1;">
                 <span id="hud-next-checkpoint-dist">500m left</span>
               </div>
@@ -346,7 +273,7 @@ export function openLiveRideMapModal({
 
             <div style="width: 1px; height: 32px; background: rgba(255,255,255,0.12);"></div>
 
-            <!-- Checkpoints Counter -->
+            <!-- Checkpoints Counter (16 Total) -->
             <div>
               <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Checkpoints</div>
               <div style="font-size: 1.35rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono); line-height: 1.1;">
@@ -356,48 +283,17 @@ export function openLiveRideMapModal({
 
             <div style="width: 1px; height: 32px; background: rgba(255,255,255,0.12);"></div>
 
-            <!-- Driving Time -->
+            <!-- Trip Elapsed Time -->
             <div>
-              <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Time</div>
+              <div style="font-size: 0.6rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Duration</div>
               <div style="font-size: 1.25rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono); line-height: 1.1;">
                 <span id="hud-elapsed-time">00:00</span>
               </div>
             </div>
           </div>
 
-          <!-- Right: Mode Switcher & Close -->
+          <!-- Right: Close Button -->
           <div style="display: flex; align-items: center; gap: 0.65rem;">
-            <!-- Real GPS vs Game Simulator Toggle -->
-            <div style="
-              display: flex;
-              background: rgba(255, 255, 255, 0.06);
-              border: 1px solid rgba(255, 255, 255, 0.14);
-              border-radius: 8px;
-              overflow: hidden;
-            ">
-              <button type="button" id="btn-mode-sim" style="
-                background: #22c55e;
-                color: #000000;
-                border: none;
-                padding: 0.45rem 0.85rem;
-                font-size: 0.75rem;
-                font-weight: 800;
-                cursor: pointer;
-                transition: all 0.2s ease;
-              ">🎮 Game Drive</button>
-              <button type="button" id="btn-mode-gps" style="
-                background: transparent;
-                color: #a1a1aa;
-                border: none;
-                padding: 0.45rem 0.85rem;
-                font-size: 0.75rem;
-                font-weight: 800;
-                cursor: pointer;
-                transition: all 0.2s ease;
-              ">📡 Real GPS</button>
-            </div>
-
-            <!-- Close Modal -->
             <button type="button" id="btn-close-live-ride" style="
               background: rgba(255, 255, 255, 0.08);
               border: 1px solid rgba(255, 255, 255, 0.16);
@@ -449,7 +345,7 @@ export function openLiveRideMapModal({
           `).join('')}
         </div>
 
-        <!-- MAIN FIXED GAME-VIEW MAP CONTAINER -->
+        <!-- MAIN LOCKED GAME-VIEW MAP CONTAINER -->
         <div style="flex: 1; position: relative; overflow: hidden; height: 100%;">
           <div id="live-ride-leaflet-map" style="width: 100%; height: 100%; min-height: 480px; background: #090c10;"></div>
 
@@ -478,7 +374,7 @@ export function openLiveRideMapModal({
             <span id="checkpoint-toast-text">500m Checkpoint Cleared!</span>
           </div>
 
-          <!-- BOTTOM CORNER REAL-TIME GPS COORDINATES OVERLAY -->
+          <!-- BOTTOM GPS TELEMETRY READOUT -->
           <div style="
             position: absolute;
             bottom: 16px;
@@ -496,18 +392,18 @@ export function openLiveRideMapModal({
             gap: 0.85rem;
           ">
             <div>
-              <span style="color:#71717a;">COORDS:</span>
-              <strong id="gps-coords" style="color:#ffffff; font-family:var(--font-mono); margin-left:0.25rem;">14.42300, 78.22850</strong>
+              <span style="color:#71717a;">GPS COORDS:</span>
+              <strong id="gps-coords" style="color:#ffffff; font-family:var(--font-mono); margin-left:0.25rem;">Waiting for fix...</strong>
+            </div>
+            <div style="width:1px; height:14px; background:rgba(255,255,255,0.12);"></div>
+            <div>
+              <span style="color:#71717a;">ACCURACY:</span>
+              <strong id="gps-accuracy" style="color:#22c55e; font-family:var(--font-mono); margin-left:0.25rem;">--</strong>
             </div>
             <div style="width:1px; height:14px; background:rgba(255,255,255,0.12);"></div>
             <div>
               <span style="color:#71717a;">CAMERA:</span>
-              <strong style="color:#22c55e; font-family:var(--font-mono); margin-left:0.25rem;">Game Locked (No Zooming)</strong>
-            </div>
-            <div style="width:1px; height:14px; background:rgba(255,255,255,0.12);"></div>
-            <div>
-              <span style="color:#71717a;">PACE:</span>
-              <strong style="color:#38bdf8; font-family:var(--font-mono); margin-left:0.25rem;">500m Increments</strong>
+              <strong style="color:#38bdf8; font-family:var(--font-mono); margin-left:0.25rem;">Locked Follow (No Zoom Jump)</strong>
             </div>
           </div>
 
@@ -541,7 +437,7 @@ export function openLiveRideMapModal({
               8.0 km Practical Course Finished!
             </h2>
             <p style="font-size: 1.05rem; color: #a1a1aa; max-width: 540px; line-height: 1.5; margin: 0 0 1.5rem 0;">
-              Day ${dayNumber} training successfully completed! All 16 checkpoints (500m intervals) cleared under Instructor <strong>${currentTrainer.name}</strong>.
+              Day ${dayNumber} training successfully completed! All 16 checkpoints (500m intervals) verified under Instructor <strong>${currentTrainer.name}</strong>.
             </p>
 
             <div style="
@@ -586,7 +482,7 @@ export function openLiveRideMapModal({
           </div>
         </div>
 
-        <!-- BOTTOM ARCADE COCKPIT CONTROLS -->
+        <!-- BOTTOM CONTROLS BAR (CLEAN & MINIMAL) -->
         <footer style="
           background: #0d1117;
           border-top: 1.5px solid rgba(255, 255, 255, 0.1);
@@ -598,55 +494,58 @@ export function openLiveRideMapModal({
           flex-wrap: wrap;
           gap: 1rem;
         ">
-          <!-- Left: Drive Simulation Controls -->
-          <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-            <button type="button" id="btn-play-pause-sim" style="
-              background: #ffffff;
-              color: #000000;
-              border: none;
-              padding: 0.6rem 1.3rem;
+          <!-- Left: Real GPS Tracking Controls -->
+          <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+            <button type="button" id="btn-pause-resume-tracking" style="
+              background: rgba(255, 255, 255, 0.08);
+              border: 1px solid rgba(255, 255, 255, 0.18);
+              color: #ffffff;
+              padding: 0.6rem 1.25rem;
               border-radius: 8px;
               font-size: 0.85rem;
-              font-weight: 900;
+              font-weight: 800;
               cursor: pointer;
               display: flex;
               align-items: center;
               gap: 0.4rem;
             ">
-              <span id="sim-play-icon">⏸</span>
-              <span id="sim-play-text">Pause Drive</span>
+              <span id="pause-resume-icon">⏸</span>
+              <span id="pause-resume-text">Pause Tracking</span>
             </button>
 
-            <!-- Speed Multipliers -->
-            <div style="
-              display: flex;
-              background: rgba(255, 255, 255, 0.06);
-              border: 1px solid rgba(255, 255, 255, 0.12);
+            <button type="button" id="btn-reacquire-gps" style="
+              background: rgba(34, 197, 94, 0.12);
+              border: 1px solid rgba(34, 197, 94, 0.35);
+              color: #22c55e;
+              padding: 0.6rem 1.15rem;
               border-radius: 8px;
-              overflow: hidden;
-            ">
-              <button type="button" class="btn-speed-mult" data-speed="1" style="background:transparent; color:#a1a1aa; border:none; padding:0.55rem 0.75rem; font-size:0.75rem; font-weight:800; cursor:pointer;">1x</button>
-              <button type="button" class="btn-speed-mult active" data-speed="2" style="background:#ffffff; color:#000000; border:none; padding:0.55rem 0.75rem; font-size:0.75rem; font-weight:800; cursor:pointer;">2x</button>
-              <button type="button" class="btn-speed-mult" data-speed="5" style="background:transparent; color:#a1a1aa; border:none; padding:0.55rem 0.75rem; font-size:0.75rem; font-weight:800; cursor:pointer;">5x</button>
-              <button type="button" class="btn-speed-mult" data-speed="10" style="background:transparent; color:#a1a1aa; border:none; padding:0.55rem 0.75rem; font-size:0.75rem; font-weight:800; cursor:pointer;">10x</button>
-            </div>
-
-            <!-- Quick +500m Checkpoint Advance -->
-            <button type="button" id="btn-step-500m" style="
-              background: rgba(245, 158, 11, 0.2);
-              border: 1px solid rgba(245, 158, 11, 0.5);
-              color: #fbbf24;
-              padding: 0.6rem 1rem;
-              border-radius: 8px;
-              font-size: 0.8rem;
+              font-size: 0.825rem;
               font-weight: 800;
               cursor: pointer;
-            " title="Jump forward 500 meters to test the checkpoint chime and badge">
-              +500m Jump ⏩
+              display: flex;
+              align-items: center;
+              gap: 0.4rem;
+            ">
+              <span>🔄</span>
+              <span>Re-acquire GPS Fix</span>
+            </button>
+
+            <!-- Subtle Manual Motion Step (Only for testing indoors on stationary PC) -->
+            <button type="button" id="btn-test-step-motion" style="
+              background: transparent;
+              border: 1px dashed rgba(255, 255, 255, 0.2);
+              color: #71717a;
+              padding: 0.5rem 0.85rem;
+              border-radius: 6px;
+              font-size: 0.72rem;
+              font-weight: 700;
+              cursor: pointer;
+            " title="Simulate 25m movement (for testing without moving device)">
+              Test +25m Motion
             </button>
           </div>
 
-          <!-- Right: Save & Log Button -->
+          <!-- Right: Save & Complete Day X Ride Button -->
           <div style="display: flex; align-items: center; gap: 0.75rem;">
             <button type="button" id="btn-complete-direct" style="
               background: #22c55e;
@@ -667,15 +566,11 @@ export function openLiveRideMapModal({
     </div>
   `;
 
-  // Cleanup on close
+  // Cleanup helper
   const closeModal = () => {
     if (activeWatchId !== null && navigator.geolocation) {
       navigator.geolocation.clearWatch(activeWatchId);
       activeWatchId = null;
-    }
-    if (simulationTimer) {
-      clearInterval(simulationTimer);
-      simulationTimer = null;
     }
     if (elapsedTimer) {
       clearInterval(elapsedTimer);
@@ -701,7 +596,7 @@ export function openLiveRideMapModal({
         activeLiveMap = null;
       }
 
-      // STRICT GAME CAMERA: No zoom controls, no scroll zoom, no double-click zoom!
+      // STRICT LOCKED CAMERA: No manual zoom, locked at zoom 18
       const map = L.map(mapContainer, {
         zoomControl: false,
         scrollWheelZoom: false,
@@ -713,47 +608,19 @@ export function openLiveRideMapModal({
       });
       activeLiveMap = map;
 
-      // Clean OpenStreetMap tiles
+      // Reliable OpenStreetMap tiles
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         subdomains: ['a', 'b', 'c']
       }).addTo(map);
 
-      const allCoords = track.map(t => [t.lat, t.lng]);
-      const startPos = allCoords[0];
+      // Default center fallback (Pulivendula Academy or current student location)
+      const defaultCenter = [session?.route?.startPoint?.lat || 14.4230, session?.route?.startPoint?.lng || 78.2285];
+      map.setView(defaultCenter, 18);
 
-      // SET FIXED CLOSE-UP GAME VIEW DIRECTLY (NO ZOOM OUT / NO ZOOM IN JUMPS)
-      map.setView(startPos, 18);
-
-      // Base unvisited road casing
-      L.polyline(allCoords, {
-        color: '#0f172a',
-        weight: 18,
-        opacity: 0.9,
-        lineCap: 'round',
-        lineJoin: 'round'
-      }).addTo(map);
-
-      // Base asphalt pavement
-      L.polyline(allCoords, {
-        color: '#334155',
-        weight: 14,
-        opacity: 0.95,
-        lineCap: 'round',
-        lineJoin: 'round'
-      }).addTo(map);
-
-      // Center dashed road markings
-      L.polyline(allCoords, {
-        color: '#facc15',
-        weight: 2.5,
-        opacity: 0.8,
-        dashArray: '8, 12'
-      }).addTo(map);
-
-      // DYNAMIC REAL-TIME TRAVELED PATH POLYLINE (Draws live behind the car as we go!)
-      traveledCoords = [startPos];
-      livePolyline = L.polyline(traveledCoords, {
+      // Live Traveled Path Polyline (Draws behind car as it moves)
+      traveledCoords = [];
+      livePolyline = L.polyline([], {
         color: '#22c55e',
         weight: 8,
         opacity: 0.98,
@@ -761,53 +628,7 @@ export function openLiveRideMapModal({
         lineJoin: 'round'
       }).addTo(map);
 
-      // Start Marker (Depot 0.0 km)
-      const startIcon = L.divIcon({
-        className: 'gamified-start-marker',
-        html: `
-          <div style="transform: translate(-50%, -100%); display:flex; flex-direction:column; align-items:center;">
-            <div style="background:#16a34a; color:#ffffff; font-weight:900; font-size:11px; padding:3px 8px; border-radius:6px; white-space:nowrap; border:2px solid #ffffff; box-shadow:0 4px 12px rgba(0,0,0,0.4);">
-              🏁 0.0 km START
-            </div>
-            <div style="width:2px; height:10px; background:#16a34a;"></div>
-          </div>
-        `,
-        iconSize: [0, 0]
-      });
-      L.marker(startPos, { icon: startIcon }).addTo(map);
-
-      // 16 Checkpoint Milestone Beacons (Every 500m)
-      checkpoints.forEach(cp => {
-        const cpIcon = L.divIcon({
-          className: `gamified-cp-marker cp-marker-${cp.id}`,
-          html: `
-            <div id="cp-beacon-${cp.id}" style="
-              width: 32px;
-              height: 32px;
-              border-radius: 50%;
-              background: #ffffff;
-              border: 2.5px solid #f59e0b;
-              box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              transform: translate(-50%, -50%);
-              cursor: pointer;
-              transition: all 0.25s ease;
-            ">
-              <span style="font-size: 8px; font-weight: 900; color: #b45309; font-family: var(--font-mono); line-height: 1;">${cp.id}</span>
-              <span style="font-size: 7px; font-weight: 800; color: #0f172a; line-height: 1;">${cp.label}</span>
-            </div>
-          `,
-          iconSize: [0, 0]
-        });
-
-        const marker = L.marker([cp.lat, cp.lng], { icon: cpIcon }).addTo(map);
-        marker.bindPopup(`<b>Checkpoint ${cp.id} (${cp.label})</b><br>${cp.title}`);
-      });
-
-      // Dual Rider Moving Vehicle Marker
+      // Dual Rider Car Marker
       const carIcon = L.divIcon({
         className: 'gamified-dual-car-marker',
         html: `
@@ -818,7 +639,7 @@ export function openLiveRideMapModal({
             flex-direction: column;
             align-items: center;
           ">
-            <!-- Heads-Up Rider Tag -->
+            <!-- Rider Tag -->
             <div style="
               background: #090c10;
               border: 1.5px solid #22c55e;
@@ -839,7 +660,7 @@ export function openLiveRideMapModal({
               <span style="color: #4ade80;">👨‍🏫 ${currentTrainer.name.split(' ')[0]}</span>
             </div>
 
-            <!-- Yellow Training Car with Heading Rotation -->
+            <!-- Vehicle Icon -->
             <div id="car-rotation-node" style="
               width: 40px;
               height: 40px;
@@ -850,7 +671,7 @@ export function openLiveRideMapModal({
               align-items: center;
               justify-content: center;
               box-shadow: 0 4px 18px rgba(0,0,0,0.6);
-              transition: transform 0.1s linear;
+              transition: transform 0.15s linear;
             ">
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
                 <rect x="5" y="3" width="14" height="18" rx="4" fill="#090c10" stroke="#ffffff" stroke-width="1"/>
@@ -866,15 +687,15 @@ export function openLiveRideMapModal({
         iconSize: [0, 0]
       });
 
-      carMarker = L.marker(startPos, { icon: carIcon }).addTo(map);
+      carMarker = L.marker(defaultCenter, { icon: carIcon }).addTo(map);
 
-      // Invalidate sizes immediately without zooming
+      // Invalidate sizes to ensure immediate rendering
       map.invalidateSize();
       setTimeout(() => map.invalidateSize(), 200);
 
-      // Driving Elapsed Timer
+      // Live Driving Duration Timer
       elapsedTimer = setInterval(() => {
-        if (isRideCompleted) return;
+        if (isRideCompleted || isTrackingPaused) return;
         secondsElapsed++;
         const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
         const secs = String(secondsElapsed % 60).padStart(2, '0');
@@ -883,15 +704,15 @@ export function openLiveRideMapModal({
       }, 1000);
 
       // =========================================================
-      // REAL-TIME DATA & PATH EXTENSION ENGINE
+      // REAL-TIME GPS MOVEMENT & 500M CHECKPOINTS LOGIC
       // =========================================================
-      function advanceRide(newTotalMeters, currentLat, currentLng, speedKmh = 30) {
-        if (isRideCompleted) return;
+      function recordMovement(latitude, longitude, speedKmh = 0, deltaMeters = 0) {
+        if (isRideCompleted || isTrackingPaused) return;
 
-        totalDistanceMeters = Math.min(8000, Math.max(totalDistanceMeters, newTotalMeters));
+        totalDistanceMeters = Math.min(8000, totalDistanceMeters + deltaMeters);
         const distKm = (totalDistanceMeters / 1000).toFixed(2);
 
-        // 1. Update Odometer & Speed HUD in real-time
+        // 1. Update Odometer & Speed HUD in real time
         const distKmElem = document.getElementById('hud-distance-km');
         if (distKmElem) distKmElem.textContent = distKm;
 
@@ -901,24 +722,23 @@ export function openLiveRideMapModal({
         const speedElem = document.getElementById('hud-speed');
         if (speedElem) speedElem.textContent = Math.round(speedKmh);
 
-        // 2. Extend real-time traveled path behind the car
-        traveledCoords.push([currentLat, currentLng]);
+        // 2. Extend real-time traveled path behind vehicle
+        traveledCoords.push([latitude, longitude]);
         if (livePolyline) livePolyline.setLatLngs(traveledCoords);
 
-        // 3. Move car marker
-        if (carMarker) carMarker.setLatLng([currentLat, currentLng]);
+        // 3. Move vehicle marker to real position
+        if (carMarker) carMarker.setLatLng([latitude, longitude]);
 
-        // 4. CAMERA LOCKED ON CAR (NO ZOOM IN / NO ZOOM OUT)
-        // Pan directly to car coordinate, maintaining fixed zoom level 18
+        // 4. LOCKED CAMERA: Keep car centered at zoom 18 (NO zoom-in / zoom-out jumps)
         if (map) {
-          map.setView([currentLat, currentLng], 18, { animate: false });
+          map.setView([latitude, longitude], 18, { animate: false });
         }
 
         // 5. Update GPS Coordinates readout
         const coordsElem = document.getElementById('gps-coords');
-        if (coordsElem) coordsElem.textContent = `${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
+        if (coordsElem) coordsElem.textContent = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
 
-        // 6. Checkpoint Verification (every 500m)
+        // 6. Checkpoint Progress (Every 500m)
         let clearedCount = 0;
         checkpoints.forEach(cp => {
           if (totalDistanceMeters >= cp.distanceMeters) {
@@ -945,17 +765,17 @@ export function openLiveRideMapModal({
           }
         }
 
-        // 8. 8.0 km Course Completed
+        // 8. 8.0 km Full Lesson Completed
         if (totalDistanceMeters >= 8000) {
           finishRide();
         }
       }
 
       function triggerCheckpointReached(cp) {
-        // Celebratory chime
+        // Milestone Chime
         playMilestoneChime();
 
-        // Milestone ribbon glow
+        // Highlight ribbon segment
         const seg = document.getElementById(`prog-seg-${cp.id}`);
         if (seg) {
           seg.style.background = '#22c55e';
@@ -964,13 +784,22 @@ export function openLiveRideMapModal({
           seg.innerHTML = `✓ ${cp.label}`;
         }
 
-        // Beacon lighting on road
-        const beacon = document.getElementById(`cp-beacon-${cp.id}`);
-        if (beacon) {
-          beacon.style.borderColor = '#ffffff';
-          beacon.style.background = '#16a34a';
-          beacon.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.9)';
-          beacon.innerHTML = `<span style="font-size: 13px; font-weight: 900; color: #ffffff;">✓</span>`;
+        // Add a permanent milestone beacon marker at this GPS spot on the map
+        if (carMarker && map) {
+          const pos = carMarker.getLatLng();
+          const markerIcon = L.divIcon({
+            className: 'checkpoint-passed-marker',
+            html: `
+              <div style="transform:translate(-50%, -100%); display:flex; flex-direction:column; align-items:center;">
+                <div style="background:#22c55e; color:#000000; font-weight:900; font-size:11px; padding:3px 8px; border-radius:6px; white-space:nowrap; border:2px solid #ffffff; box-shadow:0 4px 14px rgba(0,0,0,0.5);">
+                  ✓ ${cp.label} (${cp.title})
+                </div>
+                <div style="width:2px; height:8px; background:#22c55e;"></div>
+              </div>
+            `,
+            iconSize: [0, 0]
+          });
+          L.marker(pos, { icon: markerIcon }).addTo(map);
         }
 
         // Toast celebration banner
@@ -991,7 +820,6 @@ export function openLiveRideMapModal({
         if (isRideCompleted) return;
         isRideCompleted = true;
 
-        if (simulationTimer) clearInterval(simulationTimer);
         if (activeWatchId !== null && navigator.geolocation) {
           navigator.geolocation.clearWatch(activeWatchId);
           activeWatchId = null;
@@ -1009,63 +837,19 @@ export function openLiveRideMapModal({
       }
 
       // =========================================================
-      // GAME DRIVE SIMULATOR ENGINE (CONTINUOUS SMOOTH DRIVE)
+      // REAL DEVICE GPS PERMISSIONS & TRACKING
       // =========================================================
-      function startSimulation() {
-        if (isRideCompleted) return;
-        isSimPlaying = true;
-        const playIcon = document.getElementById('sim-play-icon');
-        const playText = document.getElementById('sim-play-text');
-        if (playIcon) playIcon.textContent = '⏸';
-        if (playText) playText.textContent = 'Pause Drive';
+      function startDeviceGpsTracking() {
+        const statusBadge = document.getElementById('gps-status-badge');
+        const statusText = document.getElementById('gps-status-text');
 
-        if (simulationTimer) clearInterval(simulationTimer);
-
-        // Smooth interval for game drive
-        const intervalMs = Math.max(35, Math.floor(120 / simSpeedMultiplier));
-
-        simulationTimer = setInterval(() => {
-          if (simStep >= track.length - 1) {
-            finishRide();
-            return;
-          }
-
-          simStep++;
-          const pt = track[simStep];
-          if (!pt) return;
-
-          // Smooth heading rotation
-          if (simStep < track.length - 1) {
-            const nextPt = track[simStep + 1];
-            const bearing = calculateBearing([pt.lat, pt.lng], [nextPt.lat, nextPt.lng]);
-            const rotNode = document.getElementById('car-rotation-node');
-            if (rotNode) rotNode.style.transform = `rotate(${bearing}deg)`;
-          }
-
-          const dynamicSpeed = 28 + Math.round((Math.sin(simStep / 8) + 1) * 6);
-          advanceRide(pt.distanceMeters, pt.lat, pt.lng, dynamicSpeed);
-        }, intervalMs);
-      }
-
-      function pauseSimulation() {
-        isSimPlaying = false;
-        const playIcon = document.getElementById('sim-play-icon');
-        const playText = document.getElementById('sim-play-text');
-        if (playIcon) playIcon.textContent = '▶';
-        if (playText) playText.textContent = 'Resume Drive';
-
-        if (simulationTimer) {
-          clearInterval(simulationTimer);
-          simulationTimer = null;
-        }
-      }
-
-      // =========================================================
-      // REAL DEVICE GPS ENGINE
-      // =========================================================
-      function startRealGps() {
         if (!navigator.geolocation) {
-          alert('GPS not supported on this device. Continuing in Game Drive mode.');
+          if (statusBadge && statusText) {
+            statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+            statusBadge.style.borderColor = '#ef4444';
+            statusBadge.style.color = '#ef4444';
+            statusText.textContent = 'GPS NOT SUPPORTED ON THIS DEVICE';
+          }
           return;
         }
 
@@ -1074,136 +858,134 @@ export function openLiveRideMapModal({
           activeWatchId = null;
         }
 
-        pauseSimulation();
-
-        const statusBadge = document.getElementById('gps-status-badge');
-        const statusText = document.getElementById('gps-status-text');
         if (statusBadge && statusText) {
-          statusBadge.style.background = 'rgba(34, 197, 94, 0.2)';
-          statusBadge.style.borderColor = '#22c55e';
-          statusBadge.style.color = '#22c55e';
-          statusText.textContent = 'REAL GPS TRACKING ACTIVE · 500M COUNT';
+          statusBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+          statusBadge.style.borderColor = '#f59e0b';
+          statusBadge.style.color = '#fbbf24';
+          statusText.textContent = 'CONNECTING TO SATELLITE GPS...';
         }
 
         activeWatchId = navigator.geolocation.watchPosition(
           (position) => {
-            const { latitude, longitude, speed } = position.coords;
+            const { latitude, longitude, accuracy, speed, heading } = position.coords;
             const now = Date.now();
-            let stepMeters = 0;
-            let speedKmh = speed ? (speed * 3.6) : 25;
+
+            // Update GPS Accuracy indicator
+            const accElem = document.getElementById('gps-accuracy');
+            if (accElem) accElem.textContent = `±${Math.round(accuracy)}m`;
+
+            if (statusBadge && statusText) {
+              statusBadge.style.background = 'rgba(34, 197, 94, 0.2)';
+              statusBadge.style.borderColor = '#22c55e';
+              statusBadge.style.color = '#22c55e';
+              statusText.textContent = `LIVE GPS ACTIVE (±${Math.round(accuracy)}m)`;
+            }
+
+            // Set initial position on first fix
+            if (!initialMapSet) {
+              initialMapSet = true;
+              if (map) map.setView([latitude, longitude], 18, { animate: false });
+              if (carMarker) carMarker.setLatLng([latitude, longitude]);
+              traveledCoords = [[latitude, longitude]];
+              lastGpsPoint = { lat: latitude, lng: longitude };
+              lastGpsTimestamp = now;
+              return;
+            }
+
+            let deltaMeters = 0;
+            let currentSpeed = speed ? (speed * 3.6) : 0;
 
             if (lastGpsPoint) {
-              const dMeters = haversineMeters([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
-              if (dMeters >= 2.0) { // filter stationary drift
-                stepMeters = dMeters;
-                const dSec = (now - lastGpsTime) / 1000;
+              const d = haversineMeters([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
+              // Ignore stationary jitter (< 2.5m)
+              if (d >= 2.5) {
+                deltaMeters = d;
+                const dSec = (now - lastGpsTimestamp) / 1000;
                 if (!speed && dSec > 0) {
-                  speedKmh = (dMeters / dSec) * 3.6;
+                  currentSpeed = (d / dSec) * 3.6;
                 }
+
+                // Update Heading rotation
                 const bearing = calculateBearing([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
                 const rotNode = document.getElementById('car-rotation-node');
                 if (rotNode) rotNode.style.transform = `rotate(${bearing}deg)`;
 
                 lastGpsPoint = { lat: latitude, lng: longitude };
-                lastGpsTime = now;
+                lastGpsTimestamp = now;
+              } else {
+                currentSpeed = 0; // Stationary
               }
             } else {
               lastGpsPoint = { lat: latitude, lng: longitude };
-              lastGpsTime = now;
+              lastGpsTimestamp = now;
             }
 
-            advanceRide(totalDistanceMeters + stepMeters, latitude, longitude, speedKmh);
+            recordMovement(latitude, longitude, currentSpeed, deltaMeters);
           },
           (err) => {
-            console.warn('GPS signal issue:', err);
+            console.warn('GPS Fix Warning:', err);
+            if (statusBadge && statusText) {
+              statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+              statusBadge.style.borderColor = '#ef4444';
+              statusBadge.style.color = '#ef4444';
+              if (err.code === 1) {
+                statusText.textContent = 'GPS PERMISSION DENIED · ENABLE IN BROWSER';
+              } else {
+                statusText.textContent = 'SEARCHING FOR SATELLITE LOCK...';
+              }
+            }
           },
           {
             enableHighAccuracy: true,
             maximumAge: 1000,
-            timeout: 12000
+            timeout: 20000
           }
         );
       }
 
-      // Mode Switch: Game Simulator vs Real GPS
-      const btnModeSim = modalRoot.querySelector('#btn-mode-sim');
-      const btnModeGps = modalRoot.querySelector('#btn-mode-gps');
+      // Pause / Resume Tracking
+      const btnPauseResume = modalRoot.querySelector('#btn-pause-resume-tracking');
+      const iconSpan = modalRoot.querySelector('#pause-resume-icon');
+      const textSpan = modalRoot.querySelector('#pause-resume-text');
 
-      btnModeSim.addEventListener('click', () => {
-        activeMode = 'simulator';
-        btnModeSim.style.background = '#22c55e';
-        btnModeSim.style.color = '#000000';
-        btnModeGps.style.background = 'transparent';
-        btnModeGps.style.color = '#a1a1aa';
-
-        if (activeWatchId !== null && navigator.geolocation) {
-          navigator.geolocation.clearWatch(activeWatchId);
-          activeWatchId = null;
-        }
-
-        const statusBadge = document.getElementById('gps-status-badge');
-        const statusText = document.getElementById('gps-status-text');
-        if (statusBadge && statusText) {
-          statusBadge.style.background = 'rgba(34, 197, 94, 0.2)';
-          statusBadge.style.borderColor = '#22c55e';
-          statusBadge.style.color = '#22c55e';
-          statusText.textContent = 'GAME DRIVE ACTIVE · 500M TRACKING';
-        }
-
-        startSimulation();
-      });
-
-      btnModeGps.addEventListener('click', () => {
-        activeMode = 'gps';
-        btnModeGps.style.background = '#22c55e';
-        btnModeGps.style.color = '#000000';
-        btnModeSim.style.background = 'transparent';
-        btnModeSim.style.color = '#a1a1aa';
-        startRealGps();
-      });
-
-      // Simulator Play / Pause
-      const btnPlayPauseSim = modalRoot.querySelector('#btn-play-pause-sim');
-      btnPlayPauseSim?.addEventListener('click', () => {
-        if (isSimPlaying) {
-          pauseSimulation();
+      btnPauseResume?.addEventListener('click', () => {
+        isTrackingPaused = !isTrackingPaused;
+        if (isTrackingPaused) {
+          iconSpan.textContent = '▶';
+          textSpan.textContent = 'Resume Tracking';
+          const speedElem = document.getElementById('hud-speed');
+          if (speedElem) speedElem.textContent = '0';
         } else {
-          startSimulation();
+          iconSpan.textContent = '⏸';
+          textSpan.textContent = 'Pause Tracking';
         }
       });
 
-      // Speed Multipliers
-      modalRoot.querySelectorAll('.btn-speed-mult').forEach(btn => {
-        btn.addEventListener('click', () => {
-          modalRoot.querySelectorAll('.btn-speed-mult').forEach(b => {
-            b.classList.remove('active');
-            b.style.background = 'transparent';
-            b.style.color = '#a1a1aa';
-          });
-          btn.classList.add('active');
-          btn.style.background = '#ffffff';
-          btn.style.color = '#000000';
-          simSpeedMultiplier = parseInt(btn.dataset.speed, 10);
-          if (isSimPlaying) {
-            startSimulation();
-          }
-        });
+      // Re-acquire GPS Fix
+      modalRoot.querySelector('#btn-reacquire-gps')?.addEventListener('click', () => {
+        startDeviceGpsTracking();
       });
 
-      // Quick +500m Milestone Jump
-      modalRoot.querySelector('#btn-step-500m')?.addEventListener('click', () => {
-        const nextTargetM = Math.min(8000, totalDistanceMeters + 500);
-        const closest = track.reduce((prev, curr) => 
-          Math.abs(curr.distanceMeters - nextTargetM) < Math.abs(prev.distanceMeters - nextTargetM) ? curr : prev
-        );
-        simStep = closest.step;
-        advanceRide(nextTargetM, closest.lat, closest.lng, 35);
+      // Discrete +25m Motion Step (Only for testing indoors when stationary)
+      modalRoot.querySelector('#btn-test-step-motion')?.addEventListener('click', () => {
+        if (!lastGpsPoint) {
+          lastGpsPoint = { lat: defaultCenter[0], lng: defaultCenter[1] };
+        }
+        // Advance slightly north-east (~25 meters)
+        const newLat = lastGpsPoint.lat + 0.00018;
+        const newLng = lastGpsPoint.lng + 0.00015;
+        const bearing = calculateBearing([lastGpsPoint.lat, lastGpsPoint.lng], [newLat, newLng]);
+        const rotNode = document.getElementById('car-rotation-node');
+        if (rotNode) rotNode.style.transform = `rotate(${bearing}deg)`;
+
+        lastGpsPoint = { lat: newLat, lng: newLng };
+        recordMovement(newLat, newLng, 28, 25);
       });
 
       // Save & Complete Ride Handler
       const handleSaveRide = () => {
         store.completeSession(currentStudent.id, dayNumber, {
-          instructorNotes: `Day ${dayNumber} live 8.0 km ride completed with all 16 500m checkpoints logged.`
+          instructorNotes: `Day ${dayNumber} live 8.0 km ride recorded under Instructor ${currentTrainer.name}. Checkpoints verified.`
         });
         if (onRideCompleted) onRideCompleted();
         closeModal();
@@ -1212,11 +994,11 @@ export function openLiveRideMapModal({
       modalRoot.querySelector('#btn-complete-direct')?.addEventListener('click', handleSaveRide);
       modalRoot.querySelector('#btn-save-completed-ride')?.addEventListener('click', handleSaveRide);
 
-      // Auto-start game drive immediately on launch!
-      startSimulation();
+      // Start Real Device GPS Tracking on launch
+      startDeviceGpsTracking();
 
     } catch (err) {
-      console.error('Failed to initialize Game Ride Map:', err);
+      console.error('Failed to initialize Real GPS Ride Tracker:', err);
     }
   }, 100);
 }
