@@ -81,6 +81,86 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
           </div>
         </div>
 
+        <!-- INSTRUCTOR ACTIVE GPS RIDE DISPATCH COMMAND CARD -->
+        <div class="trainer-gps-command-card" style="
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.14) 0%, rgba(15, 23, 42, 0.85) 100%);
+          border: 1.5px solid rgba(34, 197, 94, 0.45);
+          border-radius: 14px;
+          padding: 1.25rem 1.6rem;
+          margin-bottom: 1.75rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1.25rem;
+          flex-wrap: wrap;
+          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+        ">
+          <div style="display:flex; align-items:center; gap:1.15rem;">
+            <div style="
+              width: 52px;
+              height: 52px;
+              border-radius: 14px;
+              background: #22c55e;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 1.75rem;
+              box-shadow: 0 4px 20px rgba(34, 197, 94, 0.45);
+            ">🛰️</div>
+            <div>
+              <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.25rem; flex-wrap:wrap;">
+                <span class="p-badge p-badge-green" style="font-size:0.72rem; font-weight:900; letter-spacing:0.04em;">
+                  INSTRUCTOR GPS TELEMETRY COCKPIT
+                </span>
+                <span style="font-size:0.8rem; color:#a1a1aa; font-weight:700;">
+                  Dual-Control Sensor · 500m Checkpoint Verification
+                </span>
+              </div>
+              <h3 style="font-size:1.2rem; font-weight:900; color:#ffffff; margin:0 0 0.25rem 0;">
+                Live Practical Ride &amp; Distance Tracking (8.0 km)
+              </h3>
+              <p style="font-size:0.825rem; color:#94a3b8; margin:0;">
+                Select an active student candidate to launch live GPS tracking with 500m milestone logs and automatic curriculum sync.
+              </p>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.85rem; flex-wrap:wrap;">
+            <select id="trainer-quick-select-student" style="
+              background: rgba(13, 16, 23, 0.95);
+              border: 1px solid rgba(255, 255, 255, 0.25);
+              color: #ffffff;
+              padding: 0.75rem 1rem;
+              border-radius: 8px;
+              font-size: 0.85rem;
+              font-weight: 700;
+              cursor: pointer;
+            ">
+              ${myTrainees.filter(t => t.isActive).map(t => `
+                <option value="${t.id}">${t.name} (Day ${t.currentDay || 1}/20 · 8km)</option>
+              `).join('')}
+            </select>
+
+            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-trainer-quick-start-gps" style="
+              background: #22c55e;
+              border-color: #22c55e;
+              color: #000000;
+              font-weight: 900;
+              padding: 0.85rem 1.75rem;
+              font-size: 0.95rem;
+              border-radius: 10px;
+              box-shadow: 0 6px 24px rgba(34, 197, 94, 0.5);
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+            ">
+              <span>🚀</span>
+              <span>Start Ride (Live GPS) →</span>
+            </button>
+          </div>
+        </div>
+
         <div class="portal-section">
           <div class="portal-section-header">
             <span class="portal-section-title">Today's Practical Driving Classes — Mark Attendance</span>
@@ -371,7 +451,39 @@ export function renderTrainerView(container, showToast, subService = 'schedule',
       });
     });
 
-    // Trainer Start / Log Ride (Opens Live 8km Map)
+    // Instructor Quick Start GPS Ride from Command Card
+    const btnQuickStartGps = container.querySelector('#btn-trainer-quick-start-gps');
+    if (btnQuickStartGps) {
+      btnQuickStartGps.addEventListener('click', () => {
+        const select = container.querySelector('#trainer-quick-select-student');
+        const selectedId = select ? select.value : (myTrainees[0]?.id);
+        const trainee = allTrainees.find(t => t.id === selectedId) || myTrainees[0];
+        if (!trainee) {
+          showToast('No active student candidate found to start ride', 'warning');
+          return;
+        }
+        const dayToComplete = trainee.currentDay || 1;
+        const sched = store.getStudentSchedule(trainee.id);
+        const session = sched?.sessions?.find(s => s.dayNumber === dayToComplete) || {
+          dayNumber: dayToComplete,
+          objective: 'Practical Road Driving Lesson (8.0 km)',
+          date: new Date().toISOString().split('T')[0]
+        };
+
+        openLiveRideMapModal({
+          session,
+          student: trainee,
+          trainer,
+          canTrainerComplete: true,
+          onRideCompleted: () => {
+            showToast(`Day ${dayToComplete} 8.0 km ride completed for ${trainee.name} ✓`, 'success');
+            render();
+          }
+        });
+      });
+    }
+
+    // Trainer Start / Log Ride (Opens Live 8km Map from Table Rows)
     container.querySelectorAll('.btn-trainer-log-ride').forEach(btn => {
       btn.addEventListener('click', () => {
         const traineeId = btn.dataset.traineeId;

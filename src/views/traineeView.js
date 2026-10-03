@@ -12,6 +12,7 @@ import { renderBrandLogo } from '../components/brandLogo.js';
 import { renderStudentAvatar } from '../components/studentAvatar.js';
 import { triggerPhotoUpload } from '../components/photoCropModal.js';
 import { renderProgressiveCalendar } from '../components/progressiveCalendar.js';
+import { openLiveRideMapModal } from '../components/liveRideTrackingModal.js';
 
 export function renderTraineeView(container, showToast, subService = 'curriculum', onNavigate) {
   let activeFilter = 'all';
@@ -25,6 +26,13 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
     const invoice  = store.payments.find(p => p.traineeId === trainee.id) || store.payments[0];
     const kmDriven = currentDay * 8;
     const kmRemaining = Math.max(0, (20 - currentDay) * 8);
+
+    const sched = store.getStudentSchedule(trainee.id);
+    const todaySession = sched?.sessions?.find(s => s.dayNumber === currentDay) || {
+      dayNumber: currentDay,
+      objective: 'Practical Road Driving Lesson (8.0 km)',
+      stage: currentDay <= 10 ? 'Stage 1 · Basic Driving' : currentDay <= 15 ? 'Stage 2 · Intermediate Driving' : 'Stage 3 · Advanced Road Skills'
+    };
 
     const currentSub = subService || 'curriculum';
 
@@ -45,8 +53,76 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
               <p class="portal-page-sub">${trainee.package} · LLR Permit: ${trainee.permitNumber || 'AP004/LLR/2026/8941'} · Instructor: ${trainer.name}</p>
             </div>
           </div>
-          <div style="display:flex; gap:0.65rem; align-items:center;">
-            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-show-qr-voucher">Pay Course Fee (UPI QR) →</button>
+          <div style="display:flex; gap:0.65rem; align-items:center; flex-wrap:wrap;">
+            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-student-start-gps-ride" style="background:#22c55e; border-color:#22c55e; color:#000000; font-weight:900; box-shadow:0 4px 18px rgba(34,197,94,0.45); display:flex; align-items:center; gap:0.45rem;">
+              <span>🚀</span> <span>Start Ride (Live GPS)</span>
+            </button>
+            <button type="button" class="btn-mnc btn-mnc-secondary" id="btn-show-qr-voucher">Pay Fee (UPI QR) →</button>
+          </div>
+        </div>
+
+        <!-- TODAY'S PRACTICAL RIDE & LIVE GPS TRACKER HERO CARD -->
+        <div class="today-ride-hero-card" style="
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.14) 0%, rgba(15, 23, 42, 0.85) 100%);
+          border: 1.5px solid rgba(34, 197, 94, 0.45);
+          border-radius: 14px;
+          padding: 1.25rem 1.6rem;
+          margin-bottom: 1.75rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1.25rem;
+          flex-wrap: wrap;
+          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+        ">
+          <div style="display:flex; align-items:center; gap:1.15rem;">
+            <div style="
+              width: 54px;
+              height: 54px;
+              border-radius: 14px;
+              background: #22c55e;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 1.75rem;
+              box-shadow: 0 4px 20px rgba(34, 197, 94, 0.45);
+            ">🚗</div>
+            <div>
+              <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.25rem; flex-wrap:wrap;">
+                <span class="p-badge p-badge-green" style="font-size:0.72rem; font-weight:900; letter-spacing:0.04em;">
+                  DAY ${currentDay} PRACTICAL RIDE
+                </span>
+                <span style="font-size:0.8rem; color:#a1a1aa; font-weight:700;">
+                  Target: 8.00 km (16 Checkpoints @ 500m Intervals)
+                </span>
+              </div>
+              <h3 style="font-size:1.2rem; font-weight:900; color:#ffffff; margin:0 0 0.25rem 0;">
+                ${todaySession.objective || 'Practical Road Driving Lesson'}
+              </h3>
+              <p style="font-size:0.825rem; color:#94a3b8; margin:0;">
+                Instructor: <strong style="color:#ffffff;">${trainer.name}</strong> · Fleet Rig: <strong style="color:#ffffff;">${trainer.car}</strong> (Dual-Brake) · Sector: <strong style="color:#ffffff;">Pulivendula</strong>
+              </p>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.85rem; flex-wrap:wrap;">
+            <button type="button" class="btn-mnc btn-mnc-primary" id="btn-hero-start-gps-ride" style="
+              background: #22c55e;
+              border-color: #22c55e;
+              color: #000000;
+              font-weight: 900;
+              padding: 0.85rem 1.85rem;
+              font-size: 0.95rem;
+              border-radius: 10px;
+              box-shadow: 0 6px 24px rgba(34, 197, 94, 0.5);
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+            ">
+              <span>🚀</span>
+              <span>Start Live GPS Ride (500m Tracking) →</span>
+            </button>
           </div>
         </div>
 
@@ -266,6 +342,32 @@ export function renderTraineeView(container, showToast, subService = 'curriculum
         onUpdate: () => render()
       });
     }
+
+    // Launch Live GPS Ride Tracker for Candidate
+    const launchStudentRide = () => {
+      const dayToRide = trainee.currentDay || 1;
+      const sched = store.getStudentSchedule(trainee.id);
+      const session = sched?.sessions?.find(s => s.dayNumber === dayToRide) || {
+        dayNumber: dayToRide,
+        objective: 'Practical Road Driving Lesson (8.0 km)',
+        stage: dayToRide <= 10 ? 'Stage 1 · Basic Driving' : dayToRide <= 15 ? 'Stage 2 · Intermediate Driving' : 'Stage 3 · Advanced Road Skills',
+        date: new Date().toISOString().split('T')[0]
+      };
+
+      openLiveRideMapModal({
+        session,
+        student: trainee,
+        trainer,
+        canTrainerComplete: false,
+        onRideCompleted: () => {
+          showToast(`Day ${dayToRide} 8.0 km ride recorded successfully! 16 Checkpoints cleared ✓`, 'success');
+          render();
+        }
+      });
+    };
+
+    container.querySelector('#btn-student-start-gps-ride')?.addEventListener('click', launchStudentRide);
+    container.querySelector('#btn-hero-start-gps-ride')?.addEventListener('click', launchStudentRide);
 
     // Service Navigation Events
     container.querySelectorAll('[data-trainee-nav]').forEach(btn => {

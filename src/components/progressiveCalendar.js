@@ -801,7 +801,7 @@ export function renderProgressiveCalendar(container, studentId, { showToast, can
                 box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);
               ">
                 <span>🚀</span>
-                <span>Start Live 8 km Ride</span>
+                <span>Start Live GPS Ride (500m Tracking)</span>
               </button>
 
               ${canTrainerLog && activeSelectedSession.status !== 'completed' ? `

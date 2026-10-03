@@ -1,26 +1,29 @@
 /* ==========================================================================
-   GAMIFIED LIVE RIDE TRACKING MAP COMPONENT (8.0 KM)
+   LIVE GPS RIDE TRACKING & 500M DISTANCE MEASUREMENT MODAL
    GAFOOR DRIVING SCHOOL — PULIVENDULA, ANDHRA PRADESH
 
    Features:
-   - Fullscreen gamified interactive driving map
-   - Creative terrain environment with roadside trees (Oak, Pine, Palm, Blossom)
-   - 16 Checkpoints every 500 meters (0.5 km to 8.0 km) with live milestone banners
-   - Live moving dual-control car with both Student (driver) and Trainer (instructor)
-   - Smooth camera auto-follow zoom and full 8 km overview toggle
-   - Interactive driving controls (Play, Pause, 1x/2x/5x/10x speeds, Fast-Forward)
-   - Full 8.0 km completion ceremony with instant progress save into store
+   - Real Device GPS Tracking (navigator.geolocation.watchPosition)
+   - Real-time Distance Measurement with Haversine formula (Meters & Kilometers)
+   - 16 Milestone Checkpoints every 500m (0.5 km, 1.0 km, ... up to 8.0 km)
+   - Real-time Next 500m Countdown ("320m to Next 500m Checkpoint")
+   - Audio Chime on 500m Checkpoint Crossing (Web Audio API)
+   - Dual-Mode: [Live GPS Mode] & [Drive Simulator Mode] (for desktop/indoor testing)
+   - Live Leaflet Map with smooth car marker, heading rotation, and traveled polyline
+   - Dual-Rider HUD: Student Driver + Instructor Co-pilot
+   - Instant Ride Logging (+8.0 km) with store & Supabase sync
    ========================================================================== */
 
 import L from 'leaflet';
 import { store } from '../store.js';
 
 let activeLiveMap = null;
-let animationTimer = null;
+let activeWatchId = null;
+let simulationTimer = null;
 
-// Helper: Haversine distance in meters
-function haversineMeters(p1, p2) {
-  const R = 6371000;
+// Helper: Haversine distance in meters between two lat/lng pairs
+export function haversineMeters(p1, p2) {
+  const R = 6371000; // Earth radius in meters
   const dLat = (p2[0] - p1[0]) * Math.PI / 180;
   const dLng = (p2[1] - p1[1]) * Math.PI / 180;
   const a = Math.sin(dLat / 2) ** 2 +
@@ -29,8 +32,8 @@ function haversineMeters(p1, p2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Calculate bearing angle between two coordinates
-function calculateBearing(start, end) {
+// Helper: Calculate bearing angle between two coordinates
+export function calculateBearing(start, end) {
   const startLat = start[0] * Math.PI / 180;
   const startLng = start[1] * Math.PI / 180;
   const endLat = end[0] * Math.PI / 180;
@@ -44,9 +47,44 @@ function calculateBearing(start, end) {
   return (brng + 360) % 360;
 }
 
+// Synthesize pleasant celebratory chime when 500m checkpoint is reached (No external asset needed)
+function playMilestoneChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+
+    // Tone 1: C5 (523.25 Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(523.25, now);
+    gain1.gain.setValueAtTime(0.18, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.28);
+
+    // Tone 2: G5 (783.99 Hz)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(783.99, now + 0.12);
+    gain2.gain.setValueAtTime(0.22, now + 0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.12);
+    osc2.stop(now + 0.45);
+  } catch (e) {
+    // Non-blocking fallback
+  }
+}
+
 // Generate an accurate 8.0 km (8000 m) smoothed polyline with 16 500m checkpoints & trees
 function build8KmTrack(basePath, startPoint, endPoint) {
-  // Pulivendula default coordinates fallback if path is short
   let rawPoints = basePath && basePath.length >= 2 ? basePath : [
     [startPoint?.lat || 14.4230, startPoint?.lng || 78.2285],
     [14.4255, 78.2315],
@@ -66,12 +104,10 @@ function build8KmTrack(basePath, startPoint, endPoint) {
     [endPoint?.lat || 14.4312, endPoint?.lng || 78.2361]
   ];
 
-  // Resample into 240 fine-grained road points
   const TOTAL_STEPS = 240;
   const TOTAL_METERS = 8000; // 8.0 km fixed
   const track = [];
 
-  // Calculate cumulative distance along raw points
   const segmentDists = [0];
   let accumulated = 0;
   for (let i = 0; i < rawPoints.length - 1; i++) {
@@ -82,7 +118,6 @@ function build8KmTrack(basePath, startPoint, endPoint) {
 
   for (let step = 0; step <= TOTAL_STEPS; step++) {
     const targetDist = (step / TOTAL_STEPS) * accumulated;
-    // Find segment
     let segIdx = 0;
     for (let i = 0; i < segmentDists.length - 1; i++) {
       if (targetDist >= segmentDists[i] && targetDist <= segmentDists[i + 1]) {
@@ -100,7 +135,7 @@ function build8KmTrack(basePath, startPoint, endPoint) {
 
     const lat = pA[0] + (pB[0] - pA[0]) * factor;
     const lng = pA[1] + (pB[1] - pA[1]) * factor;
-    const distanceMeters = (step / TOTAL_STEPS) * TOTAL_METERS;
+    const distanceMeters = Math.round((step / TOTAL_STEPS) * TOTAL_METERS);
 
     track.push({
       step,
@@ -111,8 +146,7 @@ function build8KmTrack(basePath, startPoint, endPoint) {
     });
   }
 
-  // Generate the 16 Checkpoints at exact 500m intervals (0.5 km to 8.0 km)
-  const checkpoints = [];
+  // 16 Checkpoints at exact 500m intervals (500m, 1000m, ... 8000m)
   const checkpointLabels = [
     { title: 'Cockpit Drill & ABC Orientation', place: 'Depot Exit Corridor' },
     { title: 'Steering Centering Check', place: 'Bakarapuram Avenue' },
@@ -132,9 +166,9 @@ function build8KmTrack(basePath, startPoint, endPoint) {
     { title: '8.0 km Finish Line & Docking 🏁', place: 'Academy Depot Arrival' }
   ];
 
+  const checkpoints = [];
   for (let i = 1; i <= 16; i++) {
     const targetM = i * 500;
-    // Find closest step in track
     const closest = track.reduce((prev, curr) => 
       Math.abs(curr.distanceMeters - targetM) < Math.abs(prev.distanceMeters - targetM) ? curr : prev
     );
@@ -154,13 +188,13 @@ function build8KmTrack(basePath, startPoint, endPoint) {
     });
   }
 
-  // Generate roadside trees along the route at left & right offsets
+  // Roadside trees for aesthetic driving environment
   const trees = [];
   const treeVarieties = [
-    { type: 'oak', emoji: '🌳', name: 'Banyan Oak', color: '#16a34a' },
-    { type: 'pine', emoji: '🌲', name: 'Evergreen Pine', color: '#15803d' },
-    { type: 'palm', emoji: '🌴', name: 'Canopy Palm', color: '#22c55e' },
-    { type: 'flower', emoji: '🌸', name: 'Gulmohar Tree', color: '#f43f5e' }
+    { type: 'oak', emoji: '🌳', name: 'Banyan Oak' },
+    { type: 'pine', emoji: '🌲', name: 'Evergreen Pine' },
+    { type: 'palm', emoji: '🌴', name: 'Canopy Palm' },
+    { type: 'flower', emoji: '🌸', name: 'Gulmohar Tree' }
   ];
 
   for (let i = 6; i < track.length - 6; i += 7) {
@@ -168,11 +202,11 @@ function build8KmTrack(basePath, startPoint, endPoint) {
     const p2 = track[i + 1];
     const bearing = calculateBearing([p1.lat, p1.lng], [p2.lat, p2.lng]);
     const perpBearing = (bearing + (i % 2 === 0 ? 90 : -90)) * Math.PI / 180;
-    const offsetMeters = 16 + (i % 8); // 16 to 24 meters off road center
+    const offsetMeters = 16 + (i % 8);
     const dLat = (offsetMeters * Math.cos(perpBearing)) / 111000;
     const dLng = (offsetMeters * Math.sin(perpBearing)) / (111000 * Math.cos(p1.lat * Math.PI / 180));
 
-    const variety = treeVarieties[(i / 7) % treeVarieties.length];
+    const variety = treeVarieties[Math.floor(i / 7) % treeVarieties.length];
     trees.push({
       lat: p1.lat + dLat,
       lng: p1.lng + dLng,
@@ -184,21 +218,24 @@ function build8KmTrack(basePath, startPoint, endPoint) {
   return { track, checkpoints, trees };
 }
 
+/**
+ * Main function to launch the Live GPS Ride Tracker Modal
+ */
 export function openLiveRideMapModal({
-  session,
-  student,
-  trainer,
+  session = null,
+  student = null,
+  trainer = null,
   canTrainerComplete = true,
   onRideCompleted = null
-}) {
+} = {}) {
   const modalRoot = document.getElementById('modal-root');
   if (!modalRoot) return;
 
   const currentStudent = student || store.getCurrentTrainee();
   const currentTrainer = trainer || store.trainers.find(t => t.id === currentStudent.assignedTrainerId) || store.trainers[0];
   const dayNumber = session?.dayNumber || currentStudent.currentDay || 1;
-  const objective = session?.objective || 'Practical Driving Lesson';
-  const stage = session?.stage || (dayNumber <= 10 ? 'Stage 1: Basic Driving' : dayNumber <= 15 ? 'Stage 2: Intermediate Driving' : 'Stage 3: Final Assessment & Parking');
+  const objective = session?.objective || 'Practical Road Driving Lesson';
+  const stage = session?.stage || (dayNumber <= 10 ? 'Stage 1: Basic Driving' : dayNumber <= 15 ? 'Stage 2: Intermediate Driving' : 'Stage 3: Advanced Road Skills');
 
   const { track, checkpoints, trees } = build8KmTrack(
     session?.route?.path,
@@ -206,17 +243,30 @@ export function openLiveRideMapModal({
     session?.route?.endPoint
   );
 
-  let currentStep = 0;
-  let isPlaying = false;
-  let speedMultiplier = 2; // default comfortable speed for demo
+  // Runtime State
+  let activeMode = 'gps'; // 'gps' | 'simulator'
+  let totalDistanceMeters = 0;
+  let currentSpeedKmh = 0;
+  let lastGpsPoint = null;
+  let lastGpsTime = null;
+  let gpsAccuracyMeters = null;
+  let traveledCoords = [];
+  let isRideCompleted = false;
+
+  // Simulator State
+  let simStep = 0;
+  let isSimPlaying = false;
+  let simSpeedMultiplier = 2; // default
   let followCarMode = true;
+
+  // Leaflet Map Handles
   let carMarker = null;
   let livePolyline = null;
   let checkpointMarkers = [];
-  let isCompleted = false;
+  let resizeHandler = null;
 
   modalRoot.innerHTML = `
-    <div class="mnc-modal-overlay" id="live-ride-overlay" style="padding:0; align-items:stretch; justify-content:stretch;">
+    <div class="mnc-modal-overlay" id="live-ride-overlay" style="padding:0; align-items:stretch; justify-content:stretch; z-index:9999;">
       <div class="live-ride-viewport" style="
         width: 100vw;
         height: 100vh;
@@ -231,88 +281,132 @@ export function openLiveRideMapModal({
       ">
         <!-- TOP GAMIFIED HUD HEADER -->
         <header style="
-          background: linear-gradient(180deg, rgba(13, 16, 23, 0.98) 0%, rgba(13, 16, 23, 0.92) 100%);
+          background: linear-gradient(180deg, rgba(13, 16, 23, 0.98) 0%, rgba(13, 16, 23, 0.94) 100%);
           backdrop-filter: blur(12px);
           border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-          padding: 0.75rem 1.25rem;
+          padding: 0.65rem 1.25rem;
           display: flex;
           align-items: center;
           justify-content: space-between;
           z-index: 1000;
           box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+          flex-wrap: wrap;
+          gap: 0.75rem;
         ">
-          <!-- Left: Ride & Stage Badges -->
+          <!-- Left: Title & Day Info -->
           <div style="display: flex; align-items: center; gap: 0.85rem;">
             <div style="
-              width: 42px;
-              height: 42px;
-              border-radius: 10px;
+              width: 44px;
+              height: 44px;
+              border-radius: 12px;
               background: #22c55e;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 1.35rem;
-              box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+              font-size: 1.45rem;
+              box-shadow: 0 0 24px rgba(34, 197, 94, 0.5);
             ">🚗</div>
             <div>
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <span style="
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <span id="gps-status-badge" style="
                   background: rgba(34, 197, 94, 0.2);
                   border: 1px solid #22c55e;
                   color: #22c55e;
                   font-size: 0.7rem;
                   font-weight: 800;
-                  padding: 0.15rem 0.55rem;
+                  padding: 0.2rem 0.6rem;
                   border-radius: 9999px;
                   letter-spacing: 0.04em;
                   display: flex;
                   align-items: center;
                   gap: 0.35rem;
-                "><span style="width:6px; height:6px; border-radius:50%; background:#22c55e; box-shadow:0 0 6px #22c55e; display:inline-block;"></span>LIVE 8 KM RIDE</span>
+                ">
+                  <span class="live-dot" style="width:7px; height:7px; border-radius:50%; background:#22c55e; box-shadow:0 0 8px #22c55e; display:inline-block; animation:pulseDot 1.2s infinite ease-in-out;"></span>
+                  <span id="gps-status-text">INITIALIZING GPS...</span>
+                </span>
                 <span style="font-size: 1.05rem; font-weight: 900; color: #ffffff;">
                   Day ${dayNumber}: ${objective}
                 </span>
               </div>
-              <div style="font-size: 0.78rem; color: #a1a1aa; margin-top: 0.15rem;">
-                ${stage} · Pulivendula Sector · 16 Checkpoints (Every 500m)
+              <div style="font-size: 0.75rem; color: #a1a1aa; margin-top: 0.2rem;">
+                Target: 8.00 km (8000m) · 16 Checkpoints Every 500m · ${currentStudent.name} (${currentStudent.package || 'Driving Course'})
               </div>
             </div>
           </div>
 
-          <!-- Center: Dynamic Odometer & Metrics HUD -->
+          <!-- Center: Dynamic Distance & 500m Checkpoints Odometer HUD -->
           <div style="
             display: flex;
             align-items: center;
-            gap: 1.5rem;
-            background: rgba(0, 0, 0, 0.45);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            gap: 1.25rem;
+            background: rgba(0, 0, 0, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 12px;
-            padding: 0.4rem 1.25rem;
+            padding: 0.45rem 1.35rem;
           ">
             <div>
-              <div style="font-size: 0.62rem; color: #71717a; text-transform: uppercase; font-weight: 800;">Distance Driven</div>
-              <div style="font-size: 1.4rem; font-weight: 900; color: #22c55e; font-family: var(--font-mono); line-height: 1.1;">
-                <span id="hud-distance-km">0.00</span> <span style="font-size: 0.85rem; color: #ffffff;">/ 8.00 km</span>
+              <div style="font-size: 0.62rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Distance Driven</div>
+              <div style="font-size: 1.45rem; font-weight: 900; color: #22c55e; font-family: var(--font-mono); line-height: 1.1;">
+                <span id="hud-distance-km">0.00</span> <span style="font-size: 0.85rem; color: #ffffff;">km</span>
+                <span id="hud-distance-meters" style="font-size: 0.75rem; color: #a1a1aa; margin-left: 0.35rem;">(0 m)</span>
               </div>
             </div>
-            <div style="width: 1px; height: 32px; background: rgba(255,255,255,0.1);"></div>
+            <div style="width: 1px; height: 32px; background: rgba(255,255,255,0.12);"></div>
             <div>
-              <div style="font-size: 0.62rem; color: #71717a; text-transform: uppercase; font-weight: 800;">Checkpoints (500m)</div>
-              <div style="font-size: 1.25rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono); line-height: 1.1;">
+              <div style="font-size: 0.62rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">500m Milestones</div>
+              <div style="font-size: 1.35rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono); line-height: 1.1;">
                 <span id="hud-checkpoints-cleared">0</span> <span style="font-size: 0.85rem; color: #71717a;">/ 16</span>
               </div>
             </div>
-            <div style="width: 1px; height: 32px; background: rgba(255,255,255,0.1);"></div>
+            <div style="width: 1px; height: 32px; background: rgba(255,255,255,0.12);"></div>
             <div>
-              <div style="font-size: 0.62rem; color: #71717a; text-transform: uppercase; font-weight: 800;">Vehicle Speed</div>
-              <div style="font-size: 1.25rem; font-weight: 900; color: #38bdf8; font-family: var(--font-mono); line-height: 1.1;">
-                <span id="hud-speed">30</span> <span style="font-size: 0.8rem; color: #a1a1aa;">km/h</span>
+              <div style="font-size: 0.62rem; color: #71717a; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Vehicle Speed</div>
+              <div style="font-size: 1.35rem; font-weight: 900; color: #38bdf8; font-family: var(--font-mono); line-height: 1.1;">
+                <span id="hud-speed">0</span> <span style="font-size: 0.8rem; color: #a1a1aa;">km/h</span>
+              </div>
+            </div>
+            <div style="width: 1px; height: 32px; background: rgba(255,255,255,0.12);"></div>
+            <div>
+              <div style="font-size: 0.62rem; color: #f59e0b; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Next 500m Target</div>
+              <div style="font-size: 1.1rem; font-weight: 900; color: #fbbf24; font-family: var(--font-mono); line-height: 1.1;">
+                <span id="hud-next-checkpoint-dist">500m</span>
               </div>
             </div>
           </div>
 
-          <!-- Right: Interactive View Toggles & Close -->
+          <!-- Right: Mode Switcher & Close -->
           <div style="display: flex; align-items: center; gap: 0.65rem;">
+            <!-- Mode Switcher Pill (Live GPS vs Simulator) -->
+            <div style="
+              display: flex;
+              background: rgba(255, 255, 255, 0.06);
+              border: 1px solid rgba(255, 255, 255, 0.12);
+              border-radius: 8px;
+              overflow: hidden;
+            ">
+              <button type="button" id="btn-mode-gps" style="
+                background: #22c55e;
+                color: #000000;
+                border: none;
+                padding: 0.45rem 0.85rem;
+                font-size: 0.75rem;
+                font-weight: 800;
+                cursor: pointer;
+                transition: all 0.2s ease;
+              ">📡 Real GPS</button>
+              <button type="button" id="btn-mode-sim" style="
+                background: transparent;
+                color: #a1a1aa;
+                border: none;
+                padding: 0.45rem 0.85rem;
+                font-size: 0.75rem;
+                font-weight: 800;
+                cursor: pointer;
+                transition: all 0.2s ease;
+              ">🎮 Simulator</button>
+            </div>
+
+            <!-- Follow Car Toggle -->
             <button type="button" id="btn-toggle-camera-mode" style="
               background: rgba(255, 255, 255, 0.08);
               border: 1px solid rgba(255, 255, 255, 0.16);
@@ -327,9 +421,10 @@ export function openLiveRideMapModal({
               gap: 0.4rem;
             ">
               <span id="cam-icon">🔍</span>
-              <span id="cam-text">Follow Car Zoom</span>
+              <span id="cam-text">Follow Car</span>
             </button>
 
+            <!-- Close Modal -->
             <button type="button" id="btn-close-live-ride" style="
               background: rgba(255, 255, 255, 0.08);
               border: 1px solid rgba(255, 255, 255, 0.16);
@@ -343,15 +438,15 @@ export function openLiveRideMapModal({
               cursor: pointer;
               font-size: 1.15rem;
               transition: background 0.15s ease;
-            ">✕</button>
+            " title="Close Live Ride">✕</button>
           </div>
         </header>
 
-        <!-- 16-SEGMENT CHECKPOINT PROGRESS BAR -->
+        <!-- 16-SEGMENT CHECKPOINT PROGRESS BAR (500M EACH) -->
         <div style="
           background: #11141c;
           border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-          padding: 0.35rem 1rem;
+          padding: 0.4rem 1rem;
           display: flex;
           align-items: center;
           gap: 4px;
@@ -361,8 +456,8 @@ export function openLiveRideMapModal({
           ${checkpoints.map(cp => `
             <div id="prog-seg-${cp.id}" style="
               flex: 1;
-              min-width: 44px;
-              height: 22px;
+              min-width: 48px;
+              height: 24px;
               border-radius: 4px;
               background: rgba(255, 255, 255, 0.06);
               border: 1px solid rgba(255, 255, 255, 0.1);
@@ -375,7 +470,8 @@ export function openLiveRideMapModal({
               font-family: var(--font-mono);
               transition: all 0.3s ease;
               cursor: pointer;
-            " title="${cp.label}: ${cp.title}">
+              white-space: nowrap;
+            " title="${cp.label}: ${cp.title} (${cp.distanceMeters}m)">
               ${cp.label}
             </div>
           `).join('')}
@@ -383,7 +479,41 @@ export function openLiveRideMapModal({
 
         <!-- MAIN INTERACTIVE MAP CONTAINER -->
         <div style="flex: 1; position: relative; overflow: hidden; height: 100%;">
-          <div id="live-ride-leaflet-map" style="width: 100%; height: 100%; min-height: 480px; background: #f1f5f9;"></div>
+          <div id="live-ride-leaflet-map" style="width: 100%; height: 100%; min-height: 480px; background: #0f172a;"></div>
+
+          <!-- FLOATING GPS INFO HUD (LAT, LNG, ACCURACY) -->
+          <div style="
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            background: rgba(13, 16, 23, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 0.5rem 0.85rem;
+            font-size: 0.72rem;
+            color: #a1a1aa;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+          ">
+            <div>
+              <span style="color:#71717a;">GPS FIX:</span>
+              <strong id="gps-coords" style="color:#ffffff; font-family:var(--font-mono); margin-left:0.25rem;">14.42300, 78.22850</strong>
+            </div>
+            <div style="width:1px; height:16px; background:rgba(255,255,255,0.1);"></div>
+            <div>
+              <span style="color:#71717a;">ACCURACY:</span>
+              <strong id="gps-accuracy" style="color:#22c55e; font-family:var(--font-mono); margin-left:0.25rem;">± 4m</strong>
+            </div>
+            <div style="width:1px; height:16px; background:rgba(255,255,255,0.1);"></div>
+            <div>
+              <span style="color:#71717a;">INTERVAL:</span>
+              <strong style="color:#38bdf8; font-family:var(--font-mono); margin-left:0.25rem;">500m Steps</strong>
+            </div>
+          </div>
 
           <!-- FLOATING NOTIFICATION BANNER FOR 500M CHECKPOINTS -->
           <div id="checkpoint-toast-banner" style="
@@ -393,29 +523,29 @@ export function openLiveRideMapModal({
             transform: translateX(-50%) translateY(-30px);
             opacity: 0;
             pointer-events: none;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(16, 185, 129, 0.95));
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.98), rgba(16, 185, 129, 0.98));
             color: #000000;
-            padding: 0.65rem 1.5rem;
+            padding: 0.75rem 1.8rem;
             border-radius: 9999px;
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             font-weight: 900;
-            box-shadow: 0 10px 30px rgba(34, 197, 94, 0.5);
+            box-shadow: 0 10px 35px rgba(34, 197, 94, 0.6);
             display: flex;
             align-items: center;
-            gap: 0.6rem;
+            gap: 0.65rem;
             transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
             z-index: 1200;
           ">
-            <span>🚩</span>
-            <span id="checkpoint-toast-text">Checkpoint Reached!</span>
+            <span style="font-size:1.25rem;">🎯</span>
+            <span id="checkpoint-toast-text">500m Checkpoint Cleared!</span>
           </div>
 
           <!-- FLOATING FINISH CEREMONY OVERLAY -->
           <div id="finish-ride-ceremony" style="
             position: absolute;
             inset: 0;
-            background: rgba(0, 0, 0, 0.78);
-            backdrop-filter: blur(8px);
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
             display: none;
             flex-direction: column;
             align-items: center;
@@ -423,50 +553,48 @@ export function openLiveRideMapModal({
             z-index: 1500;
             text-align: center;
             padding: 1.5rem;
-            animation: modalFadeIn 0.3s ease-out;
           ">
             <div style="
-              width: 80px;
-              height: 80px;
+              width: 86px;
+              height: 86px;
               border-radius: 50%;
               background: #22c55e;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 2.75rem;
-              box-shadow: 0 0 50px #22c55e;
+              font-size: 3rem;
+              box-shadow: 0 0 60px #22c55e;
               margin-bottom: 1.25rem;
-              animation: bounceIn 0.5s ease-out;
             ">🏆</div>
-            <h2 style="font-size: 2rem; font-weight: 900; color: #ffffff; margin: 0 0 0.4rem 0;">
+            <h2 style="font-size: 2.2rem; font-weight: 900; color: #ffffff; margin: 0 0 0.5rem 0;">
               8.0 km Practical Ride Completed!
             </h2>
-            <p style="font-size: 1rem; color: #a1a1aa; max-width: 520px; line-height: 1.5; margin: 0 0 1.5rem 0;">
-              Day ${dayNumber} training completed successfully under Instructor <strong>${currentTrainer.name}</strong>. All 16 checkpoints (500m intervals) verified!
+            <p style="font-size: 1.05rem; color: #a1a1aa; max-width: 540px; line-height: 1.5; margin: 0 0 1.5rem 0;">
+              Day ${dayNumber} training successfully finished! All 16 checkpoints (every 500m) cleared under Instructor <strong>${currentTrainer.name}</strong>.
             </p>
 
             <div style="
               display: flex;
-              gap: 1.5rem;
+              gap: 2rem;
               background: rgba(255, 255, 255, 0.05);
               border: 1px solid rgba(255, 255, 255, 0.12);
               border-radius: 12px;
-              padding: 1rem 1.75rem;
-              margin-bottom: 1.75rem;
+              padding: 1rem 2rem;
+              margin-bottom: 2rem;
             ">
               <div>
                 <div style="font-size: 0.7rem; color: #71717a; text-transform: uppercase; font-weight: 800;">Distance</div>
-                <div style="font-size: 1.35rem; font-weight: 900; color: #22c55e; font-family: var(--font-mono);">8.00 km</div>
+                <div style="font-size: 1.45rem; font-weight: 900; color: #22c55e; font-family: var(--font-mono);">8.00 km</div>
               </div>
               <div style="width: 1px; background: rgba(255,255,255,0.1);"></div>
               <div>
                 <div style="font-size: 0.7rem; color: #71717a; text-transform: uppercase; font-weight: 800;">Checkpoints</div>
-                <div style="font-size: 1.35rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono);">16 / 16 ✓</div>
+                <div style="font-size: 1.45rem; font-weight: 900; color: #ffffff; font-family: var(--font-mono);">16 / 16 ✓</div>
               </div>
               <div style="width: 1px; background: rgba(255,255,255,0.1);"></div>
               <div>
                 <div style="font-size: 0.7rem; color: #71717a; text-transform: uppercase; font-weight: 800;">Student Driver</div>
-                <div style="font-size: 1rem; font-weight: 800; color: #ffffff;">${currentStudent.name}</div>
+                <div style="font-size: 1.1rem; font-weight: 800; color: #ffffff;">${currentStudent.name}</div>
               </div>
             </div>
 
@@ -474,15 +602,15 @@ export function openLiveRideMapModal({
               background: #22c55e;
               color: #000000;
               border: none;
-              padding: 0.85rem 2.2rem;
-              border-radius: 10px;
-              font-size: 1rem;
+              padding: 0.9rem 2.5rem;
+              border-radius: 12px;
+              font-size: 1.05rem;
               font-weight: 900;
               cursor: pointer;
               box-shadow: 0 10px 30px rgba(34, 197, 94, 0.5);
               transition: transform 0.15s ease;
             ">
-              ✓ Save &amp; Log Day ${dayNumber} Ride (+8 km)
+              ✓ Save &amp; Log Day ${dayNumber} Ride (+8.0 km)
             </button>
           </div>
         </div>
@@ -491,7 +619,7 @@ export function openLiveRideMapModal({
         <footer style="
           background: #11141c;
           border-top: 1px solid rgba(255, 255, 255, 0.12);
-          padding: 0.85rem 1.25rem;
+          padding: 0.75rem 1.25rem;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -500,7 +628,7 @@ export function openLiveRideMapModal({
           gap: 1rem;
         ">
           <!-- Left: Dual Rider Cards (Student + Trainer) -->
-          <div style="display: flex; align-items: center; gap: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;">
             <!-- Student Driver Card -->
             <div style="
               display: flex;
@@ -521,11 +649,11 @@ export function openLiveRideMapModal({
                 align-items: center;
                 justify-content: center;
                 font-weight: 900;
-                font-size: 0.85rem;
+                font-size: 0.9rem;
               ">👨‍🎓</div>
               <div>
                 <div style="font-size: 0.825rem; font-weight: 800; color: #ffffff;">${currentStudent.name}</div>
-                <div style="font-size: 0.68rem; color: #a1a1aa;">Driver (Student) · Day ${dayNumber}/20</div>
+                <div style="font-size: 0.68rem; color: #a1a1aa;">Driver (Candidate) · Day ${dayNumber}/20</div>
               </div>
             </div>
 
@@ -551,112 +679,111 @@ export function openLiveRideMapModal({
                 align-items: center;
                 justify-content: center;
                 font-weight: 900;
-                font-size: 0.85rem;
+                font-size: 0.9rem;
               ">👨‍🏫</div>
               <div>
                 <div style="font-size: 0.825rem; font-weight: 800; color: #ffffff;">${currentTrainer.name}</div>
-                <div style="font-size: 0.68rem; color: #22c55e;">Instructor · Dual-Controls Active</div>
+                <div style="font-size: 0.68rem; color: #22c55e;">Instructor · Dual-Control Car</div>
               </div>
             </div>
           </div>
 
-          <!-- Center: Driving Simulation Controls -->
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <button type="button" id="btn-play-pause-ride" style="
-              background: #ffffff;
-              color: #000000;
-              border: none;
-              padding: 0.55rem 1.25rem;
+          <!-- Center: Simulator / GPS Control Buttons -->
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <!-- Real GPS Refresh / Reconnect Button -->
+            <button type="button" id="btn-gps-reconnect" style="
+              background: rgba(34, 197, 94, 0.15);
+              border: 1px solid rgba(34, 197, 94, 0.4);
+              color: #22c55e;
+              padding: 0.55rem 1rem;
               border-radius: 8px;
-              font-size: 0.85rem;
+              font-size: 0.8rem;
               font-weight: 800;
               cursor: pointer;
               display: flex;
               align-items: center;
               gap: 0.4rem;
             ">
-              <span id="play-pause-icon">▶</span>
-              <span id="play-pause-text">Start Ride</span>
+              <span>🔄</span>
+              <span>Re-sync GPS</span>
             </button>
 
-            <!-- Speed Toggles -->
-            <div style="
-              display: flex;
-              background: rgba(255, 255, 255, 0.05);
-              border: 1px solid rgba(255, 255, 255, 0.1);
-              border-radius: 8px;
-              overflow: hidden;
-            ">
-              <button type="button" class="btn-speed-mult" data-speed="1" style="
-                background: transparent;
-                color: #a1a1aa;
-                border: none;
-                padding: 0.5rem 0.75rem;
-                font-size: 0.75rem;
-                font-weight: 800;
-                cursor: pointer;
-              ">1x</button>
-              <button type="button" class="btn-speed-mult active" data-speed="2" style="
+            <!-- Simulator Controls (Visible in Simulator Mode) -->
+            <div id="sim-controls-wrapper" style="display: none; align-items: center; gap: 0.45rem;">
+              <button type="button" id="btn-play-pause-sim" style="
                 background: #ffffff;
                 color: #000000;
                 border: none;
-                padding: 0.5rem 0.75rem;
-                font-size: 0.75rem;
+                padding: 0.55rem 1.15rem;
+                border-radius: 8px;
+                font-size: 0.85rem;
                 font-weight: 800;
                 cursor: pointer;
-              ">2x</button>
-              <button type="button" class="btn-speed-mult" data-speed="5" style="
-                background: transparent;
-                color: #a1a1aa;
-                border: none;
-                padding: 0.5rem 0.75rem;
-                font-size: 0.75rem;
-                font-weight: 800;
-                cursor: pointer;
-              ">5x</button>
-              <button type="button" class="btn-speed-mult" data-speed="10" style="
-                background: transparent;
-                color: #a1a1aa;
-                border: none;
-                padding: 0.5rem 0.75rem;
-                font-size: 0.75rem;
-                font-weight: 800;
-                cursor: pointer;
-              ">10x</button>
-            </div>
+                display: flex;
+                align-items: center;
+                gap: 0.4rem;
+              ">
+                <span id="sim-play-icon">▶</span>
+                <span id="sim-play-text">Start Simulation</span>
+              </button>
 
-            <!-- Fast-Forward to Finish -->
-            <button type="button" id="btn-fast-forward-finish" style="
-              background: rgba(34, 197, 94, 0.15);
-              border: 1px solid rgba(34, 197, 94, 0.4);
-              color: #22c55e;
-              padding: 0.55rem 1rem;
-              border-radius: 8px;
-              font-size: 0.78rem;
-              font-weight: 800;
-              cursor: pointer;
-              display: flex;
-              align-items: center;
-              gap: 0.35rem;
-            " title="Instantly complete 8.0 km ride">
-              <span>⏩</span>
-              <span>Fast Finish</span>
-            </button>
+              <div style="
+                display: flex;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                overflow: hidden;
+              ">
+                <button type="button" class="btn-speed-mult" data-speed="1" style="background:transparent; color:#a1a1aa; border:none; padding:0.5rem 0.65rem; font-size:0.75rem; font-weight:800; cursor:pointer;">1x</button>
+                <button type="button" class="btn-speed-mult active" data-speed="2" style="background:#ffffff; color:#000000; border:none; padding:0.5rem 0.65rem; font-size:0.75rem; font-weight:800; cursor:pointer;">2x</button>
+                <button type="button" class="btn-speed-mult" data-speed="5" style="background:transparent; color:#a1a1aa; border:none; padding:0.5rem 0.65rem; font-size:0.75rem; font-weight:800; cursor:pointer;">5x</button>
+                <button type="button" class="btn-speed-mult" data-speed="10" style="background:transparent; color:#a1a1aa; border:none; padding:0.5rem 0.65rem; font-size:0.75rem; font-weight:800; cursor:pointer;">10x</button>
+              </div>
+
+              <!-- Quick +500m Test Step -->
+              <button type="button" id="btn-step-500m" style="
+                background: rgba(245, 158, 11, 0.18);
+                border: 1px solid rgba(245, 158, 11, 0.4);
+                color: #fbbf24;
+                padding: 0.55rem 0.85rem;
+                border-radius: 8px;
+                font-size: 0.78rem;
+                font-weight: 800;
+                cursor: pointer;
+              " title="Instantly advance by 500 meters to test checkpoint">
+                +500m Checkpoint
+              </button>
+
+              <!-- Fast Finish -->
+              <button type="button" id="btn-fast-finish" style="
+                background: rgba(34, 197, 94, 0.15);
+                border: 1px solid rgba(34, 197, 94, 0.4);
+                color: #22c55e;
+                padding: 0.55rem 0.85rem;
+                border-radius: 8px;
+                font-size: 0.78rem;
+                font-weight: 800;
+                cursor: pointer;
+              ">
+                ⏩ Finish 8km
+              </button>
+            </div>
           </div>
 
-          <!-- Right: Direct Completion Trigger -->
+          <!-- Right: Save / Log Button -->
           <div>
             <button type="button" id="btn-complete-direct" style="
-              background: rgba(255, 255, 255, 0.08);
-              border: 1px solid rgba(255, 255, 255, 0.18);
-              color: #ffffff;
-              padding: 0.55rem 1.15rem;
+              background: #22c55e;
+              border: none;
+              color: #000000;
+              padding: 0.6rem 1.4rem;
               border-radius: 8px;
-              font-size: 0.8rem;
-              font-weight: 800;
+              font-size: 0.85rem;
+              font-weight: 900;
               cursor: pointer;
+              box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
             ">
-              Log 8 km Ride ✓
+              Log Day ${dayNumber} Ride (8.0 km) ✓
             </button>
           </div>
         </footer>
@@ -664,13 +791,15 @@ export function openLiveRideMapModal({
     </div>
   `;
 
-  let resizeHandler = null;
-
-  // Cleanup helper
+  // Cleanup on close
   const closeModal = () => {
-    if (animationTimer) {
-      clearInterval(animationTimer);
-      animationTimer = null;
+    if (activeWatchId !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(activeWatchId);
+      activeWatchId = null;
+    }
+    if (simulationTimer) {
+      clearInterval(simulationTimer);
+      simulationTimer = null;
     }
     if (activeLiveMap) {
       activeLiveMap.remove();
@@ -685,7 +814,7 @@ export function openLiveRideMapModal({
 
   modalRoot.querySelector('#btn-close-live-ride').addEventListener('click', closeModal);
 
-  // Initialize Leaflet Map after DOM injection
+  // Initialize Leaflet Map
   setTimeout(() => {
     try {
       const mapContainer = document.getElementById('live-ride-leaflet-map');
@@ -702,135 +831,95 @@ export function openLiveRideMapModal({
       });
       activeLiveMap = map;
 
-      // High-visibility crisp CartoDB Voyager tiles with OpenStreetMap fallback
-      const tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      // Reliable OpenStreetMap tiles with dark fallback
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        subdomains: 'abcd',
-        attribution: '&copy; OpenStreetMap &copy; CARTO'
-      });
-      tileLayer.on('tileerror', () => {
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19
-        }).addTo(map);
-      });
-      tileLayer.addTo(map);
+        subdomains: ['a', 'b', 'c'],
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
 
       const allCoords = track.map(t => [t.lat, t.lng]);
 
-      // 1. BASE ROAD CASING (Wide deep navy-black road boundary)
+      // Base Road Visual Layer (Wide dark asphalt)
       L.polyline(allCoords, {
         color: '#0f172a',
-        weight: 18,
-        opacity: 0.95,
+        weight: 16,
+        opacity: 0.9,
         lineCap: 'round',
         lineJoin: 'round'
       }).addTo(map);
 
-      // 2. INNER ROAD PAVEMENT (Solid Slate Asphalt)
+      // Inner Asphalt Pavement
       L.polyline(allCoords, {
         color: '#334155',
-        weight: 14,
-        opacity: 1,
+        weight: 12,
+        opacity: 0.95,
         lineCap: 'round',
         lineJoin: 'round'
       }).addTo(map);
 
-      // 3. ROAD CENTER DASHED LINE (Bright highway yellow dashes)
+      // Road Center Dashed Line
       L.polyline(allCoords, {
         color: '#facc15',
-        weight: 3,
-        opacity: 0.95,
-        dashArray: '10, 14',
+        weight: 2.5,
+        opacity: 0.9,
+        dashArray: '8, 12',
         lineCap: 'butt'
       }).addTo(map);
 
-      // 4. LIVE TRAVELED PATH POLYLINE (High-visibility Vibrant Emerald Green)
-      livePolyline = L.polyline([allCoords[0]], {
+      // Live Traveled Polyline (High-visibility Vibrant Emerald Green)
+      traveledCoords = [allCoords[0]];
+      livePolyline = L.polyline(traveledCoords, {
         color: '#16a34a',
-        weight: 8,
+        weight: 7,
         opacity: 0.95,
         lineCap: 'round',
         lineJoin: 'round'
       }).addTo(map);
 
-      // 5. START POINT ARCH (DEPOT)
+      // Start Marker (Depot 0.0 km)
       const startPos = allCoords[0];
       const startIcon = L.divIcon({
         className: 'gamified-start-marker',
         html: `
-          <div style="
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            transform: translate(-50%, -100%);
-          ">
-            <div style="
-              background: #16a34a;
-              color: #ffffff;
-              font-weight: 900;
-              font-size: 11px;
-              padding: 4px 10px;
-              border-radius: 6px;
-              white-space: nowrap;
-              box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-              border: 2px solid #ffffff;
-            ">🏁 START: DEPOT (0.0 km)</div>
-            <div style="width: 2px; height: 12px; background: #16a34a;"></div>
+          <div style="transform: translate(-50%, -100%); display:flex; flex-direction:column; align-items:center;">
+            <div style="background:#16a34a; color:#ffffff; font-weight:900; font-size:11px; padding:3px 8px; border-radius:6px; white-space:nowrap; border:2px solid #ffffff; box-shadow:0 4px 12px rgba(0,0,0,0.4);">
+              🏁 0.0 km DEPOT START
+            </div>
+            <div style="width:2px; height:10px; background:#16a34a;"></div>
           </div>
         `,
         iconSize: [0, 0]
       });
       L.marker(startPos, { icon: startIcon }).addTo(map);
 
-      // 6. FINISH POINT GATE (8.0 KM)
+      // Finish Marker (8.0 km Goal)
       const endPos = allCoords[allCoords.length - 1];
       const finishIcon = L.divIcon({
         className: 'gamified-finish-marker',
         html: `
-          <div style="
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            transform: translate(-50%, -100%);
-          ">
-            <div style="
-              background: #0f172a;
-              color: #facc15;
-              font-weight: 900;
-              font-size: 11px;
-              padding: 4px 10px;
-              border-radius: 6px;
-              white-space: nowrap;
-              box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-              border: 2px solid #facc15;
-            ">🏁 8.0 KM FINISH LINE</div>
-            <div style="width: 2px; height: 12px; background: #0f172a;"></div>
+          <div style="transform: translate(-50%, -100%); display:flex; flex-direction:column; align-items:center;">
+            <div style="background:#0f172a; color:#facc15; font-weight:900; font-size:11px; padding:3px 8px; border-radius:6px; white-space:nowrap; border:2px solid #facc15; box-shadow:0 4px 12px rgba(0,0,0,0.4);">
+              🏁 8.0 km FINISH
+            </div>
+            <div style="width:2px; height:10px; background:#0f172a;"></div>
           </div>
         `,
         iconSize: [0, 0]
       });
       L.marker(endPos, { icon: finishIcon }).addTo(map);
 
-      // 7. ROADSIDE TREES & CREATIVE ENVIRONMENT
+      // Roadside Trees
       trees.forEach(tree => {
         const treeIcon = L.divIcon({
           className: 'gamified-tree-marker',
-          html: `
-            <div style="
-              font-size: ${tree.size}px;
-              line-height: 1;
-              filter: drop-shadow(0 3px 6px rgba(0,0,0,0.3));
-              transform: translate(-50%, -50%);
-              user-select: none;
-              pointer-events: none;
-            ">${tree.variety.emoji}</div>
-          `,
+          html: `<div style="font-size:${tree.size}px; line-height:1; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3)); transform:translate(-50%, -50%); pointer-events:none;">${tree.variety.emoji}</div>`,
           iconSize: [0, 0]
         });
         L.marker([tree.lat, tree.lng], { icon: treeIcon }).addTo(map);
       });
 
-      // 8. 16 CHECKPOINT MILESTONE BEACONS (EVERY 500M)
+      // 16 Checkpoint Milestone Beacons (Every 500m)
       checkpointMarkers = checkpoints.map(cp => {
         const cpIcon = L.divIcon({
           className: `gamified-cp-marker cp-marker-${cp.id}`,
@@ -841,7 +930,7 @@ export function openLiveRideMapModal({
               border-radius: 50%;
               background: #ffffff;
               border: 2.5px solid #f59e0b;
-              box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+              box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
               display: flex;
               flex-direction: column;
               align-items: center;
@@ -859,16 +948,16 @@ export function openLiveRideMapModal({
 
         const marker = L.marker([cp.lat, cp.lng], { icon: cpIcon }).addTo(map);
         marker.bindPopup(`
-          <div style="color: #0f172a; font-size: 12px; padding: 2px;">
-            <b style="color: #b45309;">${cp.name} (${cp.label})</b><br>
+          <div style="color:#0f172a; font-size:12px; padding:2px;">
+            <b style="color:#b45309;">Checkpoint ${cp.id} (${cp.label})</b><br>
             <strong>${cp.title}</strong><br>
-            <span style="color: #64748b;">${cp.place}</span>
+            <span style="color:#64748b;">${cp.place}</span>
           </div>
         `);
         return { cp, marker };
       });
 
-      // 9. DUAL RIDER CAR MARKER (STUDENT + TRAINER)
+      // Dual Rider Moving Training Car Marker
       const carIcon = L.divIcon({
         className: 'gamified-dual-car-marker',
         html: `
@@ -884,45 +973,41 @@ export function openLiveRideMapModal({
               background: #0f172a;
               border: 1.5px solid #22c55e;
               border-radius: 6px;
-              padding: 3px 8px;
+              padding: 2px 7px;
               white-space: nowrap;
               display: flex;
               align-items: center;
-              gap: 6px;
-              font-size: 10px;
+              gap: 5px;
+              font-size: 9px;
               font-weight: 800;
               color: #ffffff;
-              box-shadow: 0 4px 14px rgba(0,0,0,0.4);
-              margin-bottom: 4px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+              margin-bottom: 3px;
             ">
               <span style="color: #38bdf8;">👨‍🎓 ${currentStudent.name.split(' ')[0]}</span>
-              <span style="color: #94a3b8;">·</span>
+              <span style="color: #64748b;">·</span>
               <span style="color: #4ade80;">👨‍🏫 ${currentTrainer.name.split(' ')[0]}</span>
             </div>
 
-            <!-- Moving High-Visibility Yellow Dual-Control Training Car SVG -->
+            <!-- Dual-Control Driving School Car -->
             <div id="car-rotation-node" style="
-              width: 40px;
-              height: 40px;
+              width: 38px;
+              height: 38px;
               background: #facc15;
-              border: 2.5px solid #0f172a;
+              border: 2px solid #0f172a;
               border-radius: 10px;
               display: flex;
               align-items: center;
               justify-content: center;
-              box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-              transition: transform 0.15s ease;
+              box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+              transition: transform 0.2s ease;
             ">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                 <rect x="5" y="3" width="14" height="18" rx="4" fill="#0f172a" stroke="#ffffff" stroke-width="1"/>
-                <!-- Front Windshield -->
                 <rect x="7" y="6" width="10" height="4" rx="1" fill="#38bdf8"/>
-                <!-- Rear Windshield -->
                 <rect x="7" y="15" width="10" height="3" rx="1" fill="#94a3b8"/>
-                <!-- Headlights -->
                 <circle cx="7" cy="4" r="1.5" fill="#fef08a"/>
                 <circle cx="17" cy="4" r="1.5" fill="#fef08a"/>
-                <!-- Driving School 'L' symbol on roof -->
                 <text x="9" y="14" font-size="9" font-weight="900" fill="#ef4444" font-family="sans-serif">L</text>
               </svg>
             </div>
@@ -933,11 +1018,11 @@ export function openLiveRideMapModal({
 
       carMarker = L.marker(startPos, { icon: carIcon }).addTo(map);
 
-      // Fit entire 8 km track so the user immediately sees the whole route with trees and checkpoints
+      // Fit map to full 8.0 km track bounds
       const trackBounds = L.polyline(allCoords).getBounds();
       map.fitBounds(trackBounds, { padding: [50, 50] });
 
-      // Force Leaflet recalculation so no grey/black map occurs
+      // Invalidate sizes to ensure zero grey areas
       map.invalidateSize();
       setTimeout(() => {
         map.invalidateSize();
@@ -950,147 +1035,44 @@ export function openLiveRideMapModal({
       resizeHandler = () => map.invalidateSize();
       window.addEventListener('resize', resizeHandler);
 
-      // CAMERA MODE TOGGLE
-      const btnToggleCam = modalRoot.querySelector('#btn-toggle-camera-mode');
-      const camIcon = modalRoot.querySelector('#cam-icon');
-      const camText = modalRoot.querySelector('#cam-text');
+      // =========================================================
+      // MILESTONE & HUD UPDATE CORE LOGIC
+      // =========================================================
+      function updateRideDistance(newTotalMeters, currentLat, currentLng, speedKmh = 0) {
+        if (isRideCompleted) return;
 
-      btnToggleCam.addEventListener('click', () => {
-        followCarMode = !followCarMode;
-        if (followCarMode) {
-          camIcon.textContent = '🔍';
-          camText.textContent = 'Follow Car Zoom';
-          const currPt = track[currentStep] || track[0];
-          map.setView([currPt.lat, currPt.lng], 17);
-        } else {
-          camIcon.textContent = '🗺️';
-          camText.textContent = '8 km Track Overview';
-          map.fitBounds(L.polyline(allCoords).getBounds(), { padding: [50, 50] });
-        }
-      });
+        totalDistanceMeters = Math.min(8000, Math.max(totalDistanceMeters, newTotalMeters));
+        const distKm = (totalDistanceMeters / 1000).toFixed(2);
 
-      // PLAY / PAUSE BUTTON
-      const btnPlayPause = modalRoot.querySelector('#btn-play-pause-ride');
-      const playPauseIcon = modalRoot.querySelector('#play-pause-icon');
-      const playPauseText = modalRoot.querySelector('#play-pause-text');
-
-      const startSimulation = () => {
-        if (isCompleted) return;
-        isPlaying = true;
-        playPauseIcon.textContent = '⏸';
-        playPauseText.textContent = 'Pause Ride';
-
-        if (animationTimer) clearInterval(animationTimer);
-
-        const intervalMs = Math.max(40, Math.floor(200 / speedMultiplier));
-
-        animationTimer = setInterval(() => {
-          if (currentStep >= track.length - 1) {
-            finishRide();
-            return;
-          }
-
-          currentStep++;
-          advanceToStep(currentStep);
-        }, intervalMs);
-      };
-
-      const pauseSimulation = () => {
-        isPlaying = false;
-        playPauseIcon.textContent = '▶';
-        playPauseText.textContent = 'Resume Ride';
-        if (animationTimer) {
-          clearInterval(animationTimer);
-          animationTimer = null;
-        }
-      };
-
-      btnPlayPause.addEventListener('click', () => {
-        if (isPlaying) {
-          pauseSimulation();
-        } else {
-          startSimulation();
-        }
-      });
-
-      // SPEED MULTIPLIER BUTTONS
-      modalRoot.querySelectorAll('.btn-speed-mult').forEach(btn => {
-        btn.addEventListener('click', () => {
-          modalRoot.querySelectorAll('.btn-speed-mult').forEach(b => {
-            b.classList.remove('active');
-            b.style.background = 'transparent';
-            b.style.color = '#a1a1aa';
-          });
-          btn.classList.add('active');
-          btn.style.background = '#ffffff';
-          btn.style.color = '#000000';
-          speedMultiplier = parseInt(btn.dataset.speed, 10);
-          if (isPlaying) {
-            startSimulation(); // restart with new interval
-          }
-        });
-      });
-
-      // FAST-FORWARD TO FINISH
-      modalRoot.querySelector('#btn-fast-forward-finish').addEventListener('click', () => {
-        currentStep = track.length - 1;
-        advanceToStep(currentStep);
-        finishRide();
-      });
-
-      // DIRECT COMPLETION BUTTON
-      const handleCompleteRide = () => {
-        store.completeSession(currentStudent.id, dayNumber, {
-          instructorNotes: `Day ${dayNumber} live 8.0 km ride successfully completed under Instructor ${currentTrainer.name}.`
-        });
-        if (onRideCompleted) onRideCompleted();
-        closeModal();
-      };
-
-      modalRoot.querySelector('#btn-complete-direct').addEventListener('click', handleCompleteRide);
-      modalRoot.querySelector('#btn-save-completed-ride').addEventListener('click', handleCompleteRide);
-
-      // STEP ADVANCE FUNCTION
-      function advanceToStep(stepIdx) {
-        const pt = track[stepIdx];
-        if (!pt) return;
-
-        // 1. Move Car Marker
-        carMarker.setLatLng([pt.lat, pt.lng]);
-
-        // 2. Rotate Car Heading
-        if (stepIdx < track.length - 1) {
-          const nextPt = track[stepIdx + 1];
-          const bearing = calculateBearing([pt.lat, pt.lng], [nextPt.lat, nextPt.lng]);
-          const rotNode = document.getElementById('car-rotation-node');
-          if (rotNode) {
-            rotNode.style.transform = `rotate(${bearing}deg)`;
-          }
-        }
-
-        // 3. Update Traveled Path
-        const coveredCoords = track.slice(0, stepIdx + 1).map(t => [t.lat, t.lng]);
-        livePolyline.setLatLngs(coveredCoords);
-
-        // 4. Update Odometer & Speed HUD
+        // Update Odometer
         const distKmElem = document.getElementById('hud-distance-km');
-        if (distKmElem) distKmElem.textContent = pt.distanceKm;
+        if (distKmElem) distKmElem.textContent = distKm;
 
+        const distMElem = document.getElementById('hud-distance-meters');
+        if (distMElem) distMElem.textContent = `(${Math.round(totalDistanceMeters)} m)`;
+
+        // Update Speed
         const speedElem = document.getElementById('hud-speed');
-        if (speedElem) {
-          const simulatedSpeed = 26 + Math.round((Math.sin(stepIdx / 5) + 1) * 4);
-          speedElem.textContent = simulatedSpeed;
+        if (speedElem) speedElem.textContent = Math.round(speedKmh);
+
+        // Update Map Marker & Traveled Path
+        if (carMarker) carMarker.setLatLng([currentLat, currentLng]);
+
+        traveledCoords.push([currentLat, currentLng]);
+        if (livePolyline) livePolyline.setLatLngs(traveledCoords);
+
+        if (followCarMode && map) {
+          map.panTo([currentLat, currentLng], { animate: true, duration: 0.25 });
         }
 
-        // 5. Follow Car Camera if active
-        if (followCarMode) {
-          map.panTo([pt.lat, pt.lng], { animate: true, duration: 0.15 });
-        }
+        // Update Coordinates HUD
+        const coordsElem = document.getElementById('gps-coords');
+        if (coordsElem) coordsElem.textContent = `${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
 
-        // 6. Checkpoint Crossing Detection (500m intervals)
+        // Check 16 Checkpoints (Every 500m)
         let clearedCount = 0;
         checkpoints.forEach(cp => {
-          if (pt.distanceMeters >= cp.distanceMeters) {
+          if (totalDistanceMeters >= cp.distanceMeters) {
             clearedCount++;
             if (!cp.cleared) {
               cp.cleared = true;
@@ -1101,11 +1083,30 @@ export function openLiveRideMapModal({
 
         const cpCountElem = document.getElementById('hud-checkpoints-cleared');
         if (cpCountElem) cpCountElem.textContent = clearedCount;
+
+        // Next 500m Target Countdown
+        const nextCp = checkpoints.find(c => !c.cleared);
+        const nextDistElem = document.getElementById('hud-next-checkpoint-dist');
+        if (nextDistElem) {
+          if (nextCp) {
+            const remainingM = Math.max(0, Math.round(nextCp.distanceMeters - totalDistanceMeters));
+            nextDistElem.textContent = `${remainingM}m to ${nextCp.label}`;
+          } else {
+            nextDistElem.textContent = 'Goal Reached! 🏁';
+          }
+        }
+
+        // Trigger finish if 8000m reached
+        if (totalDistanceMeters >= 8000) {
+          finishRide();
+        }
       }
 
-      // TRIGGER CHECKPOINT CLEARED
       function triggerCheckpointReached(cp) {
-        // Milestone segment glow
+        // Play Chime
+        playMilestoneChime();
+
+        // Milestone ribbon glow
         const seg = document.getElementById(`prog-seg-${cp.id}`);
         if (seg) {
           seg.style.background = '#22c55e';
@@ -1114,64 +1115,323 @@ export function openLiveRideMapModal({
           seg.innerHTML = `✓ ${cp.label}`;
         }
 
-        // Map marker beacon transition
+        // Map beacon marker transition
         const beacon = document.getElementById(`cp-beacon-${cp.id}`);
         if (beacon) {
           beacon.style.borderColor = '#ffffff';
           beacon.style.background = '#16a34a';
-          beacon.style.boxShadow = '0 0 16px rgba(22, 163, 74, 0.8)';
-          beacon.innerHTML = `
-            <span style="font-size: 13px; font-weight: 900; color: #ffffff;">✓</span>
-          `;
+          beacon.style.boxShadow = '0 0 18px rgba(22, 163, 74, 0.9)';
+          beacon.innerHTML = `<span style="font-size: 13px; font-weight: 900; color: #ffffff;">✓</span>`;
         }
 
-        // Floating toast banner
+        // Toast celebration banner
         const banner = document.getElementById('checkpoint-toast-banner');
         const text = document.getElementById('checkpoint-toast-text');
         if (banner && text) {
-          text.textContent = `Checkpoint ${cp.id}/16 (${cp.label}) Cleared! · ${cp.title}`;
+          text.textContent = `Checkpoint ${cp.id}/16 Cleared (${cp.label}) · ${cp.title} (+500m)`;
           banner.style.opacity = '1';
           banner.style.transform = 'translateX(-50%) translateY(0)';
           setTimeout(() => {
             banner.style.opacity = '0';
             banner.style.transform = 'translateX(-50%) translateY(-30px)';
-          }, 2400);
+          }, 2600);
         }
       }
 
-      // FINISH RIDE FUNCTION
       function finishRide() {
-        if (isCompleted) return;
-        isCompleted = true;
-        pauseSimulation();
+        if (isRideCompleted) return;
+        isRideCompleted = true;
 
-        // Ensure 8.00 km is shown
-        const distKmElem = document.getElementById('hud-distance-km');
-        if (distKmElem) distKmElem.textContent = '8.00';
+        if (simulationTimer) clearInterval(simulationTimer);
+        if (activeWatchId !== null && navigator.geolocation) {
+          navigator.geolocation.clearWatch(activeWatchId);
+          activeWatchId = null;
+        }
 
-        const cpCountElem = document.getElementById('hud-checkpoints-cleared');
-        if (cpCountElem) cpCountElem.textContent = '16';
-
-        // Clear all 16 checkpoints
+        // Complete all 16 checkpoints
         checkpoints.forEach(cp => {
-          cp.cleared = true;
-          triggerCheckpointReached(cp);
+          if (!cp.cleared) {
+            cp.cleared = true;
+            triggerCheckpointReached(cp);
+          }
         });
 
-        // Show Ceremony Modal
         const ceremony = document.getElementById('finish-ride-ceremony');
-        if (ceremony) {
-          ceremony.style.display = 'flex';
+        if (ceremony) ceremony.style.display = 'flex';
+      }
+
+      // =========================================================
+      // REAL DEVICE GPS TRACKING ENGINE
+      // =========================================================
+      function startRealGpsTracking() {
+        const statusBadge = document.getElementById('gps-status-badge');
+        const statusText = document.getElementById('gps-status-text');
+
+        if (!navigator.geolocation) {
+          if (statusBadge && statusText) {
+            statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+            statusBadge.style.borderColor = '#ef4444';
+            statusBadge.style.color = '#ef4444';
+            statusText.textContent = 'GPS NOT SUPPORTED — SWITCH TO SIMULATOR';
+          }
+          return;
+        }
+
+        if (activeWatchId !== null) {
+          navigator.geolocation.clearWatch(activeWatchId);
+          activeWatchId = null;
+        }
+
+        if (statusText) statusText.textContent = 'ACQUIRING SATELLITE FIX...';
+
+        activeWatchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude, accuracy, speed, heading } = position.coords;
+            gpsAccuracyMeters = accuracy;
+
+            // Update GPS accuracy pill
+            const accElem = document.getElementById('gps-accuracy');
+            if (accElem) accElem.textContent = `± ${Math.round(accuracy)}m`;
+
+            if (statusBadge && statusText) {
+              statusBadge.style.background = 'rgba(34, 197, 94, 0.2)';
+              statusBadge.style.borderColor = '#22c55e';
+              statusBadge.style.color = '#22c55e';
+              statusText.textContent = `LIVE GPS ACTIVE (±${Math.round(accuracy)}m)`;
+            }
+
+            const now = Date.now();
+            let stepDistanceMeters = 0;
+            let calculatedSpeedKmh = speed ? (speed * 3.6) : 0;
+
+            if (lastGpsPoint) {
+              const dMeters = haversineMeters([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
+              // Ignore stationary jitter (< 2.5m)
+              if (dMeters >= 2.5) {
+                stepDistanceMeters = dMeters;
+                const dSeconds = (now - lastGpsTime) / 1000;
+                if (!speed && dSeconds > 0) {
+                  calculatedSpeedKmh = (dMeters / dSeconds) * 3.6;
+                }
+
+                // Update Heading Rotation
+                const bearing = calculateBearing([lastGpsPoint.lat, lastGpsPoint.lng], [latitude, longitude]);
+                const rotNode = document.getElementById('car-rotation-node');
+                if (rotNode) rotNode.style.transform = `rotate(${bearing}deg)`;
+
+                lastGpsPoint = { lat: latitude, lng: longitude };
+                lastGpsTime = now;
+              }
+            } else {
+              lastGpsPoint = { lat: latitude, lng: longitude };
+              lastGpsTime = now;
+              // Center map on student's first GPS location
+              if (map) map.setView([latitude, longitude], 17);
+            }
+
+            const newTotalMeters = totalDistanceMeters + stepDistanceMeters;
+            updateRideDistance(newTotalMeters, latitude, longitude, calculatedSpeedKmh);
+          },
+          (error) => {
+            console.warn('GPS Warning:', error);
+            if (statusBadge && statusText) {
+              statusBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+              statusBadge.style.borderColor = '#f59e0b';
+              statusBadge.style.color = '#fbbf24';
+              statusText.textContent = 'GPS WAITING / DENIED — TRY SIMULATOR';
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 1000,
+            timeout: 15000
+          }
+        );
+      }
+
+      // =========================================================
+      // DRIVE SIMULATOR ENGINE (FOR DESKTOP / INDOOR DEMO)
+      // =========================================================
+      function startSimulation() {
+        if (isRideCompleted) return;
+        isSimPlaying = true;
+        const playIcon = document.getElementById('sim-play-icon');
+        const playText = document.getElementById('sim-play-text');
+        if (playIcon) playIcon.textContent = '⏸';
+        if (playText) playText.textContent = 'Pause Simulation';
+
+        if (simulationTimer) clearInterval(simulationTimer);
+
+        const intervalMs = Math.max(40, Math.floor(180 / simSpeedMultiplier));
+
+        simulationTimer = setInterval(() => {
+          if (simStep >= track.length - 1) {
+            finishRide();
+            return;
+          }
+
+          simStep++;
+          const pt = track[simStep];
+          if (!pt) return;
+
+          // Rotate heading
+          if (simStep < track.length - 1) {
+            const nextPt = track[simStep + 1];
+            const bearing = calculateBearing([pt.lat, pt.lng], [nextPt.lat, nextPt.lng]);
+            const rotNode = document.getElementById('car-rotation-node');
+            if (rotNode) rotNode.style.transform = `rotate(${bearing}deg)`;
+          }
+
+          const simSpeed = 28 + Math.round((Math.sin(simStep / 6) + 1) * 6);
+          updateRideDistance(pt.distanceMeters, pt.lat, pt.lng, simSpeed);
+        }, intervalMs);
+      }
+
+      function pauseSimulation() {
+        isSimPlaying = false;
+        const playIcon = document.getElementById('sim-play-icon');
+        const playText = document.getElementById('sim-play-text');
+        if (playIcon) playIcon.textContent = '▶';
+        if (playText) playText.textContent = 'Resume Simulation';
+
+        if (simulationTimer) {
+          clearInterval(simulationTimer);
+          simulationTimer = null;
         }
       }
 
-      // AUTO-START SIMULATION ON LAUNCH
-      setTimeout(() => {
+      // Mode Switch: Real GPS vs Simulator
+      const btnModeGps = modalRoot.querySelector('#btn-mode-gps');
+      const btnModeSim = modalRoot.querySelector('#btn-mode-sim');
+      const simControlsWrapper = modalRoot.querySelector('#sim-controls-wrapper');
+      const btnGpsReconnect = modalRoot.querySelector('#btn-gps-reconnect');
+
+      btnModeGps.addEventListener('click', () => {
+        activeMode = 'gps';
+        btnModeGps.style.background = '#22c55e';
+        btnModeGps.style.color = '#000000';
+        btnModeSim.style.background = 'transparent';
+        btnModeSim.style.color = '#a1a1aa';
+        simControlsWrapper.style.display = 'none';
+        btnGpsReconnect.style.display = 'flex';
+        pauseSimulation();
+        startRealGpsTracking();
+      });
+
+      btnModeSim.addEventListener('click', () => {
+        activeMode = 'simulator';
+        btnModeSim.style.background = '#ffffff';
+        btnModeSim.style.color = '#000000';
+        btnModeGps.style.background = 'transparent';
+        btnModeGps.style.color = '#a1a1aa';
+        simControlsWrapper.style.display = 'flex';
+        btnGpsReconnect.style.display = 'none';
+
+        if (activeWatchId !== null && navigator.geolocation) {
+          navigator.geolocation.clearWatch(activeWatchId);
+          activeWatchId = null;
+        }
+
+        const statusBadge = document.getElementById('gps-status-badge');
+        const statusText = document.getElementById('gps-status-text');
+        if (statusBadge && statusText) {
+          statusBadge.style.background = 'rgba(56, 189, 248, 0.2)';
+          statusBadge.style.borderColor = '#38bdf8';
+          statusBadge.style.color = '#38bdf8';
+          statusText.textContent = 'SIMULATOR DRIVE ACTIVE (500M INTERVALS)';
+        }
+
         startSimulation();
-      }, 400);
+      });
+
+      // GPS Reconnect Click
+      btnGpsReconnect.addEventListener('click', () => {
+        startRealGpsTracking();
+      });
+
+      // Simulator Play/Pause
+      const btnPlayPauseSim = modalRoot.querySelector('#btn-play-pause-sim');
+      btnPlayPauseSim?.addEventListener('click', () => {
+        if (isSimPlaying) {
+          pauseSimulation();
+        } else {
+          startSimulation();
+        }
+      });
+
+      // Simulator Speed Multipliers
+      modalRoot.querySelectorAll('.btn-speed-mult').forEach(btn => {
+        btn.addEventListener('click', () => {
+          modalRoot.querySelectorAll('.btn-speed-mult').forEach(b => {
+            b.classList.remove('active');
+            b.style.background = 'transparent';
+            b.style.color = '#a1a1aa';
+          });
+          btn.classList.add('active');
+          btn.style.background = '#ffffff';
+          btn.style.color = '#000000';
+          simSpeedMultiplier = parseInt(btn.dataset.speed, 10);
+          if (isSimPlaying) {
+            startSimulation();
+          }
+        });
+      });
+
+      // +500m Checkpoint Step Button
+      modalRoot.querySelector('#btn-step-500m')?.addEventListener('click', () => {
+        const nextTargetM = Math.min(8000, totalDistanceMeters + 500);
+        const closest = track.reduce((prev, curr) => 
+          Math.abs(curr.distanceMeters - nextTargetM) < Math.abs(prev.distanceMeters - nextTargetM) ? curr : prev
+        );
+        simStep = closest.step;
+        updateRideDistance(nextTargetM, closest.lat, closest.lng, 35);
+      });
+
+      // Fast-forward to finish
+      modalRoot.querySelector('#btn-fast-finish')?.addEventListener('click', () => {
+        const lastPt = track[track.length - 1];
+        simStep = track.length - 1;
+        updateRideDistance(8000, lastPt.lat, lastPt.lng, 40);
+        finishRide();
+      });
+
+      // Camera Follow Toggle
+      const btnToggleCam = modalRoot.querySelector('#btn-toggle-camera-mode');
+      const camIcon = modalRoot.querySelector('#cam-icon');
+      const camText = modalRoot.querySelector('#cam-text');
+
+      btnToggleCam?.addEventListener('click', () => {
+        followCarMode = !followCarMode;
+        if (followCarMode) {
+          camIcon.textContent = '🔍';
+          camText.textContent = 'Follow Car';
+          if (lastGpsPoint) {
+            map.setView([lastGpsPoint.lat, lastGpsPoint.lng], 17);
+          }
+        } else {
+          camIcon.textContent = '🗺️';
+          camText.textContent = 'Full Route';
+          map.fitBounds(L.polyline(allCoords).getBounds(), { padding: [50, 50] });
+        }
+      });
+
+      // Save & Complete Ride Handler
+      const handleSaveRide = () => {
+        store.completeSession(currentStudent.id, dayNumber, {
+          instructorNotes: `Day ${dayNumber} live 8.0 km ride completed with 16 500m checkpoints logged.`
+        });
+        if (onRideCompleted) onRideCompleted();
+        closeModal();
+      };
+
+      modalRoot.querySelector('#btn-complete-direct')?.addEventListener('click', handleSaveRide);
+      modalRoot.querySelector('#btn-save-completed-ride')?.addEventListener('click', handleSaveRide);
+
+      // Initialize real GPS tracking immediately
+      startRealGpsTracking();
 
     } catch (err) {
-      console.error('Failed to initialize Gamified Live Map:', err);
+      console.error('Failed to initialize Live Ride GPS Map:', err);
     }
   }, 100);
 }
